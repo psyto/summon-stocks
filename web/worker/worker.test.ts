@@ -34,20 +34,23 @@ function req(path: string, init: RequestInit = {}, country = "JP", ip = "203.0.1
   return Object.assign(r, { cf: { country } });
 }
 
-const domain = { name: "Summon", version: "1", chainId: 84532 } as const;
+const domain = { name: "Summon", version: "2", chainId: 84532 } as const;
 const types = {
   Intent: [
     { name: "ticker", type: "string" },
+    { name: "token", type: "address" },
     { name: "usd", type: "uint256" },
     { name: "expiry", type: "uint256" },
     { name: "nonce", type: "uint256" },
   ],
 } as const;
 
-async function intent(e: never, acct: ReturnType<typeof privateKeyToAccount>, ticker: string, usd: number, ip = "203.0.113.7") {
-  const message = { ticker, usd: BigInt(usd), expiry: BigInt(Math.floor(Date.now() / 1000) + 86_400), nonce: BigInt(Date.now()) };
+const tokenOf = new Map((JSON.parse(snapshot) as { stocks: { ticker: string; address: `0x${string}` }[] }).stocks.map((s) => [s.ticker, s.address]));
+
+async function intent(e: never, acct: ReturnType<typeof privateKeyToAccount>, ticker: string, usd: number, ip = "203.0.113.7", token = tokenOf.get(ticker)!) {
+  const message = { ticker, token, usd: BigInt(usd), expiry: BigInt(Math.floor(Date.now() / 1000) + 86_400), nonce: BigInt(Date.now()) };
   const signature = await acct.signTypedData({ domain, types, primaryType: "Intent", message });
-  const body = JSON.stringify({ ticker, usd, expiry: Number(message.expiry), nonce: Number(message.nonce), address: acct.address, signature });
+  const body = JSON.stringify({ ticker, token, usd, expiry: Number(message.expiry), nonce: Number(message.nonce), address: acct.address, signature });
   return worker.fetch(req("/api/intents", { method: "POST", body, headers: { "content-type": "application/json" } }, "JP", ip), e);
 }
 
@@ -86,20 +89,31 @@ const tests: [string, () => Promise<void>][] = [
       const a = privateKeyToAccount(generatePrivateKey());
       await intent(e, a, "SOFI", 120);
       const body = (await (await worker.fetch(req("/api/demand?ticker=SOFI"), e)).json()) as {
-        intents: { ticker: string; address: string; usd: number; expiry: number; nonce: number; signature: `0x${string}` }[];
+        intents: { ticker: string; token: `0x${string}`; address: string; usd: number; expiry: number; nonce: number; signature: `0x${string}` }[];
       };
       assert.equal(body.intents.length, 1);
       const it = body.intents[0]!;
+      assert.equal(it.token, tokenOf.get("SOFI"));
       const { verifyTypedData } = await import("viem");
       const ok = await verifyTypedData({
         address: a.address,
         domain,
         types,
         primaryType: "Intent",
-        message: { ticker: it.ticker, usd: BigInt(it.usd), expiry: BigInt(it.expiry), nonce: BigInt(it.nonce) },
+        message: { ticker: it.ticker, token: it.token, usd: BigInt(it.usd), expiry: BigInt(it.expiry), nonce: BigInt(it.nonce) },
         signature: it.signature,
       });
       assert.equal(ok, true);
+    },
+  ],
+  [
+    "an intent naming another contract for the ticker is refused",
+    async () => {
+      const e = env();
+      const a = privateKeyToAccount(generatePrivateKey());
+      const r = await intent(e, a, "SOFI", 50, "203.0.113.7", tokenOf.get("RKT"));
+      assert.equal(r.status, 400);
+      assert.match(((await r.json()) as { error: string }).error, /not the registered contract for SOFI/);
     },
   ],
   [

@@ -2,12 +2,13 @@
  * Summon's Worker: serves the page (static assets) and stores signed, non-binding intents.
  *
  *   GET  /api/intents        -> { [ticker]: { backers, usd } }
- *   POST /api/intents        <- { ticker, usd, expiry, nonce, address, signature }
+ *   POST /api/intents        <- { ticker, token, usd, expiry, nonce, address, signature }
  *   GET  /api/demand         -> every unexpired intent with its signature, so an issuer can verify the
  *                               totals itself instead of trusting this Worker (?ticker=GME narrows it)
  *
- * Each intent is an EIP-712 signature checked here. One intent per wallet per ticker (a new one
- * replaces the old). The demo wallets are refused, so the board never counts our own signatures.
+ * Each intent is an EIP-712 signature checked here. It names the stock by ticker and by its B20 contract
+ * address, and the address must match the snapshot (Base's docs: identify stocks by address, since a
+ * symbol can change). One intent per wallet per stock (a new one replaces the old). The demo wallets are refused, so the board never counts our own signatures.
  */
 import { verifyTypedData, getAddress, isAddress } from "viem";
 
@@ -30,10 +31,11 @@ const BLOCKED_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"
 <style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#ecf0ec;color:#14211c;font:17px/1.5 system-ui,sans-serif;padding:24px}main{max-width:34em}h1{color:#0e4a3b;font-size:28px;margin:0 0 12px}</style></head>
 <body><main><h1>Summon is not available in the United States.</h1><p>Coinbase tokenized stocks are not offered to US persons, and Summon is not offered there either.</p></main></body></html>`;
 
-const DOMAIN = { name: "Summon", version: "1", chainId: 84532 } as const;
+const DOMAIN = { name: "Summon", version: "2", chainId: 84532 } as const;
 const TYPES = {
   Intent: [
     { name: "ticker", type: "string" },
+    { name: "token", type: "address" },
     { name: "usd", type: "uint256" },
     { name: "expiry", type: "uint256" },
     { name: "nonce", type: "uint256" },
@@ -61,10 +63,10 @@ async function summary(env: Env): Promise<Summary> {
   return ((await env.INTENTS.get("summary", "json")) as Summary | null) ?? {};
 }
 
-async function tickers(env: Env, req: Request): Promise<Map<string, { status: string; pyth: boolean }>> {
+async function tickers(env: Env, req: Request): Promise<Map<string, { address: string; status: string; pyth: boolean }>> {
   const res = await env.ASSETS.fetch(new URL("/b20.json", req.url));
-  const snap = (await res.json()) as { stocks: { ticker: string; status: string; pythFeed: string | null }[] };
-  return new Map(snap.stocks.map((s) => [s.ticker, { status: s.status, pyth: !!s.pythFeed }]));
+  const snap = (await res.json()) as { stocks: { ticker: string; address: string; status: string; pythFeed: string | null }[] };
+  return new Map(snap.stocks.map((s) => [s.ticker, { address: s.address, status: s.status, pyth: !!s.pythFeed }]));
 }
 
 async function underLimit(env: Env, req: Request, address: string, isNew: boolean): Promise<string | null> {
@@ -88,21 +90,23 @@ async function underLimit(env: Env, req: Request, address: string, isNew: boolea
 }
 
 async function post(req: Request, env: Env): Promise<Response> {
-  let b: { ticker?: string; usd?: number; expiry?: number; nonce?: number; address?: string; signature?: string };
+  let b: { ticker?: string; token?: string; usd?: number; expiry?: number; nonce?: number; address?: string; signature?: string };
   try {
     b = await req.json();
   } catch {
-    return json({ error: "Send JSON: ticker, usd, expiry, nonce, address, signature." }, 400);
+    return json({ error: "Send JSON: ticker, token, usd, expiry, nonce, address, signature." }, 400);
   }
-  const { ticker, usd, expiry, nonce, address, signature } = b;
-  if (!ticker || !Number.isInteger(usd) || !Number.isInteger(expiry) || !Number.isInteger(nonce) || !address || !signature) {
-    return json({ error: "Missing a field: ticker, usd, expiry, nonce, address and signature are all required." }, 400);
+  const { ticker, token, usd, expiry, nonce, address, signature } = b;
+  if (!ticker || !token || !Number.isInteger(usd) || !Number.isInteger(expiry) || !Number.isInteger(nonce) || !address || !signature) {
+    return json({ error: "Missing a field: ticker, token, usd, expiry, nonce, address and signature are all required." }, 400);
   }
   if (!isAddress(address)) return json({ error: "address is not an Ethereum address." }, 400);
+  if (!isAddress(token)) return json({ error: "token is not a contract address." }, 400);
   if (usd! < 1 || usd! > MAX_USD) return json({ error: `usd must be between 1 and ${MAX_USD}.` }, 400);
   if (expiry! < Date.now() / 1000) return json({ error: "This intent has expired. Sign a new one." }, 400);
   const known = (await tickers(env, req)).get(ticker);
   if (!known) return json({ error: `${ticker} is not a registered tokenized stock.` }, 400);
+  if (getAddress(token) !== getAddress(known.address)) return json({ error: `token is not the registered contract for ${ticker} (${known.address}).` }, 400);
   if (known.status === "trading") return json({ error: `${ticker} already trades on Base.` }, 400);
   if (DEMO_WALLETS.has(address.toLowerCase())) return json({ error: "Demo wallets cannot sign intents; they would inflate the board." }, 403);
 
@@ -111,16 +115,16 @@ async function post(req: Request, env: Env): Promise<Response> {
     domain: DOMAIN,
     types: TYPES,
     primaryType: "Intent",
-    message: { ticker, usd: BigInt(usd!), expiry: BigInt(expiry!), nonce: BigInt(nonce!) },
+    message: { ticker, token: getAddress(token), usd: BigInt(usd!), expiry: BigInt(expiry!), nonce: BigInt(nonce!) },
     signature: signature as `0x${string}`,
   }).catch(() => false);
   if (!ok) return json({ error: "The signature does not match this address and intent." }, 401);
 
-  const key = `i:${ticker}:${address.toLowerCase()}`;
+  const key = `i:${token.toLowerCase()}:${address.toLowerCase()}`;
   const prev = (await env.INTENTS.get(key, "json")) as { usd: number } | null;
   const limited = await underLimit(env, req, address.toLowerCase(), !prev);
   if (limited) return json({ error: limited }, 429);
-  await env.INTENTS.put(key, JSON.stringify({ usd, expiry, nonce, signature, at: Date.now() }));
+  await env.INTENTS.put(key, JSON.stringify({ ticker, token: getAddress(token), usd, expiry, nonce, signature, at: Date.now() }));
   const s = await summary(env);
   const row = s[ticker] ?? { backers: 0, usd: 0 };
   s[ticker] = { backers: row.backers + (prev ? 0 : 1), usd: row.usd - (prev?.usd ?? 0) + usd! };
@@ -129,16 +133,18 @@ async function post(req: Request, env: Env): Promise<Response> {
 }
 
 async function demand(req: Request, env: Env): Promise<Response> {
-  const only = new URL(req.url).searchParams.get("ticker") ?? undefined;
+  const ticker = new URL(req.url).searchParams.get("ticker");
+  const only = ticker ? (await tickers(env, req)).get(ticker)?.address.toLowerCase() : undefined;
+  if (ticker && !only) return json({ error: `${ticker} is not a registered tokenized stock.` }, 400);
   const rows: Record<string, unknown>[] = [];
   let cursor: string | undefined;
   do {
     const page = await env.INTENTS.list({ prefix: only ? `i:${only}:` : "i:", cursor });
     for (const k of page.keys) {
-      const [, ticker, address] = k.name.split(":");
-      const v = (await env.INTENTS.get(k.name, "json")) as { usd: number; expiry: number; nonce: number; signature: string } | null;
+      const address = k.name.split(":")[2];
+      const v = (await env.INTENTS.get(k.name, "json")) as { ticker: string; token: string; usd: number; expiry: number; nonce: number; signature: string } | null;
       if (!v || v.expiry < Date.now() / 1000) continue;
-      rows.push({ ticker, address, usd: v.usd, expiry: v.expiry, nonce: v.nonce, signature: v.signature });
+      rows.push({ ticker: v.ticker, token: v.token, address, usd: v.usd, expiry: v.expiry, nonce: v.nonce, signature: v.signature });
     }
     cursor = page.list_complete ? undefined : page.cursor;
   } while (cursor);

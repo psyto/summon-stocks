@@ -10,6 +10,7 @@
     "test:worker": "tsx worker/worker.test.ts"
   },
   "dependencies": {
+    "ox": "0.14.33",
     "viem": "2.55.11"
   },
   "devDependencies": {

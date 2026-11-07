@@ -101,10 +101,17 @@ export type RoundState = (typeof STATES)[number];
 export const POLICY_REGISTRY = "0x8453000000000000000000000000000000000002" as const;
 
 /** EIP-712 intent: a signature, not a payment. */
-export const intentDomain = { name: "Summon", version: "1", chainId: baseSepolia.id } as const;
+/** Base Builder Code (ERC-8021), from Base Dashboard. It is public: every transaction carries it. Empty
+ * until the project is registered; then the page's transactions (not the demo scripts') are attributed. */
+export const BUILDER_CODE = "";
+
+/** v2 (2026-11-08) signs the token's contract address too: Base's docs say to identify a stock by address,
+ * because its symbol can be changed. v1 signatures no longer verify. */
+export const intentDomain = { name: "Summon", version: "2", chainId: baseSepolia.id } as const;
 export const intentTypes = {
   Intent: [
     { name: "ticker", type: "string" },
+    { name: "token", type: "address" },
     { name: "usd", type: "uint256" },
     { name: "expiry", type: "uint256" },
     { name: "nonce", type: "uint256" },

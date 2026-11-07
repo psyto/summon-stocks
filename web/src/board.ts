@@ -145,7 +145,7 @@ function register(s: Snapshot, totals: Totals): HTMLElement {
       sign.setAttribute("disabled", "");
       msg.textContent = "Check your wallet to sign.";
       try {
-        const r = await signIntent(x.ticker, n);
+        const r = await signIntent(x.ticker, x.address as `0x${string}`, n);
         totals[x.ticker] = r;
         msg.textContent = `Signed. ${x.ticker} now has ${usd(r.usd)} from ${r.backers} ${r.backers === 1 ? "backer" : "backers"}.`;
         draw();

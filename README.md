@@ -53,10 +53,11 @@ track). **Testnet only (Base Sepolia).** Mainnet data is only read and shown.
 | Base Sepolia deployment | done 2026-11-07: factory, hook, swap router, registries and five real B20 demo stocks (see below). Open rounds: sGME [`0xa799…046D`](https://sepolia.basescan.org/address/0xa799fC499Af97a474D02878fC10fB8B733b1046D) and sSOFI [`0xAae4…DbEE`](https://sepolia.basescan.org/address/0xAae40400113c32D8D0345EBad6F781E56ECDDbEE) (both target 300 tUSDC) |
 | Guard (`ts/guard.ts`) | done: Nasdaq halts and, for guard pricing, the quote. It writes nothing while the market is closed |
 | End-to-end fill on Base Sepolia (`ts/e2e.ts`) | scripted. It picks up the stock's open round wherever it stands, so pledges made from the web page count. First run when the market opens (weekdays 09:30–16:00 ET) |
-| Web (`web/`) | built 2026-11-07: the register of all 298 stocks; live round pages; signed intents, with a round opening from the register once a demo stock's intents reach $250; trading a summoned pool; a demand export issuers can verify; the US block and per-network limits (7 Worker tests). Runs locally; goes public once the Codex review is addressed |
+| Web (`web/`) | built 2026-11-07: the register of all 298 stocks; live round pages; signed intents, with a round opening from the register once a demo stock's intents reach $250; trading a summoned pool; a demand export issuers can verify; the US block and per-network limits (8 Worker tests). Runs locally; goes public once the Codex review is addressed |
 | Demand from elsewhere | planned (from 2026-11-14): marks on the register for never-minted stocks that already trade elsewhere, by amount, not by listing. Hyperliquid HIP-3 open interest and volume; Robinhood Chain token supply. Display only: fills still price from Pyth. Counts are under "The numbers" |
 
-First use (2026-11-07): the author, in their own browser wallet, signed $250 of intent for SOFI. The
+First use (2026-11-07, with v1 intents; v2 also signs the token address, so that intent is to be signed
+again): the author, in their own browser wallet, signed $250 of intent for SOFI. The
 register then offered a round, they opened it, got test USDC, pledged 50 and took it back (the round
 shows 0 pledged). One fix came out of it: the round page now makes the step you can take the primary
 button (get test USDC first, then pledge). Fills and trading follow on the first weekday with the market
@@ -191,9 +192,11 @@ anyone can mint; `DemoOracleRegistry`, which stands in for Coinbase's mainnet or
 `web/` is the page and a Cloudflare Worker. The page shows the register of all 298 stocks, each with
 its own guilloché seal, and a round page that reads the fill conditions live from Base Sepolia. The
 Worker stores signed intents and exports them at `/api/demand`, with signatures, so an issuer can verify the
-totals itself. It checks each EIP-712 signature, keeps one intent per wallet per ticker,
-and refuses the project's own demo wallets, so the board never counts them. Each network may write 20
-intents an hour and add 5 new wallets a day. The whole site, page and API, is closed to US visitors
+totals itself. It checks each EIP-712 signature. An intent names the stock by ticker and by its B20
+contract address, and the address must match the snapshot: Base's docs say to identify a stock by address,
+because its symbol can be changed. The Worker keeps one intent per wallet per stock, and refuses the project's own demo wallets, so the board never counts them. Each network may write 20
+intents an hour and add 5 new wallets a day. The page's transactions carry a Base Builder Code (ERC-8021)
+once one is registered (`BUILDER_CODE` in `web/src/chain.ts`, empty for now); the demo scripts' do not. The whole site, page and API, is closed to US visitors
 (HTTP 451): Coinbase tokenized stocks are not offered to US persons, and projects that enable trading for
 US users are out of scope. `npm run test:worker` checks these rules. The design notes are in
 [docs/design.md](docs/design.md).

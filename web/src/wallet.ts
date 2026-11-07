@@ -1,5 +1,6 @@
 import { createWalletClient, custom, type WalletClient } from "viem";
-import { chain } from "./chain";
+import { Attribution } from "ox/erc8021";
+import { BUILDER_CODE, chain } from "./chain";
 import { h } from "./el";
 
 declare global {
@@ -8,6 +9,8 @@ declare global {
   }
 }
 
+const dataSuffix = BUILDER_CODE ? Attribution.toDataSuffix({ codes: [BUILDER_CODE] }) : undefined;
+
 let account: `0x${string}` | undefined;
 const listeners = new Set<() => void>();
 export const onWallet = (f: () => void) => listeners.add(f);
@@ -15,7 +18,7 @@ export const current = () => account;
 
 export function walletClient(): WalletClient {
   if (!window.ethereum) throw new Error("No wallet found. Install a browser wallet such as Coinbase Wallet or MetaMask.");
-  return createWalletClient({ chain, transport: custom(window.ethereum) });
+  return createWalletClient({ chain, transport: custom(window.ethereum), dataSuffix });
 }
 
 export async function connect(): Promise<`0x${string}`> {
