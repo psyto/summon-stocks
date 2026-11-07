@@ -49,6 +49,10 @@ export const roundAbi = parseAbi([
   "function liquidity() view returns (uint128)",
 ]);
 
+export const guardFeedAbi = parseAbi([
+  "function post(bytes32 id, int64 price, uint64 conf, int32 expo, uint256 publishTime)",
+]);
+
 export const pythAbi = parseAbi(["function getUpdateFee(bytes[] updateData) view returns (uint256)"]);
 
 export const STATES = ["Open", "Funded", "Auction", "Filled", "Expired"] as const;

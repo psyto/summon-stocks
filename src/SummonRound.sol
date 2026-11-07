@@ -51,7 +51,6 @@ contract SummonRound is IUnlockCallback {
 
     struct Deps {
         address usdc;
-        address pyth;
         address policyRegistry;
         address marketState;
         address oracleRegistry; // address(0): no issuer registry on this chain
@@ -61,6 +60,7 @@ contract SummonRound is IUnlockCallback {
 
     struct Params {
         address token;
+        address priceSource; // Pyth, or a feed with Pyth's read interface; bound to the token by the factory owner
         bytes32 priceId;
         uint256 target; // USDC, 6 decimals
         uint64 deadline;
@@ -148,7 +148,7 @@ contract SummonRound is IUnlockCallback {
 
     constructor(Deps memory deps_, Params memory params_) {
         if (
-            params_.token == address(0) || params_.target == 0 || params_.deadline <= block.timestamp
+            params_.token == address(0) || params_.priceSource == address(0) || params_.target == 0 || params_.deadline <= block.timestamp
                 || params_.maxSpreadBps > MAX_SPREAD_CAP_BPS || params_.lpBps == 0 || params_.lpBps > MAX_LP_BPS
                 || params_.rampSeconds == 0 || params_.windowSeconds < params_.rampSeconds || params_.maxAuctions == 0
                 || params_.maxPythAge == 0 || params_.maxGuardAge == 0 || params_.maxJumpBps == 0
@@ -389,7 +389,7 @@ contract SummonRound is IUnlockCallback {
         // 2. market state, fail closed
         MarketStateCheck.requireOpen(MarketStateRegistry(d.marketState), p.token, p.maxGuardAge);
         // 3. a fresh Pyth price with a narrow confidence interval (stops publishing outside the session)
-        HLPriceGuard.Ref memory r = PythRef.updateAndReadFresh(IPyth(d.pyth), pythUpdate, p.priceId, p.maxPythAge, p.maxConfBps);
+        HLPriceGuard.Ref memory r = PythRef.updateAndReadFresh(IPyth(p.priceSource), pythUpdate, p.priceId, p.maxPythAge, p.maxConfBps);
         uint256 m = IB20AssetMin(p.token).multiplier();
         ref = SummonPrice.refPerToken(r.price, m);
         // 4. issuer registry: not paused, and its multiplier agrees with the token's

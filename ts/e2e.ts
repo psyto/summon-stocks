@@ -1,7 +1,7 @@
 /**
  * Spec 001 A1 on Base Sepolia: open a round, three demo backers pledge to target, start the auction,
- * the demo filler fills, backers claim. Prints every transaction. Needs the market open (Pyth's GME feed
- * publishes 09:30-16:00 ET on weekdays), the guard running, and PYTH_API_KEY.
+ * the demo filler fills, backers claim. Prints every transaction. Needs the market open (09:30-16:00 ET
+ * on weekdays) and the guard running; with PRICE_SOURCE=pyth deployments, also PYTH_API_KEY.
  *
  *   npm run e2e                 # target 300 tUSDC, fill after 120 s
  *   WAIT_SECONDS=900 npm run e2e
@@ -31,7 +31,12 @@ async function send(role: keyof typeof ROLES, step: string, req: Call) {
   return r;
 }
 
-async function pythArgs() {
+/** Hermes update data for real Pyth; nothing for GuardPriceFeed, which the guard keeps posting to. */
+async function pythArgs(): Promise<{ data: Hex[]; fee: bigint }> {
+  if (d.priceSource.toLowerCase() === d.guardFeed.toLowerCase()) {
+    console.log("  price: GuardPriceFeed (the guard must be running)");
+    return { data: [], fee: 0n };
+  }
   const u = await latestUpdate(d.priceId);
   const fee = await pc.readContract({ address: d.pyth, abi: pythAbi, functionName: "getUpdateFee", args: [u.data] });
   const age = Math.floor(Date.now() / 1000) - u.publishTime;

@@ -17,6 +17,7 @@ import {SummonHook, ISummonRegistry} from "../src/SummonHook.sol";
 import {SummonPrice} from "../src/SummonPrice.sol";
 import {SummonPool} from "../src/SummonPool.sol";
 import {MockERC20, MockB20, MockPolicyRegistry, MockOracleRegistry} from "./mocks/Mocks.sol";
+import {GuardPriceFeed} from "../src/testnet/GuardPriceFeed.sol";
 
 contract SummonRoundTest is Test {
     using PoolIdLibrary for PoolKey;
@@ -64,7 +65,6 @@ contract SummonRoundTest is Test {
             address(this),
             SummonRound.Deps({
                 usdc: address(usdc),
-                pyth: address(pyth),
                 policyRegistry: address(policies),
                 marketState: address(market),
                 oracleRegistry: address(oracle),
@@ -84,7 +84,7 @@ contract SummonRoundTest is Test {
             })
         );
         hook.setFactory(ISummonRegistry(address(factory)));
-        factory.list(address(token), GME);
+        factory.list(address(token), address(pyth), GME);
         round = factory.openRound(address(token), 10_000e6, uint64(block.timestamp + 7 days), 100, 7 days);
 
         for (uint256 i; i < 3; ++i) {
@@ -451,10 +451,10 @@ contract SummonRoundTest is Test {
         vm.expectRevert(abi.encodeWithSelector(SummonFactory.RoundActive.selector, address(round)));
         factory.openRound(address(token), 1e6, uint64(block.timestamp + 1 days), 100, 1 days);
         vm.expectRevert(abi.encodeWithSelector(SummonFactory.AlreadyListed.selector, address(token)));
-        factory.list(address(token), bytes32(uint256(1)));
+        factory.list(address(token), address(pyth), bytes32(uint256(1)));
         vm.prank(alice);
         vm.expectRevert(SummonFactory.NotOwner.selector);
-        factory.list(address(usdc), bytes32(uint256(1)));
+        factory.list(address(usdc), address(pyth), bytes32(uint256(1)));
         // spread above 1% is refused
         vm.warp(block.timestamp + 8 days);
         vm.expectRevert(SummonRound.BadParams.selector);
@@ -496,6 +496,78 @@ contract SummonRoundTest is Test {
         uint256 before = address(this).balance;
         round.startAuction{value: 0.1 ether}(_fresh());
         assertEq(before - address(this).balance, 1); // only the Pyth fee
+    }
+
+    // ------------------------------------------------------------------ the guard's price feed (testnet)
+
+    function _guardRound() internal returns (SummonRound r, MockB20 t2, GuardPriceFeed feed) {
+        feed = new GuardPriceFeed(address(this));
+        feed.setUpdater(address(this), true);
+        t2 = new MockB20(policies);
+        market.setState(address(t2), false, 0, 0);
+        oracle.set(1e18, false);
+        factory.list(address(t2), address(feed), GME);
+        r = factory.openRound(address(t2), 10_000e6, uint64(block.timestamp + 1 days), 100, 1 days);
+        for (uint256 i; i < 3; ++i) {
+            address b = [alice, bob, carol][i];
+            vm.startPrank(b);
+            usdc.approve(address(r), type(uint256).max);
+            r.pledge([5_000e6, 3_000e6, 2_000e6][i]);
+            vm.stopPrank();
+        }
+        t2.mint(ap, 1_000e8);
+        vm.prank(ap);
+        t2.approve(address(r), type(uint256).max);
+    }
+
+    function test_guardFeedRound() public {
+        (SummonRound r, MockB20 t2, GuardPriceFeed feed) = _guardRound();
+        bytes[] memory none = new bytes[](0);
+        feed.post(GME, PX, CONF, EXPO, block.timestamp);
+        r.startAuction(none);
+        vm.warp(block.timestamp + 900);
+        address[] memory ts = new address[](1);
+        ts[0] = address(t2);
+        market.heartbeat(ts);
+        feed.post(GME, PX, CONF, EXPO, block.timestamp);
+        vm.prank(ap);
+        r.fill(none);
+        assertEq(uint8(r.state()), uint8(SummonRound.State.Filled));
+        assertEq(r.fillRef(), 23.45e18);
+        assertEq(r.fillSpreadBps(), 50);
+    }
+
+    function test_guardFeedGoesStaleWhenGuardStops() public {
+        (SummonRound r,, GuardPriceFeed feed) = _guardRound();
+        bytes[] memory none = new bytes[](0);
+        feed.post(GME, PX, CONF, EXPO, block.timestamp);
+        r.startAuction(none);
+        vm.warp(block.timestamp + 61); // the guard posted nothing since
+        vm.prank(ap);
+        vm.expectRevert(abi.encodeWithSelector(PythRef.PythStale.selector, GME, 61, 60));
+        r.fill(none);
+    }
+
+    function test_guardFeedRules() public {
+        GuardPriceFeed feed = new GuardPriceFeed(address(this));
+        vm.expectRevert(GuardPriceFeed.NotUpdater.selector);
+        feed.post(GME, PX, CONF, EXPO, block.timestamp);
+        feed.setUpdater(address(this), true);
+        vm.expectRevert(GuardPriceFeed.PriceFeedNotFound.selector);
+        feed.getPriceUnsafe(GME);
+        feed.post(GME, PX, CONF, EXPO, block.timestamp);
+        vm.expectRevert(abi.encodeWithSelector(GuardPriceFeed.NotNewer.selector, block.timestamp, block.timestamp));
+        feed.post(GME, PX, CONF, EXPO, block.timestamp);
+        vm.expectRevert(GuardPriceFeed.BadPrice.selector);
+        feed.post(GME, PX, CONF, EXPO, block.timestamp + 31);
+        vm.expectRevert(GuardPriceFeed.BadPrice.selector);
+        feed.post(GME, 0, CONF, EXPO, block.timestamp + 1);
+        bytes[] memory one = new bytes[](1);
+        vm.expectRevert(GuardPriceFeed.NoUpdateData.selector);
+        feed.updatePriceFeeds(one);
+        vm.prank(alice);
+        vm.expectRevert(GuardPriceFeed.NotOwner.selector);
+        feed.setUpdater(alice, true);
     }
 
     receive() external payable {}

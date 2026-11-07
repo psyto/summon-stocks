@@ -42,6 +42,8 @@ export interface Deployment {
   hook: Hex;
   poolManager: Hex;
   pyth: Hex;
+  guardFeed: Hex;
+  priceSource: Hex;
   factory: Hex;
 }
 export function deployment(): Deployment {

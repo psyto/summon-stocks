@@ -4,7 +4,7 @@ pragma solidity 0.8.26;
 import {SummonRound} from "./SummonRound.sol";
 
 /// @title SummonFactory
-/// @notice Opens rounds and keeps the list. The owner binds each stock token to its Pyth feed once, so a
+/// @notice Opens rounds and keeps the list. The owner binds each stock token to its price feed once, so a
 ///         summoner cannot open a round for a token priced off another stock's feed.
 contract SummonFactory {
     struct Defaults {
@@ -23,7 +23,12 @@ contract SummonFactory {
     SummonRound.Deps internal deps;
     Defaults public defaults;
 
-    mapping(address token => bytes32) public priceIdOf;
+    struct Feed {
+        address source; // Pyth, or a feed with Pyth's read interface
+        bytes32 priceId;
+    }
+
+    mapping(address token => Feed) public feedOf;
     mapping(address token => address) public latestRound;
     mapping(bytes32 keyHash => address) public roundForPool;
     address[] public rounds;
@@ -34,7 +39,7 @@ contract SummonFactory {
     error TokenLive(address round);
     error AlreadyListed(address token);
 
-    event Listed(address indexed token, bytes32 priceId);
+    event Listed(address indexed token, address source, bytes32 priceId);
     event RoundOpened(address indexed token, address round, uint256 target, uint64 deadline, uint16 maxSpreadBps);
     event OwnerTransferred(address indexed newOwner);
 
@@ -54,11 +59,13 @@ contract SummonFactory {
         emit OwnerTransferred(newOwner);
     }
 
-    /// Binds a token to its Pyth US equity feed. Once, so a live round's feed can never change under it.
-    function list(address token, bytes32 priceId) external onlyOwner {
-        if (priceIdOf[token] != bytes32(0)) revert AlreadyListed(token);
-        priceIdOf[token] = priceId;
-        emit Listed(token, priceId);
+    /// Binds a token to its price feed (source contract and feed id). Once, so a live round's feed can
+    /// never change under it.
+    function list(address token, address source, bytes32 priceId) external onlyOwner {
+        if (feedOf[token].source != address(0)) revert AlreadyListed(token);
+        if (source == address(0) || priceId == bytes32(0)) revert NotListed(token);
+        feedOf[token] = Feed(source, priceId);
+        emit Listed(token, source, priceId);
     }
 
     /// Anyone may open a round for a listed token, unless one is still running or one already filled
@@ -67,8 +74,8 @@ contract SummonFactory {
         external
         returns (SummonRound round)
     {
-        bytes32 id = priceIdOf[token];
-        if (id == bytes32(0)) revert NotListed(token);
+        Feed memory feed = feedOf[token];
+        if (feed.source == address(0)) revert NotListed(token);
         address prev = latestRound[token];
         if (prev != address(0)) {
             SummonRound.State s = SummonRound(prev).state();
@@ -80,7 +87,8 @@ contract SummonFactory {
             deps,
             SummonRound.Params({
                 token: token,
-                priceId: id,
+                priceSource: feed.source,
+                priceId: feed.priceId,
                 target: target,
                 deadline: deadline,
                 maxSpreadBps: maxSpreadBps,

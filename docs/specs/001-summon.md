@@ -47,6 +47,10 @@ Non-goals:
 - **The owner binds each token to its Pyth feed, once** (`SummonFactory.list(token, priceId)`). In r2 the
   summoner chose the feed id, so anyone could open a GME round priced off another stock's feed, and a
   filler would then deliver GME at that other stock's price. Summoners open rounds only for listed tokens.
+- **The price source is per listing** (`list(token, source, priceId)`): Pyth Core, or the testnet-only
+  `GuardPriceFeed` (Pyth's read interface, written by the guard). Hermes needs an API key since
+  2026-08-26, and the onchain GME price on Base Sepolia was last pushed in April 2025, so the testnet demo
+  defaults to the guard feed. Both sources go through the same 5.1/5.2 checks.
 - **One Summon pool per token.** A new round may open after an earlier one expired, but not after one
   filled: the pool key can be initialized only once, and r2 has no "join an existing pool" path.
 

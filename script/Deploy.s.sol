@@ -8,9 +8,12 @@ import {SummonRound} from "../src/SummonRound.sol";
 import {SummonHook, ISummonRegistry} from "../src/SummonHook.sol";
 import {TestUSDC} from "../src/testnet/TestUSDC.sol";
 import {DemoOracleRegistry} from "../src/testnet/DemoOracleRegistry.sol";
+import {GuardPriceFeed} from "../src/testnet/GuardPriceFeed.sol";
 
 /// Deploys Summon on Base Sepolia, except the B20 stock (created with the B20 factory precompile by
-/// ts/create-stock.ts, which forge cannot simulate). Then lists that stock against its Pyth feed.
+/// ts/create-stock.ts, which forge cannot simulate). Then lists that stock against its price feed:
+/// PRICE_SOURCE=guard (default; GuardPriceFeed, written by the demo guard) or PRICE_SOURCE=pyth (Pyth
+/// Core, which needs Hermes update data and so a Pyth API key).
 ///
 ///   STOCK_TOKEN=0xb2… PRICE_ID=0x6f9c… forge script script/Deploy.s.sol --rpc-url base_sepolia --broadcast
 contract Deploy is Script {
@@ -21,32 +24,67 @@ contract Deploy is Script {
     uint160 constant FLAG_MASK = (1 << 14) - 1;
     uint160 constant BEFORE_INITIALIZE = 1 << 13;
 
-    function run() external {
-        address stock = vm.envAddress("STOCK_TOKEN");
-        bytes32 priceId = vm.envBytes32("PRICE_ID");
-        address me = vm.envOr("DEPLOYER", msg.sender);
+    struct Out {
+        address stock;
+        bytes32 priceId;
+        address market;
+        address oracle;
+        address usdc;
+        address guardFeed;
+        address hook;
+        address factory;
+        address source;
+    }
 
-        bytes memory hookInit = abi.encodePacked(type(SummonHook).creationCode, abi.encode(POOL_MANAGER, me));
-        (bytes32 salt, address hookAddr) = mineHookSalt(keccak256(hookInit));
+    function run() external {
+        address me = vm.envOr("DEPLOYER", msg.sender);
+        Out memory o;
+        o.stock = vm.envAddress("STOCK_TOKEN");
+        o.priceId = vm.envBytes32("PRICE_ID");
+        bool usePyth = keccak256(bytes(vm.envOr("PRICE_SOURCE", string("guard")))) == keccak256("pyth");
+        (bytes32 salt, address hookAddr) =
+            mineHookSalt(keccak256(abi.encodePacked(type(SummonHook).creationCode, abi.encode(POOL_MANAGER, me))));
 
         vm.startBroadcast();
+        _deployDeps(o, me);
+        SummonHook hook = new SummonHook{salt: salt}(POOL_MANAGER, me);
+        require(address(hook) == hookAddr, "hook address");
+        o.hook = address(hook);
+        o.factory = address(_deployFactory(o, me));
+        hook.setFactory(ISummonRegistry(o.factory));
+        o.source = usePyth ? PYTH : o.guardFeed;
+        SummonFactory(o.factory).list(o.stock, o.source, o.priceId);
+        vm.stopBroadcast();
+
+        _write(o);
+        console2.log("factory", o.factory);
+        console2.log("hook", o.hook);
+        console2.log("price source", usePyth ? "pyth" : "guard");
+    }
+
+    function _deployDeps(Out memory o, address me) internal {
         MarketStateRegistry market = new MarketStateRegistry(me);
         market.setUpdater(me, true);
         DemoOracleRegistry oracle = new DemoOracleRegistry(me);
-        oracle.set(stock, 1e18, false);
-        TestUSDC usdc = new TestUSDC();
-        SummonHook hook = new SummonHook{salt: salt}(POOL_MANAGER, me);
-        require(address(hook) == hookAddr, "hook address");
-        SummonFactory factory = new SummonFactory(
+        oracle.set(o.stock, 1e18, false);
+        GuardPriceFeed guardFeed = new GuardPriceFeed(me);
+        guardFeed.setUpdater(me, true);
+        o.market = address(market);
+        o.oracle = address(oracle);
+        o.usdc = address(new TestUSDC());
+        o.guardFeed = address(guardFeed);
+    }
+
+    function _deployFactory(Out memory o, address me) internal returns (SummonFactory) {
+        return new SummonFactory(
             me,
             SummonRound.Deps({
-                usdc: address(usdc),
-                pyth: PYTH,
+                usdc: o.usdc,
                 policyRegistry: POLICY_REGISTRY,
-                marketState: address(market),
-                oracleRegistry: address(oracle),
+                marketState: o.market,
+                oracleRegistry: o.oracle,
                 poolManager: POOL_MANAGER,
-                hook: address(hook)
+                hook: o.hook
             }),
             SummonFactory.Defaults({
                 lpBps: 2000,
@@ -60,23 +98,22 @@ contract Deploy is Script {
                 cooldownSeconds: 3600
             })
         );
-        hook.setFactory(ISummonRegistry(address(factory)));
-        factory.list(stock, priceId);
-        vm.stopBroadcast();
+    }
 
-        string memory o = "deploy";
-        vm.serializeAddress(o, "stock", stock);
-        vm.serializeBytes32(o, "priceId", priceId);
-        vm.serializeAddress(o, "marketState", address(market));
-        vm.serializeAddress(o, "oracleRegistry", address(oracle));
-        vm.serializeAddress(o, "usdc", address(usdc));
-        vm.serializeAddress(o, "hook", address(hook));
-        vm.serializeAddress(o, "poolManager", POOL_MANAGER);
-        vm.serializeAddress(o, "pyth", PYTH);
-        string memory json = vm.serializeAddress(o, "factory", address(factory));
+    function _write(Out memory o) internal {
+        string memory k = "deploy";
+        vm.serializeAddress(k, "stock", o.stock);
+        vm.serializeBytes32(k, "priceId", o.priceId);
+        vm.serializeAddress(k, "marketState", o.market);
+        vm.serializeAddress(k, "oracleRegistry", o.oracle);
+        vm.serializeAddress(k, "usdc", o.usdc);
+        vm.serializeAddress(k, "hook", o.hook);
+        vm.serializeAddress(k, "poolManager", POOL_MANAGER);
+        vm.serializeAddress(k, "pyth", PYTH);
+        vm.serializeAddress(k, "guardFeed", o.guardFeed);
+        vm.serializeAddress(k, "priceSource", o.source);
+        string memory json = vm.serializeAddress(k, "factory", o.factory);
         vm.writeJson(json, string.concat("deployments/", vm.toString(block.chainid), ".json"));
-        console2.log("factory", address(factory));
-        console2.log("hook", address(hook));
     }
 
     /// A CREATE2 salt whose hook address has BEFORE_INITIALIZE as its only flag bit.

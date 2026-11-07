@@ -28,7 +28,7 @@ track). **Testnet only (Base Sepolia).** Mainnet data is only read and shown.
 |---|---|
 | Spec ([docs/specs/001-summon.md](docs/specs/001-summon.md)) | r3, after one independent review ([docs/reviews](docs/reviews)); Codex review next |
 | Price math (`src/SummonPrice.sol`, spec 5.1) | done, with tests: split invariance, dividend multiplier, fuzzed rounding |
-| Round, factory, pool hook (`src/SummonRound.sol`, `SummonFactory.sol`, `SummonHook.sol`) | done, 30 tests: each fill condition failing alone, pledge cap, withdraw rules, expiry and refunds, claims under transfer policies, LP unwind, pool initialization restricted to the round. Removing any of 8 checks makes a test fail |
+| Round, factory, pool hook (`src/SummonRound.sol`, `SummonFactory.sol`, `SummonHook.sol`) | done, 33 tests: each fill condition failing alone, pledge cap, withdraw rules, expiry and refunds, claims under transfer policies, LP unwind, pool initialization restricted to the round. Removing any of 8 checks makes a test fail |
 | Sepolia end-to-end, guard, UI, intent board | next (see spec section 10) |
 
 ## The numbers
@@ -66,23 +66,41 @@ tracks GME's Pyth price, and it has no value.
 
 ```sh
 npm install
-# .env: DEMO_MNEMONIC (testnet wallets: 0 operator, 1-3 backers, 4 filler) and PYTH_API_KEY
-#       (Pyth Terminal, app.pyth.com: Hermes needs a key since 2026-08-26; keep it server-side)
+# .env: DEMO_MNEMONIC (testnet wallets: 0 operator, 1-3 backers, 4 filler); PYTH_API_KEY only for
+#       PRICE_SOURCE=pyth (Pyth Terminal, app.pyth.com: Hermes needs a key since 2026-08-26)
 set -a; . ./.env; set +a                       # so forge sees DEMO_MNEMONIC
 npm run fund                                   # operator -> demo wallets, for gas
 DRY_RUN=1 npm run create-stock                 # simulate; needs no funds
 npm run create-stock                           # prints STOCK_TOKEN
 STOCK_TOKEN=0x… PRICE_ID=0x6f9cd89ef1b7fd39f667101a91ad578b6c6ace4579d5f7f285a4b06aa4504be6 \
   forge script script/Deploy.s.sol --rpc-url base_sepolia --broadcast --mnemonics "$DEMO_MNEMONIC"
-npm run guard                                  # keep running: Nasdaq halts -> MarketStateRegistry
-npm run e2e                                    # weekdays 09:30-16:00 ET, when Pyth's GME feed publishes
+npm run guard                                  # keep running: halts (and, for guard pricing, the quote)
+npm run e2e                                    # weekdays 09:30-16:00 ET
 ```
+
+**Price source.** Each listed token is bound to one feed, chosen by the factory owner:
+- `PRICE_SOURCE=pyth`: Pyth Core, with update data from Hermes. This is the design Summon is built for.
+  Since 2026-08-26 Hermes needs an API key, which must stay on a server.
+- `PRICE_SOURCE=guard` (the default on testnet): `GuardPriceFeed`, which has Pyth's read interface. The
+  demo guard posts GME's quote there while GME is open and not halted. The quote comes from Nasdaq.com's
+  public endpoint, which is undocumented and possibly delayed. Treat it as demo data only:
+  - Nasdaq's terms for its other products forbid automated copying, so check the site's terms before you
+    run the guard;
+  - a delayed price would let a filler fill only when the delay favors them, so it must never back
+    real funds.
+
+  The guard key already decides whether the market is open. With guard pricing, it also sets the price.
+
+Both sources go through the same checks in the round: the price is at most 60 s old, its confidence is
+within 50 bp, and it has not jumped more than 3% since the auction started. A guard that stops posting
+therefore stops fills.
 
 The deploy script finds a CREATE2 salt that puts the hook at an address with BEFORE_INITIALIZE as its
 only flag. Contracts used on Base Sepolia: Uniswap v4 PoolManager `0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408`,
 Pyth `0xA2aa501b19aff244D90cc15a4Cf739D2725B5729`, and the B20 policy registry precompile
-`0x8453…0002`. Two contracts exist on testnet only, and both are labelled as such: `TestUSDC`, which
-anyone can mint, and `DemoOracleRegistry`, which stands in for Coinbase's mainnet oracle registry.
+`0x8453…0002`. Three contracts exist on testnet only, and all are labelled as such: `TestUSDC`, which
+anyone can mint; `DemoOracleRegistry`, which stands in for Coinbase's mainnet oracle registry; and
+`GuardPriceFeed`.
 
 ## Parts used
 
