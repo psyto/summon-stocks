@@ -28,7 +28,7 @@ track). **Testnet only (Base Sepolia).** Mainnet data is only read and shown.
 |---|---|
 | Spec ([docs/specs/001-summon.md](docs/specs/001-summon.md)) | r3, after one independent review ([docs/reviews](docs/reviews)); Codex review next |
 | Price math (`src/SummonPrice.sol`, spec 5.1) | done, with tests: split invariance, dividend multiplier, fuzzed rounding |
-| Round, factory, pool hook (`src/SummonRound.sol`, `SummonFactory.sol`, `SummonHook.sol`) | done, 33 tests: each fill condition failing alone, pledge cap, withdraw rules, expiry and refunds, claims under transfer policies, LP unwind, pool initialization restricted to the round. Removing any of 8 checks makes a test fail |
+| Round, factory, pool hook (`src/SummonRound.sol`, `SummonFactory.sol`, `SummonHook.sol`) | done, 33 tests: each fill condition failing alone, pledge cap, withdraw rules, expiry and refunds, claims under transfer policies, LP unwind, pool initialization restricted to the round, the guard price feed. Removing any of 8 checks makes a test fail |
 | Sepolia end-to-end, guard, UI, intent board | next (see spec section 10) |
 
 ## The numbers
@@ -73,7 +73,7 @@ npm run fund                                   # operator -> demo wallets, for g
 DRY_RUN=1 npm run create-stock                 # simulate; needs no funds
 npm run create-stock                           # prints STOCK_TOKEN
 STOCK_TOKEN=0x… PRICE_ID=0x6f9cd89ef1b7fd39f667101a91ad578b6c6ace4579d5f7f285a4b06aa4504be6 \
-  forge script script/Deploy.s.sol --rpc-url base_sepolia --broadcast --mnemonics "$DEMO_MNEMONIC"
+  PRICE_SOURCE=guard forge script script/Deploy.s.sol --rpc-url base_sepolia --broadcast --mnemonics "$DEMO_MNEMONIC"
 npm run guard                                  # keep running: halts (and, for guard pricing, the quote)
 npm run e2e                                    # weekdays 09:30-16:00 ET
 ```
