@@ -49,10 +49,11 @@ track). **Testnet only (Base Sepolia).** Mainnet data is only read and shown.
 |---|---|
 | Spec ([docs/specs/001-summon.md](docs/specs/001-summon.md)) | r3, after one independent review ([docs/reviews](docs/reviews)). The Codex review of the spec and the code is written up ([docs/reviews/codex-r1-request.md](docs/reviews/codex-r1-request.md)) and runs from 2026-11-10 |
 | Price math (`src/SummonPrice.sol`, spec 5.1) | done, with tests: split invariance, dividend multiplier, fuzzed rounding |
-| Round, factory, pool hook, swap (`src/SummonRound.sol`, `SummonFactory.sol`, `SummonHook.sol`, `SummonSwap.sol`) | done, 35 tests: each fill condition failing alone, pledge cap, withdraw rules, expiry and refunds, claims under transfer policies, LP unwind, pool initialization restricted to the round, the guard price feed, trading the summoned pool. Removing any of 8 checks makes a test fail |
+| Round, factory, pool hook, swap (`src/SummonRound.sol`, `SummonFactory.sol`, `SummonHook.sol`, `SummonSwap.sol`) | done, 41 tests: each fill condition failing alone, pledge cap, withdraw rules, expiry and refunds, claims under transfer policies, LP unwind, pool initialization and liquidity restricted to the round, the guard price feed, trading the summoned pool, and the pool that knows the stock's market (below). Removing any of 8 fill checks, or any of the hook's 6 rules, makes a test fail |
+| Stock-aware pool (`SummonHook`, `SummonRound.realign`, spec 5.5 and 5.5a, r4) | built 2026-11-08, not yet deployed: no swaps in a corporate action window, while the multiplier differs from the one the pool was priced at, or while the listing exchange has the stock halted; a 1.00% fee instead of 0.30% while the session is closed or the guard is quiet; after a split or a dividend in shares, anyone can `realign` the backers' pool to the new multiplier, so the first trader cannot take the difference. No fills in the first 15 and last 25 minutes of the session, while US LULD bands are doubled (market-state `core-hours`). Holidays and 13:00 early closes from market-state `v0.2.0` |
 | Base Sepolia deployment | done 2026-11-07: factory, hook, swap router, registries and five real B20 demo stocks (see below). Open rounds: sGME [`0xa799…046D`](https://sepolia.basescan.org/address/0xa799fC499Af97a474D02878fC10fB8B733b1046D) and sSOFI [`0xAae4…DbEE`](https://sepolia.basescan.org/address/0xAae40400113c32D8D0345EBad6F781E56ECDDbEE) (both target 300 tUSDC) |
 | Guard (`ts/guard.ts`) | done: Nasdaq halts and, for guard pricing, the quote. It writes nothing while the market is closed |
-| End-to-end fill on Base Sepolia (`ts/e2e.ts`) | scripted. It picks up the stock's open round wherever it stands, so pledges made from the web page count. First run when the market opens (weekdays 09:30–16:00 ET) |
+| End-to-end fill on Base Sepolia (`ts/e2e.ts`) | scripted. It picks up the stock's open round wherever it stands, so pledges made from the web page count. First run when the market opens (weekdays 09:45–15:35 ET: the session without the LULD doubled-band edges) |
 | Web (`web/`) | built 2026-11-07: the register of all 298 stocks; live round pages; signed intents, with a round opening from the register once a demo stock's intents reach $250; trading a summoned pool; a demand export issuers can verify; the US block and per-network limits (8 Worker tests). Runs locally; goes public once the Codex review is addressed |
 | Demand from elsewhere | planned (from 2026-11-14): marks on the register for never-minted stocks that already trade elsewhere, by amount, not by listing. Hyperliquid HIP-3 open interest and volume; Robinhood Chain token supply. Display only: fills still price from Pyth. Counts are under "The numbers" |
 
@@ -142,7 +143,7 @@ npm run create-stock                           # prints STOCK_TOKEN
 STOCK_TOKEN=0x… PRICE_ID=0x6f9cd89ef1b7fd39f667101a91ad578b6c6ace4579d5f7f285a4b06aa4504be6 \
   PRICE_SOURCE=guard forge script script/Deploy.s.sol --rpc-url base_sepolia --broadcast --mnemonics "$DEMO_MNEMONIC"
 npm run guard                                  # keep running: halts (and, for guard pricing, the quote)
-npm run e2e                                    # weekdays 09:30-16:00 ET
+npm run e2e                                    # trading days 09:45-15:35 ET (12:35 on early closes)
 ```
 
 **Price source.** Each listed token is bound to one feed, chosen by the factory owner:

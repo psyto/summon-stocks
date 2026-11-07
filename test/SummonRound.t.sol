@@ -17,6 +17,7 @@ import {SummonHook, ISummonRegistry} from "../src/SummonHook.sol";
 import {SummonPrice} from "../src/SummonPrice.sol";
 import {SummonPool} from "../src/SummonPool.sol";
 import {SummonSwap} from "../src/SummonSwap.sol";
+import {PoolModifyLiquidityTest} from "v4-core/src/test/PoolModifyLiquidityTest.sol";
 import {MockERC20, MockB20, MockPolicyRegistry, MockOracleRegistry} from "./mocks/Mocks.sol";
 import {GuardPriceFeed} from "../src/testnet/GuardPriceFeed.sol";
 
@@ -57,8 +58,9 @@ contract SummonRoundTest is Test {
         market.setUpdater(address(this), true);
         market.setState(address(token), false, 0, 0);
 
-        // the hook must sit at an address whose low 14 bits are BEFORE_INITIALIZE (1 << 13) only
-        address hookAddr = address((uint160(0x5) << 152) | uint160(1 << 13));
+        // the hook must sit at an address whose low 14 bits are its flags: BEFORE_INITIALIZE, BEFORE_ADD_LIQUIDITY
+        // and BEFORE_SWAP
+        address hookAddr = address((uint160(0x5) << 152) | uint160((1 << 13) | (1 << 11) | (1 << 7)));
         deployCodeTo("SummonHook.sol:SummonHook", abi.encode(address(pm), address(this)), hookAddr);
         hook = SummonHook(hookAddr);
 
@@ -545,6 +547,131 @@ contract SummonRoundTest is Test {
         vm.stopPrank();
         assertLt(back, 100e6, "a round trip costs fees");
         assertEq(usdc.balanceOf(address(router)) + token.balanceOf(address(router)), 0, "router holds nothing");
+    }
+
+    // ------------------------------------------------------------------ a pool that knows the market (§5.5, §5.5a)
+
+    function _summoned() internal returns (SummonSwap router, PoolKey memory key, bool usdcIs0) {
+        _start();
+        _fillAfter(60);
+        router = new SummonSwap(IPoolManager(address(pm)));
+        key = round.poolKey();
+        usdcIs0 = address(usdc) < address(token);
+        vm.prank(alice);
+        usdc.approve(address(router), type(uint256).max);
+    }
+
+    function _buy(SummonSwap router, PoolKey memory key, bool usdcIs0) internal returns (uint256) {
+        vm.prank(alice);
+        return router.swapExactIn(key, usdcIs0, 100e6, 1, alice);
+    }
+
+    function test_swapFeeRisesWhileClosed() public {
+        (SummonSwap router, PoolKey memory key, bool usdcIs0) = _summoned();
+        uint256 snap = vm.snapshotState();
+        uint256 open = _buy(router, key, usdcIs0);
+        vm.revertToState(snap);
+        // the guard records the session closed: swaps go on, at 1.00% instead of 0.30%
+        market.setState(address(token), true, market.REASON_SESSION_CLOSED(), 0);
+        uint256 closed = _buy(router, key, usdcIs0);
+        assertLt(closed, open);
+        // 0.7% more fee on the same trade, within the price impact's rounding
+        assertApproxEqRel(closed * 1e18 / open, uint256(990_000e18) / 997_000, 1e15);
+        vm.revertToState(snap);
+        // a guard that has gone quiet counts as closed too
+        vm.warp(block.timestamp + 301);
+        assertEq(_buy(router, key, usdcIs0), closed);
+    }
+
+    function test_swapStopsWhileHalted() public {
+        (SummonSwap router, PoolKey memory key, bool usdcIs0) = _summoned();
+        market.setState(address(token), true, market.REASON_PRIMARY_HALT(), 0);
+        vm.prank(alice);
+        vm.expectRevert(); // the PoolManager wraps the hook's MarketHalted
+        router.swapExactIn(key, usdcIs0, 100e6, 1, alice);
+        // resumed, but not before resumeAfter
+        market.setState(address(token), false, 0, uint64(block.timestamp + 120));
+        vm.prank(alice);
+        vm.expectRevert();
+        router.swapExactIn(key, usdcIs0, 100e6, 1, alice);
+        vm.warp(block.timestamp + 120);
+        _heartbeat();
+        assertGt(_buy(router, key, usdcIs0), 0);
+    }
+
+    function test_swapStopsInCorporateActionWindow() public {
+        (SummonSwap router, PoolKey memory key, bool usdcIs0) = _summoned();
+        token.setEffectiveAt(block.timestamp + 1800); // inside the 3600 s cooldown
+        vm.prank(alice);
+        vm.expectRevert();
+        router.swapExactIn(key, usdcIs0, 100e6, 1, alice);
+    }
+
+    function test_realignAfterMultiplierChange() public {
+        (SummonSwap router, PoolKey memory key, bool usdcIs0) = _summoned();
+        (uint160 before,, uint128 l0) = router.poolState(key);
+        assertEq(round.poolMultiplier(), 1e18);
+
+        // a 2-for-1 in shares: one token is now worth twice as much, and the pool would sell it at half price
+        token.setMultiplier(2e18);
+        oracle.set(2e18, false);
+        vm.prank(alice);
+        vm.expectRevert(); // StaleMultiplier
+        router.swapExactIn(key, usdcIs0, 100e6, 1, alice);
+
+        // not while the action window is open, and not while the issuer's registry disagrees
+        token.setEffectiveAt(block.timestamp + 600);
+        vm.expectRevert(abi.encodeWithSelector(SummonRound.CorporateActionWindow.selector, block.timestamp + 600));
+        round.realign();
+        token.setEffectiveAt(0);
+        oracle.set(1e18, false);
+        vm.expectRevert(abi.encodeWithSelector(SummonRound.MultiplierMismatch.selector, 1e18, 2e18));
+        round.realign();
+        oracle.set(2e18, false);
+
+        // anyone can realign; the pool's price doubles (in USDC per token) and swaps resume
+        vm.prank(carol);
+        round.realign();
+        (uint160 afterP,, uint128 l1) = router.poolState(key);
+        // sqrtP is sqrt(currency1 / currency0): x sqrt(2) when the token is currency0, / sqrt(2) when it is currency1
+        uint256 ratio = usdcIs0 ? uint256(before) * 1e18 / afterP : uint256(afterP) * 1e18 / before;
+        assertApproxEqRel(ratio, 1.414213562373095048e18, 1e12);
+        assertGt(l1, 0);
+        assertLt(l1, l0 * 101 / 100);
+        assertEq(round.poolMultiplier(), 2e18);
+        vm.expectRevert(SummonRound.NothingToDo.selector);
+        round.realign();
+
+        uint256 got = _buy(router, key, usdcIs0);
+        // $100 now buys about half as many tokens as at fill: each one is two shares at $23.45
+        uint256 worth = got * 2 * 23.45e18 / 1e8 / 1e12;
+        assertGt(worth, 90e6);
+        assertLt(worth, 100e6);
+
+        // what realign could not put back reaches the backers at unwind
+        uint256 idleT = round.idleTokens();
+        uint256 idleU = round.idleUsdc();
+        vm.warp(block.timestamp + 7 days + 1);
+        round.unwindLP();
+        assertGe(round.lpTokens(), idleT);
+        assertGe(round.lpUsdc(), idleU);
+    }
+
+    function test_onlyTheRoundAddsLiquidity() public {
+        (, PoolKey memory key,) = _summoned();
+        PoolModifyLiquidityTest lp = new PoolModifyLiquidityTest(IPoolManager(address(pm)));
+        usdc.mint(address(this), 1_000e6);
+        token.mint(address(this), 100e8);
+        usdc.approve(address(lp), type(uint256).max);
+        token.approve(address(lp), type(uint256).max);
+        vm.expectRevert(); // the PoolManager wraps the hook's NotTheRound
+        lp.modifyLiquidity(key, IPoolManager.ModifyLiquidityParams(-887220, 887220, 1e9, 0), "");
+    }
+
+    function test_hookRejectsDirectSwapCalls() public {
+        PoolKey memory key = round.poolKey();
+        vm.expectRevert(SummonHook.NotPoolManager.selector);
+        hook.beforeSwap(address(this), key, IPoolManager.SwapParams(true, -1, 0), "");
     }
 
     // ------------------------------------------------------------------ the guard's price feed (testnet)

@@ -1,7 +1,8 @@
 # 001: Summon — backers bring a stock onto Base
 
-Status: draft r3 (Claude): r2 answering docs/reviews/001-spec-r1-claude.md, plus two decisions made while
-implementing it (section 2a). Prepared for Base "Stocksmaxxing",
+Status: draft r4 (Claude, 2026-11-08): r3 plus a pool that knows the stock's market (5.5, 5.5a) and US
+session edges (5.2 item 9). r3 was r2 answering docs/reviews/001-spec-r1-claude.md, plus two decisions
+made while implementing it (section 2a). Prepared for Base "Stocksmaxxing",
 track Programmable Stock Markets, submission 2026-12-05. Testnet only.
 
 ## 1. Why
@@ -142,6 +143,10 @@ Open ──(pledged == target)──> Funded ──startAuction()──> Auction
    recorded at `startAuction`. Otherwise `fill` reverts, and the round can only return to Funded when the
    window ends. This uses hl-price-guard's `JumpLatch` with the anchor set by `startAuction`. Re-arming
    happens only through a new `startAuction`.
+9. US equity session edges (r4): the guard reports the session closed in the first 15 minutes after the
+   open and the last 25 minutes before the close (09:30-09:45 and 15:35-16:00 ET; 12:35-13:00 on early
+   closes). Those are the periods when US Limit Up-Limit Down bands are doubled, and quotes and Pyth's
+   confidence are widest. Exchange holidays and early closes come from market-state `v0.2.0`.
 
 ### 5.3 What a fill moves
 Let `P = target`, `U_lp = P × lpBps / 1e4` (default `lpBps` = 2000), and `U_f = P − U_lp`.
@@ -157,11 +162,41 @@ Let `P = target`, `U_lp = P × lpBps / 1e4` (default `lpBps` = 2000), and `U_f =
 - `claim()` transfers the backer's tokens. If a policy rejects the backer, it reverts with `NotAuthorized`.
   The tokens stay claimable, and the round never redirects them.
 
-### 5.5 Pool
-- PoolKey = (token, USDC, fee 3000, tickSpacing 60, hooks = `SummonHook`). `SummonHook.beforeInitialize`
-  requires `sender` to be a round registered in the factory for that token. Nobody else can initialize the
-  key, so there is no "join an existing pool" branch.
-- Seed full range at `ref` (no spread), so the pool does not open overpriced.
+### 5.5 Pool: a pool that knows the stock's market (r4, 2026-11-08)
+- PoolKey = (token, USDC, dynamic fee, tickSpacing 60, hooks = `SummonHook`). The hook's address carries
+  three flags: BEFORE_INITIALIZE, BEFORE_ADD_LIQUIDITY and BEFORE_SWAP.
+- `beforeInitialize` and `beforeAddLiquidity`: only the round registered for the key may initialize it or
+  add liquidity. Nobody can create the pool first at a bad price, and the position in the pool is the
+  backers' alone, which `realign` (5.5a) relies on. Removing liquidity is not gated (only the round has any).
+- Seed full range at `ref` (no spread), so the pool does not open overpriced. The round records the
+  token's multiplier at the fill as `poolMultiplier`.
+- `beforeSwap` reads the same sources as the fill conditions (5.2), and applies these rules in order:
+  1. **Corporate action window: no swaps.** The token's `effectiveAt()` is non-zero and within
+     `[now − cooldown, now + cooldown]`. The same window as 5.2 item 5.
+  2. **Stale multiplier: no swaps.** `multiplier()` differs from `poolMultiplier`. One token is now worth
+     a different number of shares, so the pool's price is wrong by that ratio, and the first trader would
+     take the difference from the backers. Swaps resume after `realign` (5.5a). The round's own swap
+     inside `realign` is the one exception.
+  3. **Halted: no swaps.** The market state says halted for any reason other than "session closed"
+     (primary halt, bad print, corporate action, manual, issuer paused), or `now < resumeAfter`. When the
+     listing exchange stops trading, nobody knows the price.
+  4. **Closed: a higher fee.** The state says "session closed", or the guard has not confirmed it within
+     `maxGuardAge`. Swaps pay `CLOSED_FEE` (1.00%) instead of `OPEN_FEE` (0.30%). Trading on Base does not
+     stop at night, but the price cannot be checked against the listing exchange, so the backers, who are
+     the LPs, are paid more for that risk.
+  5. Otherwise, `OPEN_FEE` (0.30%).
+
+### 5.5a Realign after a corporate action
+- `realign()` on the round: anyone may call it once the corporate action window has passed and
+  `multiplier()` differs from `poolMultiplier`. In one unlock it removes the whole position, moves the
+  now-empty pool's price by `multiplier / poolMultiplier` (a swap with no liquidity moves the price and
+  nothing else), and adds the liquidity back at the new price. Then `poolMultiplier` takes the new value.
+- No price source is read. The new price is the pool's own price scaled by the issuer's multiplier, so a
+  caller cannot choose it.
+- What does not fit at the new ratio stays in the round and is added to what backers receive at
+  `unwindLP` (5.6).
+- Before the LP lock ends this is the only way to resume trading after an action. After the lock,
+  backers may also unwind instead.
 
 ### 5.6 LP unwind
 - One position, held by the round. After `lpLock` (default 7 days in the demo), anyone can call

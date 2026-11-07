@@ -1,8 +1,8 @@
 /**
  * Spec 001 A1 on Base Sepolia: three demo backers pledge to target, start the auction, the demo filler
  * fills, backers claim. Prints every transaction. Picks up the stock's open round where it stands (other
- * people may already have pledged); opens a new round only if none is open. Needs the market open (09:30-16:00 ET
- * on weekdays) and the guard running; with PRICE_SOURCE=pyth deployments, also PYTH_API_KEY.
+ * people may already have pledged); opens a new round only if none is open. Needs the market open (09:45-15:35 ET on trading
+ * days) and the guard running; with PRICE_SOURCE=pyth deployments, also PYTH_API_KEY.
  *
  *   npm run e2e                 # GME; target 300 tUSDC, fill after 120 s
  *   TICKER=AMC npm run e2e       # another demo stock

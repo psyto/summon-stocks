@@ -18,7 +18,7 @@ import { deployment, publicClient, wallet } from "./env.js";
 
 const INTERVAL_SECONDS = Number(process.env.GUARD_INTERVAL ?? "30"); // rounds accept prices up to 60 s old
 const HEARTBEAT_SECONDS = 240; // under the rounds' maxGuardAge of 300 s
-const policy: GuardPolicy = { market: { haltSync: true, issuerSync: false, badPrintBandBps: 0, session: "regular-hours", maxStateAgeSeconds: 300 } };
+const policy: GuardPolicy = { market: { haltSync: true, issuerSync: false, badPrintBandBps: 0, session: "core-hours", maxStateAgeSeconds: 300 } };
 const factoryAbi = parseAbi(["function latestRound(address) view returns (address)"]);
 const roundAbi = parseAbi(["function state() view returns (uint8)"]);
 

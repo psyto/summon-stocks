@@ -8,6 +8,8 @@ import {IUnlockCallback} from "v4-core/src/interfaces/callback/IUnlockCallback.s
 import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
 import {PoolKey} from "v4-core/src/types/PoolKey.sol";
 import {Currency} from "v4-core/src/types/Currency.sol";
+import {PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
+import {StateLibrary} from "v4-core/src/libraries/StateLibrary.sol";
 import {BalanceDelta} from "v4-core/src/types/BalanceDelta.sol";
 import {HLPriceGuard} from "hl-price-guard/HLPriceGuard.sol";
 import {PythRef, IPyth} from "hl-price-guard/PythRef.sol";
@@ -40,6 +42,8 @@ interface IOracleParams {
 ///         reference price; part of the round seeds a Uniswap v4 pool that the backers own pro rata.
 contract SummonRound is IUnlockCallback {
     using HLPriceGuard for HLPriceGuard.JumpLatch;
+    using PoolIdLibrary for PoolKey;
+    using StateLibrary for IPoolManager;
 
     enum State {
         Open,
@@ -79,6 +83,9 @@ contract SummonRound is IUnlockCallback {
 
     uint16 public constant MAX_SPREAD_CAP_BPS = 100;
     uint16 public constant MAX_LP_BPS = 5000;
+    uint8 internal constant OP_UNWIND = 0;
+    uint8 internal constant OP_SEED = 1;
+    uint8 internal constant OP_REALIGN = 2;
 
     Deps internal d;
     Params internal p;
@@ -102,6 +109,9 @@ contract SummonRound is IUnlockCallback {
     uint256 public backerTokens; // raw token units owed to backers in total
     uint256 public backerUsdcDust; // seed USDC the pool did not take, owed to backers in total
     uint128 public liquidity;
+    uint256 public poolMultiplier; // the token multiplier the pool is priced at (§5.5a)
+    uint256 public idleTokens; // what realign could not put back, owed to backers at unwind
+    uint256 public idleUsdc;
     mapping(address => bool) public claimed;
 
     // LP unwind
@@ -138,6 +148,7 @@ contract SummonRound is IUnlockCallback {
     event Refunded(address indexed backer, uint256 amount);
     event LPUnwound(uint256 tokens, uint256 usdc);
     event LPClaimed(address indexed backer, uint256 tokens, uint256 usdc);
+    event Realigned(uint256 fromMultiplier, uint256 toMultiplier, uint160 sqrtPriceX96, uint128 liquidity);
 
     modifier nonReentrant() {
         if (_lock != 1) revert Reentrancy();
@@ -257,6 +268,7 @@ contract SummonRound is IUnlockCallback {
         filler = msg.sender;
         fillSpreadBps = s;
         fillRef = ref;
+        poolMultiplier = nowMultiplier;
 
         _pull(p.token, msg.sender, q);
         _push(d.usdc, msg.sender, usdcFiller);
@@ -311,11 +323,36 @@ contract SummonRound is IUnlockCallback {
         if (block.timestamp < until) revert LpLocked(until);
         unwound = true;
         (uint256 t, uint256 u) = abi.decode(
-            IPoolManager(d.poolManager).unlock(abi.encode(false, uint256(0), uint256(0))), (uint256, uint256)
+            IPoolManager(d.poolManager).unlock(abi.encode(OP_UNWIND, uint256(0), uint256(0))), (uint256, uint256)
         );
-        lpTokens = t;
-        lpUsdc = u;
+        lpTokens = t + idleTokens;
+        lpUsdc = u + idleUsdc;
         emit LPUnwound(t, u);
+    }
+
+    /// §5.5a: after a corporate action, re-prices the backers' pool by the multiplier's change, so the first
+    /// trader cannot take the difference. Anyone may call it once the action window has passed.
+    function realign() external nonReentrant {
+        _sync();
+        if (_state != State.Filled) revert WrongState(_state);
+        if (unwound) revert NothingToDo();
+        uint256 m = IB20AssetMin(p.token).multiplier();
+        uint256 from = poolMultiplier;
+        if (m == from) revert NothingToDo();
+        uint256 eff = IB20AssetMin(p.token).effectiveAt();
+        if (_inActionWindow(eff)) revert CorporateActionWindow(eff);
+        if (d.oracleRegistry != address(0)) {
+            (uint256 rm,) = IOracleParams(d.oracleRegistry).getOracleParams(p.token);
+            if (rm != m) revert MultiplierMismatch(rm, m);
+        }
+        (uint256 t, uint256 u, uint128 l, uint160 sqrtP) = abi.decode(
+            IPoolManager(d.poolManager).unlock(abi.encode(OP_REALIGN, m, from)), (uint256, uint256, uint128, uint160)
+        );
+        idleTokens += t;
+        idleUsdc += u;
+        liquidity = l;
+        poolMultiplier = m;
+        emit Realigned(from, m, sqrtP, l);
     }
 
     function claimLP() external nonReentrant {
@@ -333,39 +370,61 @@ contract SummonRound is IUnlockCallback {
 
     // ------------------------------------------------------------------ pool
 
+    /// `data` is (op, a, b): seed (a = token, b = USDC), unwind, or realign (a = new multiplier, b = old).
     function unlockCallback(bytes calldata data) external returns (bytes memory) {
         if (msg.sender != d.poolManager) revert NotPoolManager();
-        (bool seed, uint256 tokenAmt, uint256 usdcAmt) = abi.decode(data, (bool, uint256, uint256));
+        (uint8 op, uint256 a, uint256 b) = abi.decode(data, (uint8, uint256, uint256));
         IPoolManager pm = IPoolManager(d.poolManager);
         PoolKey memory key = poolKey();
         bool tokenIs0 = p.token < d.usdc;
-        if (seed) {
-            (uint256 a0, uint256 a1) = tokenIs0 ? (tokenAmt, usdcAmt) : (usdcAmt, tokenAmt);
-            uint160 sqrtP = SummonPool.sqrtPriceX96(a0, a1);
+        if (op == OP_SEED) {
+            uint160 sqrtP = tokenIs0 ? SummonPool.sqrtPriceX96(a, b) : SummonPool.sqrtPriceX96(b, a);
             pm.initialize(key, sqrtP);
-            uint128 l = SummonPool.fullRangeLiquidity(sqrtP, a0, a1);
-            (BalanceDelta delta,) = pm.modifyLiquidity(
-                key,
-                IPoolManager.ModifyLiquidityParams(SummonPool.tickLower(), SummonPool.tickUpper(), int256(uint256(l)), 0),
-                ""
-            );
-            uint256 paid0 = _settleOwed(pm, key.currency0, delta.amount0());
-            uint256 paid1 = _settleOwed(pm, key.currency1, delta.amount1());
-            (uint256 tokenUsed, uint256 usdcUsed) = tokenIs0 ? (paid0, paid1) : (paid1, paid0);
+            (uint256 tokenUsed, uint256 usdcUsed, uint128 l) = _addFullRange(pm, key, sqrtP, a, b);
             return abi.encode(tokenUsed, usdcUsed, l);
         }
-        (BalanceDelta delta2,) = pm.modifyLiquidity(
+        (uint256 t, uint256 u) = _removeAll(pm, key);
+        if (op == OP_UNWIND) return abi.encode(t, u);
+        // realign: the pool is empty now, so a swap moves its price and moves no tokens. The price is
+        // currency1 per currency0, so it scales by new/old multiplier when the token is currency0.
+        (uint160 sqrtNow,,,) = pm.getSlot0(key.toId());
+        uint160 target = tokenIs0 ? SummonPool.scaledSqrtPrice(sqrtNow, a, b) : SummonPool.scaledSqrtPrice(sqrtNow, b, a);
+        if (target != sqrtNow) {
+            pm.swap(key, IPoolManager.SwapParams({zeroForOne: target < sqrtNow, amountSpecified: -1, sqrtPriceLimitX96: target}), "");
+        }
+        (uint256 tUsed, uint256 uUsed, uint128 l2) = _addFullRange(pm, key, target, t, u);
+        return abi.encode(t - tUsed, u - uUsed, l2, target);
+    }
+
+    function _addFullRange(IPoolManager pm, PoolKey memory key, uint160 sqrtP, uint256 tokenAmt, uint256 usdcAmt)
+        internal
+        returns (uint256 tokenUsed, uint256 usdcUsed, uint128 l)
+    {
+        bool tokenIs0 = p.token < d.usdc;
+        (uint256 a0, uint256 a1) = tokenIs0 ? (tokenAmt, usdcAmt) : (usdcAmt, tokenAmt);
+        l = SummonPool.fullRangeLiquidity(sqrtP, a0, a1);
+        (BalanceDelta delta,) = pm.modifyLiquidity(
+            key, IPoolManager.ModifyLiquidityParams(SummonPool.tickLower(), SummonPool.tickUpper(), int256(uint256(l)), 0), ""
+        );
+        uint256 paid0 = _settleOwed(pm, key.currency0, delta.amount0());
+        uint256 paid1 = _settleOwed(pm, key.currency1, delta.amount1());
+        (tokenUsed, usdcUsed) = tokenIs0 ? (paid0, paid1) : (paid1, paid0);
+    }
+
+    /// Removes the whole position, fees included, into the round; returns (tokens, USDC).
+    function _removeAll(IPoolManager pm, PoolKey memory key) internal returns (uint256, uint256) {
+        (BalanceDelta delta,) = pm.modifyLiquidity(
             key,
             IPoolManager.ModifyLiquidityParams(SummonPool.tickLower(), SummonPool.tickUpper(), -int256(uint256(liquidity)), 0),
             ""
         );
-        uint256 got0 = _takeOwed(pm, key.currency0, delta2.amount0());
-        uint256 got1 = _takeOwed(pm, key.currency1, delta2.amount1());
-        return tokenIs0 ? abi.encode(got0, got1) : abi.encode(got1, got0);
+        uint256 got0 = _takeOwed(pm, key.currency0, delta.amount0());
+        uint256 got1 = _takeOwed(pm, key.currency1, delta.amount1());
+        return p.token < d.usdc ? (got0, got1) : (got1, got0);
     }
 
     function _seed(uint256 tokenAmt, uint256 usdcAmt) internal returns (uint256, uint256, uint128) {
-        bytes memory r = IPoolManager(d.poolManager).unlock(abi.encode(true, tokenAmt, usdcAmt));
+        bytes memory r = IPoolManager(d.poolManager).unlock(abi.encode(OP_SEED, tokenAmt, usdcAmt));
         return abi.decode(r, (uint256, uint256, uint128));
     }
 
@@ -400,9 +459,7 @@ contract SummonRound is IUnlockCallback {
         }
         // 5. no scheduled multiplier change near now
         uint256 eff = IB20AssetMin(p.token).effectiveAt();
-        if (eff != 0 && block.timestamp + p.cooldownSeconds >= eff && block.timestamp <= eff + p.cooldownSeconds) {
-            revert CorporateActionWindow(eff);
-        }
+        if (_inActionWindow(eff)) revert CorporateActionWindow(eff);
         // 6. transfers not paused; an unreadable answer counts as paused
         try IB20(p.token).isPaused(IB20.PausableFeature.TRANSFER) returns (bool isP) {
             if (isP) revert TokenPaused();
@@ -419,6 +476,10 @@ contract SummonRound is IUnlockCallback {
         _requireAuthorized(sender, d.poolManager);
         _requireAuthorized(receiver, d.poolManager);
         _requireAuthorized(executor, d.poolManager);
+    }
+
+    function _inActionWindow(uint256 eff) internal view returns (bool) {
+        return eff != 0 && block.timestamp + p.cooldownSeconds >= eff && block.timestamp <= eff + p.cooldownSeconds;
     }
 
     function _requireCanReceive(address account) internal view {
