@@ -1,22 +1,38 @@
 /**
- * The demo guard, every 30 s:
- * 1. reads Nasdaq Trader's halts feed and writes GME's state (the stock the demo token tracks) to
- *    MarketStateRegistry, with @fabrknt/market-state;
- * 2. when the deployment prices from GuardPriceFeed (testnet), and GME is open and not halted, posts
- *    GME's public Nasdaq quote there.
- * An unreadable feed or quote writes nothing, so the onchain state and price go stale and rounds fail
- * closed. The quote may be delayed: fine for a testnet demo, never for real funds.
+ * The demo guard, every 30 s, for every demo stock in deployments/84532.json:
+ * 1. reads Nasdaq Trader's halts feed once and writes each stock's state (the stock its demo token
+ *    tracks) to MarketStateRegistry, with @fabrknt/market-state. State changes are written one by one;
+ *    confirmations go in one batched heartbeat, only when the last one nears the rounds' 300 s limit.
+ * 2. when the deployment prices from GuardPriceFeed (testnet), posts the public Nasdaq quote of each stock
+ *    whose round is Funded or in its Auction: the only rounds that read a price. Other stocks cost no gas.
+ * A closed market writes nothing (a stale state reads as closed). An unreadable feed or quote writes
+ * nothing either, so rounds fail closed. The quote may be delayed: fine for a testnet demo, never for real
+ * funds.
  *
  *   npm run guard
  */
 import { GUARD_FEED_MAX_AGE_SECONDS, NASDAQ_HALTS_URL, marketStateFor, parseNasdaqFeed, type GuardPolicy } from "@fabrknt/market-state";
-import { guardFeedAbi, marketAbi } from "./abi.js";
+import { parseAbi, type Hex } from "viem";
+import { guardFeedAbi, marketAbi, STATES } from "./abi.js";
 import { deployment, publicClient, wallet } from "./env.js";
 
-const SYMBOL = "GME";
-const INTERVAL_SECONDS = Number(process.env.GUARD_INTERVAL ?? "30"); // price posts; rounds accept prices up to 60 s old
+const INTERVAL_SECONDS = Number(process.env.GUARD_INTERVAL ?? "30"); // rounds accept prices up to 60 s old
 const HEARTBEAT_SECONDS = 240; // under the rounds' maxGuardAge of 300 s
 const policy: GuardPolicy = { market: { haltSync: true, issuerSync: false, badPrintBandBps: 0, session: "regular-hours", maxStateAgeSeconds: 300 } };
+const factoryAbi = parseAbi(["function latestRound(address) view returns (address)"]);
+const roundAbi = parseAbi(["function state() view returns (uint8)"]);
+
+interface Demo {
+  ticker: string;
+  symbol: string;
+  address: Hex;
+  priceId: Hex;
+}
+
+function demos(): Demo[] {
+  const d = deployment() as ReturnType<typeof deployment> & { demoStocks?: Demo[] };
+  return d.demoStocks ?? [{ ticker: "GME", symbol: "sGME", address: d.stock, priceId: d.priceId }];
+}
 
 async function tick() {
   const d = deployment();
@@ -25,38 +41,48 @@ async function tick() {
   const res = await fetch(NASDAQ_HALTS_URL, { headers: { "User-Agent": "summon-stocks guard" } });
   const feed = parseNasdaqFeed(await res.text()); // throws on anything but a complete feed
   const now = Math.floor(Date.now() / 1000);
-  const s = marketStateFor(policy, SYMBOL, now, { halts: feed.halts, fetchedAt: feed.publishedAt }, GUARD_FEED_MAX_AGE_SECONDS);
-  const cur = await pc.readContract({ address: d.marketState, abi: marketAbi, functionName: "stateOf", args: [d.stock] });
-  const same = cur.halted === s.halted && cur.reason === s.reason && cur.resumeAfter === BigInt(s.resumeAfter);
-  // closed and already recorded closed (or never written): write nothing; a stale state reads as closed
-  // anyway (MarketStateCheck fails closed), so the guard spends no gas while the market is shut
-  if (s.halted && (same || cur.updatedAt === 0n)) {
-    console.log(new Date().toISOString(), SYMBOL, `halted (${s.detail}), nothing to write`);
-    return;
-  }
-  // open and confirmed recently: skip the heartbeat until it nears the rounds' 300 s limit
-  const age = now - Number(cur.updatedAt);
-  if (same && age < HEARTBEAT_SECONDS) {
-    await postPrice(s.halted, now);
-    return;
-  }
-  const hash = same
-    ? await op.writeContract({ address: d.marketState, abi: marketAbi, functionName: "heartbeat", args: [[d.stock]] })
-    : await op.writeContract({
+  const toConfirm: Hex[] = [];
+  const open: Demo[] = [];
+  for (const x of demos()) {
+    const s = marketStateFor(policy, x.ticker, now, { halts: feed.halts, fetchedAt: feed.publishedAt }, GUARD_FEED_MAX_AGE_SECONDS);
+    const cur = await pc.readContract({ address: d.marketState, abi: marketAbi, functionName: "stateOf", args: [x.address] });
+    const same = cur.halted === s.halted && cur.reason === s.reason && cur.resumeAfter === BigInt(s.resumeAfter);
+    if (!s.halted) open.push(x);
+    // closed and already recorded closed (or never written): nothing to write
+    if (s.halted && (same || cur.updatedAt === 0n)) continue;
+    if (!same) {
+      const hash = await op.writeContract({
         address: d.marketState,
         abi: marketAbi,
         functionName: "setState",
-        args: [d.stock, s.halted, s.reason, BigInt(s.resumeAfter)],
+        args: [x.address, s.halted, s.reason, BigInt(s.resumeAfter)],
       });
-  console.log(new Date().toISOString(), SYMBOL, s.halted ? `halted (${s.detail})` : "open", same ? "heartbeat" : "setState", hash);
-  await postPrice(s.halted, now);
+      await pc.waitForTransactionReceipt({ hash });
+      console.log(new Date().toISOString(), x.ticker, s.halted ? `halted (${s.detail})` : "open", "setState", hash);
+    } else if (now - Number(cur.updatedAt) >= HEARTBEAT_SECONDS) {
+      toConfirm.push(x.address);
+    }
+  }
+  if (toConfirm.length) {
+    const hash = await op.writeContract({ address: d.marketState, abi: marketAbi, functionName: "heartbeat", args: [toConfirm] });
+    await pc.waitForTransactionReceipt({ hash });
+    console.log(new Date().toISOString(), `heartbeat ${toConfirm.length}`, hash);
+  }
+  if (open.length === 0) console.log(new Date().toISOString(), "market closed, nothing to write");
+  for (const x of open) await postPrice(x, now);
 }
 
-async function postPrice(halted: boolean, now: number) {
+/** Posts a stock's quote only while its round needs a price (Funded or Auction). */
+async function postPrice(x: Demo, now: number) {
   const d = deployment();
+  if (d.priceSource.toLowerCase() !== d.guardFeed.toLowerCase()) return;
+  const pc = publicClient();
+  const round = await pc.readContract({ address: d.factory, abi: factoryAbi, functionName: "latestRound", args: [x.address] });
+  if (round === "0x0000000000000000000000000000000000000000") return;
+  const st = STATES[await pc.readContract({ address: round, abi: roundAbi, functionName: "state" })];
+  if (st !== "Funded" && st !== "Auction") return;
   const op = wallet("operator");
-  if (d.priceSource.toLowerCase() !== d.guardFeed.toLowerCase() || halted) return;
-  const q = await quote(SYMBOL);
+  const q = await quote(x.ticker);
   const price = BigInt(Math.round(q.last * 1e5));
   // no published spread: say 10 bp, under the rounds' 50 bp confidence limit
   const conf = q.halfSpread !== undefined ? BigInt(Math.round(q.halfSpread * 1e5)) : price / 1000n;
@@ -64,9 +90,9 @@ async function postPrice(halted: boolean, now: number) {
     address: d.guardFeed,
     abi: guardFeedAbi,
     functionName: "post",
-    args: [d.priceId, price, conf, -5, BigInt(now)],
+    args: [x.priceId, price, conf, -5, BigInt(now)],
   });
-  console.log(`  posted ${SYMBOL} $${q.last} ±${Number(conf) / 1e5} (realtime: ${q.realTime}, last trade ${q.lastTrade})`, posted);
+  console.log(`  posted ${x.ticker} $${q.last} ±${Number(conf) / 1e5} for its ${st} round (realtime: ${q.realTime}, last trade ${q.lastTrade})`, posted);
 }
 
 interface Quote {

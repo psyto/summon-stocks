@@ -4,7 +4,8 @@
  * people may already have pledged); opens a new round only if none is open. Needs the market open (09:30-16:00 ET
  * on weekdays) and the guard running; with PRICE_SOURCE=pyth deployments, also PYTH_API_KEY.
  *
- *   npm run e2e                 # target 300 tUSDC, fill after 120 s
+ *   npm run e2e                 # GME; target 300 tUSDC, fill after 120 s
+ *   TICKER=AMC npm run e2e       # another demo stock
  *   WAIT_SECONDS=900 npm run e2e
  */
 import { decodeEventLog, parseUnits, type Abi, type Hex } from "viem";
@@ -13,7 +14,14 @@ import { account, deployment, publicClient, wallet, type ROLES } from "./env.js"
 import { latestUpdate } from "./hermes.js";
 
 const pc = publicClient();
-const d = deployment();
+const d0 = deployment() as ReturnType<typeof deployment> & { demoStocks?: { ticker: string; symbol: string; address: Hex; priceId: Hex }[] };
+// TICKER=AMC picks a demo stock (default GME); every other address comes from the deployment
+const found = (d0.demoStocks ?? [{ ticker: "GME", symbol: "sGME", address: d0.stock, priceId: d0.priceId }]).find(
+  (x) => x.ticker === (process.env.TICKER ?? "GME"),
+);
+if (!found) throw new Error(`No demo stock for TICKER=${process.env.TICKER}`);
+const demo = found;
+const d = { ...d0, stock: demo.address, priceId: demo.priceId };
 const log = (step: string, hash: Hex) => console.log(`${step.padEnd(28)} https://sepolia.basescan.org/tx/${hash}`);
 
 interface Call {
@@ -97,7 +105,7 @@ async function main() {
     console.log(`waiting ${wait} s for the spread to rise`);
     await new Promise((r) => setTimeout(r, wait * 1000));
   }
-  await send("filler", "filler: approve sGME", { address: d.stock, abi: b20Abi, functionName: "approve", args: [round, 2n ** 255n] });
+  await send("filler", `filler: approve ${demo.symbol}`, { address: d.stock, abi: b20Abi, functionName: "approve", args: [round, 2n ** 255n] });
   p = await pythArgs();
   await send("filler", "fill", { address: round, abi: roundAbi, functionName: "fill", args: [p.data], value: p.fee });
 
@@ -107,14 +115,14 @@ async function main() {
     pc.readContract({ address: round, abi: roundAbi, functionName: "backerTokens" }),
     pc.readContract({ address: round, abi: roundAbi, functionName: "liquidity" }),
   ]);
-  console.log(`  filled: ref $${Number(ref) / 1e18}/token, spread now ${spread} bp, backers owed ${Number(owed) / 1e8} sGME, pool liquidity ${liq}`);
+  console.log(`  filled: ref $${Number(ref) / 1e18}/token, spread now ${spread} bp, backers owed ${Number(owed) / 1e8} ${demo.symbol}, pool liquidity ${liq}`);
 
   for (const who of Object.keys(shares) as (keyof typeof shares)[]) {
     const mine = await pc.readContract({ address: round, abi: roundAbi, functionName: "pledgeOf", args: [account(who).address] });
     if (mine === 0n) continue;
     await send(who, `${who}: claim`, { address: round, abi: roundAbi, functionName: "claim" });
     const bal = await pc.readContract({ address: d.stock, abi: b20Abi, functionName: "balanceOf", args: [account(who).address] });
-    console.log(`  ${who} holds ${Number(bal) / 1e8} sGME`);
+    console.log(`  ${who} holds ${Number(bal) / 1e8} ${demo.symbol}`);
   }
   const s = await pc.readContract({ address: round, abi: roundAbi, functionName: "state" });
   console.log("round state", STATES[s]);

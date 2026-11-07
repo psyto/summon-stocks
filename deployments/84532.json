@@ -9,5 +9,38 @@
   "priceSource": "0x7D875Ee915a12c0CF6DD206f4CA37181ca0a75EC",
   "pyth": "0xA2aa501b19aff244D90cc15a4Cf739D2725B5729",
   "stock": "0xB20000000000000000000065bC5A9eB6218d9E68",
-  "usdc": "0xdAA34F28c1D0Fd3c6a5B52a7B41505D12Dd4D109"
+  "usdc": "0xdAA34F28c1D0Fd3c6a5B52a7B41505D12Dd4D109",
+  "demoStocks": [
+    {
+      "ticker": "GME",
+      "symbol": "sGME",
+      "address": "0xB20000000000000000000065bC5A9eB6218d9E68",
+      "priceId": "0x6f9cd89ef1b7fd39f667101a91ad578b6c6ace4579d5f7f285a4b06aa4504be6"
+    },
+    {
+      "ticker": "AMC",
+      "symbol": "sAMC",
+      "address": "0xb20000000000000000000084246F11C15C326DD9",
+      "priceId": "0x5b1703d7eb9dc8662a61556a2ca2f9861747c3fc803e01ba5a8ce35cb50a13a1"
+    },
+    {
+      "ticker": "RIVN",
+      "symbol": "sRIVN",
+      "address": "0xB2000000000000000000007ad0F0FeF5d2b4A11E",
+      "priceId": "0x1e59e3164331ce560683eae0c69efe9650ff1bc834225772ddb330aa808f72f0"
+    },
+    {
+      "ticker": "SOFI",
+      "symbol": "sSOFI",
+      "address": "0xB2000000000000000000006b9fb9a28A08243AC4",
+      "priceId": "0x72fae0e0683c186f5ce9444afac9909cf5d60b499f4f9569dd75442f19c625c8"
+    },
+    {
+      "ticker": "RDDT",
+      "symbol": "sRDDT",
+      "address": "0xb200000000000000000000Ba2c05b1Ca0D438CF8",
+      "priceId": "0xc0ece6b9254797f4384bda1ba3f2c33259f552c7849a86b3029e811be5ea9227"
+    }
+  ],
+  "swap": "0xbDcD54Ece175f14b1C10DAcb6ffD16dEdB35de3D"
 }
