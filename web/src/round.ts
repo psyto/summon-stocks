@@ -457,6 +457,14 @@ function pool(round: Addr, p: Params): HTMLElement {
       const tokenIs0 = key.currency0.toLowerCase() === p.token.toLowerCase();
       const px = poolPriceUsd(sqrtP, tokenIs0);
       lede.textContent = `Pool price $${px.toFixed(2)} per ${demo.symbol}. In-range liquidity ${liq.toString()}. Pool fee 0.3%. Anyone can trade it; the backers are its LPs.`;
+      box.append(
+        h(
+          "p",
+          { class: "act__note" },
+          `On mainnet, launchpads such as BaseStonk already list ${demo.ticker}c as a pair, but with no pool to buy it through. A filled round gives it one. `,
+          h("a", { href: "https://basestonk.io/create", target: "_blank", rel: "noopener" }, "BaseStonk (mainnet)"),
+        ),
+      );
       const me = current();
       if (!me) {
         box.append(h("p", { class: "act__note" }, "Connect a wallet to trade."));

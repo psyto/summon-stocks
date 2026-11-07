@@ -28,7 +28,9 @@ A round fills only when every condition below holds:
 - **For Base:** stocks reach Base in order of demand. Each one arrives with a pool, and its backers are
   the LPs.
 - **For launchpads and apps:** a stock with no pool cannot be paired, routed or lent against. Once a stock
-  is summoned, any launchpad can pair against it.
+  is summoned, any launchpad can pair against it. BaseStonk's public pair list, for example, has 357 stock
+  pairs on Base, and 279 of them show no liquidity, including AMCc, RIVNc and SOFIc (read 2026-11-07 from
+  api.basestonk.io). A coin paired with one of those has no pool to route through.
 - **For backers:** the worst price is shown before you commit (at most 1% over the reference). If the
   round does not fill, every pledge is refunded.
 
