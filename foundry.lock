@@ -13,8 +13,14 @@
   },
   "lib/hl-price-guard": {
     "tag": {
-      "name": "v0.3.1",
-      "rev": "f151b2d5f7ba6b19c056fe199ce35f6ddad0a188"
+      "name": "v0.3.2",
+      "rev": "e82819a8eed7fca97e0826bf931d8d00fe724976"
+    }
+  },
+  "lib/market-state": {
+    "tag": {
+      "name": "v0.1.0",
+      "rev": "323ce9d166eea022db657b23a780b66b27dcbc26"
     }
   },
   "lib/pyth-sdk-solidity": {

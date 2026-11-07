@@ -5,8 +5,14 @@ import {Test} from "forge-std/Test.sol";
 import {SummonPrice} from "../src/SummonPrice.sol";
 
 contract SummonPriceHarness {
+    /// Pyth (price, expo) scaled to 18 decimals the way PythRef.read does, then the multiplier.
     function ref(int64 p, int32 e, uint256 m) external pure returns (uint256) {
-        return SummonPrice.refPerToken(p, e, m);
+        require(p > 0 && e <= 0 && e >= -18, "bad pyth");
+        return SummonPrice.refPerToken(uint256(int256(p)) * 10 ** uint256(int256(18 + e)), m);
+    }
+
+    function refWad(uint256 u, uint256 m) external pure returns (uint256) {
+        return SummonPrice.refPerToken(u, m);
     }
 
     function usdcFor(uint256 q, uint256 r, uint256 s, uint8 d) external pure returns (uint256) {
@@ -80,11 +86,9 @@ contract SummonPriceTest is Test {
 
     function test_rejectsBadInputs() public {
         vm.expectRevert(SummonPrice.BadPythPrice.selector);
-        h.ref(0, -8, 1e18);
-        vm.expectRevert(SummonPrice.BadPythPrice.selector);
-        h.ref(1e8, 1, 1e18);
+        h.refWad(0, 1e18);
         vm.expectRevert(SummonPrice.BadMultiplier.selector);
-        h.ref(1e8, -8, 0);
+        h.refWad(1e18, 0);
         vm.expectRevert(SummonPrice.BadDecimals.selector);
         h.usdcFor(1, 1e18, 0, 5);
         vm.expectRevert(SummonPrice.SpreadTooWide.selector);

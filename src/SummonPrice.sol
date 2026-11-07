@@ -16,15 +16,12 @@ library SummonPrice {
     error BadDecimals();
     error SpreadTooWide();
 
-    /// USD per whole token, 18 decimals: price × 10^expo × multiplier.
-    /// @param pythPrice Pyth `price` (> 0)
-    /// @param expo Pyth `expo`, in [-18, 0]
-    /// @param multiplier the token's `multiplier()`, WAD
-    function refPerToken(int64 pythPrice, int32 expo, uint256 multiplier) internal pure returns (uint256) {
-        if (pythPrice <= 0 || expo > 0 || expo < -18) revert BadPythPrice();
+    /// USD per whole token, 18 decimals: underlying share price (18 decimals, as PythRef returns it)
+    /// × multiplier (WAD).
+    function refPerToken(uint256 underlyingWad, uint256 multiplier) internal pure returns (uint256) {
+        if (underlyingWad == 0) revert BadPythPrice();
         if (multiplier == 0) revert BadMultiplier();
-        uint256 underlying = uint256(int256(pythPrice)) * 10 ** uint256(int256(18 + expo));
-        return underlying * multiplier / WAD;
+        return underlyingWad * multiplier / WAD;
     }
 
     /// USDC (6 decimals) owed for `qRaw` raw token units at `ref` × (1 + spreadBps), rounded down

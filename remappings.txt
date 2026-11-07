@@ -3,3 +3,4 @@ v4-core/=lib/v4-core/
 @pythnetwork/pyth-sdk-solidity/=lib/pyth-sdk-solidity/
 base-std/=lib/base-std/src/
 hl-price-guard/=lib/hl-price-guard/src/
+market-state/=lib/market-state/src/
