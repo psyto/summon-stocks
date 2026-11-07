@@ -48,6 +48,7 @@ track). **Testnet only (Base Sepolia).** Mainnet data is only read and shown.
 | Guard (`ts/guard.ts`) | done: Nasdaq halts and, for guard pricing, the quote. It writes nothing while the market is closed |
 | End-to-end fill on Base Sepolia (`ts/e2e.ts`) | scripted. It picks up the stock's open round wherever it stands, so pledges made from the web page count. First run when the market opens (weekdays 09:30–16:00 ET) |
 | Web (`web/`) | built 2026-11-07: the register of all 298 stocks; live round pages; signed intents, with a round opening from the register once a demo stock's intents reach $250; trading a summoned pool; a demand export issuers can verify; the US block and per-network limits (7 Worker tests). Runs locally; goes public once the Codex review is addressed |
+| Demand from elsewhere | planned (from 2026-11-14): marks on the register for never-minted stocks that already trade elsewhere, by amount, not by listing. Hyperliquid HIP-3 open interest and volume; Robinhood Chain token supply. Display only: fills still price from Pyth. Counts are under "The numbers" |
 
 First use (2026-11-07): the author, in their own browser wallet, signed $250 of intent for SOFI. The
 register then offered a round, they opened it, got test USDC, pledged 50 and took it back (the round

@@ -88,3 +88,13 @@ Principles:
 - First use by the author (11-07): with Pledge always enabled, the order (get test USDC, then pledge) was
   unclear. The round page now makes whichever step can be taken the primary button. Pledge stays disabled
   until there is test USDC, and the amount is checked against the balance and the room left.
+
+## Planned (2026-11-08): demand from elsewhere
+- On the register, a never-minted stock that already trades elsewhere gets a mark: Hyperliquid HIP-3 (open
+  interest and 24 h volume) or Robinhood Chain (token supply). The mark is set by an amount, never by a
+  listing alone. xStocks lists 164 of the 227, so a listing alone would mark nearly every cell.
+- Quiet, like everything but the rosette: a hairline tick in the cell, with the amount and its source and
+  read time in the cell's detail (principle 4). No coloured badges (principle 2).
+- The framing is "stocks with proven demand come to Base first", not "Base is behind".
+- Hyperliquid prices are shown for reference only. A HIP-3 deployer sets its own oracle, so fills keep
+  pricing from Pyth.
