@@ -68,6 +68,7 @@ tracks GME's Pyth price, and it has no value.
 npm install
 # .env: DEMO_MNEMONIC (testnet wallets: 0 operator, 1-3 backers, 4 filler) and PYTH_API_KEY
 #       (Pyth Terminal, app.pyth.com: Hermes needs a key since 2026-08-26; keep it server-side)
+set -a; . ./.env; set +a                       # so forge sees DEMO_MNEMONIC
 npm run fund                                   # operator -> demo wallets, for gas
 DRY_RUN=1 npm run create-stock                 # simulate; needs no funds
 npm run create-stock                           # prints STOCK_TOKEN
