@@ -50,9 +50,10 @@ track). **Testnet only (Base Sepolia).** Mainnet data is only read and shown.
 | Web (`web/`) | built 2026-11-07: the register of all 298 stocks; live round pages; signed intents, with a round opening from the register once a demo stock's intents reach $250; trading a summoned pool; a demand export issuers can verify; the US block and per-network limits (7 Worker tests). Runs locally; goes public once the Codex review is addressed |
 
 First use (2026-11-07): the author, in their own browser wallet, signed $250 of intent for SOFI. The
-register then offered a round, they opened it, got test USDC, pledged 50 and took it back (the round shows 0 pledged). One fix came out of it: the
-round page now makes the step you can take the primary button (get test USDC first, then pledge). Fills
-and trading follow on the first weekday with the market open.
+register then offered a round, they opened it, got test USDC, pledged 50 and took it back (the round
+shows 0 pledged). One fix came out of it: the round page now makes the step you can take the primary
+button (get test USDC first, then pledge). Fills and trading follow on the first weekday with the market
+open.
 
 Docs:
 - [docs/specs/001-summon.md](docs/specs/001-summon.md): the spec (r3)
@@ -89,6 +90,17 @@ Reproduce them with `python3 scripts/count_b20.py`. It reads public APIs and nee
 | never minted | 227 |
 | with a Pyth US equity feed | 213 |
 | never minted, with a Pyth feed (Summon can open a round) | 154 |
+
+The same stocks elsewhere (read 2026-11-08 from public sources, no keys). Of the 227 never minted on B20:
+- 80 are stock tokens on Robinhood Chain (212 tokens from its `StockFactory`
+  `0x4783C67b63dE2B358Ac5951a7D41F47A38F3C046`, chain 4663), including JPM, V, DIS, CRM and UBER;
+- 24 trade as perps on Hyperliquid's HIP-3 markets, led by DELL (about $6.3M open interest);
+- 164 are listed as xStocks (`api.backed.fi`). Backed lists 1,533 tokens, so a listing alone is not
+  evidence of demand.
+
+GME shows the gap on Base itself. Coinbase's GMEc is minted but has no pool, and Backed's older bGME on
+Base ([`0x7212…2323`](https://basescan.org/address/0x7212088a11b4d8f6fc90fbb3dfe793b45dd72323)) has a
+total supply of 0, while bNVDA has about 7,063.
 
 Base's Chainlink equity feeds cover 10 liquid tickers, so Summon prices from Pyth. Pyth gives the
 underlying share price, and a B20 token is worth underlying × `multiplier()`.
