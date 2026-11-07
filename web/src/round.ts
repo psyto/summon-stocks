@@ -3,7 +3,9 @@ import {
   b20Abi,
   client,
   D,
-  DEMO,
+  DEMO_DECIMALS,
+  demoAt,
+  swapAbi,
   erc20Abi,
   explorer,
   marketAbi,
@@ -41,6 +43,8 @@ interface Check {
 }
 
 const now = () => Math.floor(Date.now() / 1000);
+/** The round's demo stock; set when the page renders. */
+let demo = { ticker: "?", symbol: "token" };
 const ago = (t: number) => {
   const s = Math.max(0, now() - t);
   return s < 120 ? `${s} s ago` : s < 7200 ? `${Math.round(s / 60)} min ago` : `${Math.round(s / 3600)} h ago`;
@@ -55,6 +59,8 @@ export async function renderRound(main: HTMLElement, round: Addr) {
     main.append(h("p", { class: "round-missing" }, "No Summon round at this address on Base Sepolia. ", h("a", { href: "#/" }, "Back to the register")));
     return;
   }
+  const found = demoAt(p.token);
+  demo = { ticker: found?.ticker ?? "?", symbol: found?.symbol ?? "token" };
   const page = h("article", { class: "cert", "aria-busy": "true" }, h("p", { class: "cert__loading" }, "Reading this round from Base Sepolia…"));
   main.append(h("p", { class: "back" }, h("a", { href: "#/" }, "The register")), page);
 
@@ -155,9 +161,9 @@ async function readChecks(round: Addr, p: Params): Promise<Check[]> {
     ok: !ms.halted && fresh && resumed && ms.updatedAt !== 0n,
     value:
       ms.updatedAt === 0n
-        ? "Not written yet. The guard writes GME's state while the US market is open, weekdays 09:30–16:00 ET."
+        ? `Not written yet. The guard writes ${demo.ticker}'s state while the US market is open, weekdays 09:30–16:00 ET.`
         : ms.halted
-          ? `GME is ${REASON[ms.reason] ?? "halted"}.`
+          ? `${demo.ticker} is ${REASON[ms.reason] ?? "halted"}.`
           : !fresh
             ? `Last confirmed ${ago(Number(ms.updatedAt))}; anything older than ${p.maxGuardAge / 60} min counts as closed.`
             : !resumed
@@ -168,7 +174,7 @@ async function readChecks(round: Addr, p: Params): Promise<Check[]> {
 
   const priceSource = guardSource ? "GuardPriceFeed (testnet; the guard posts a public Nasdaq quote)" : "Pyth Core";
   if (!price) {
-    checks.push({ name: "The price is fresh", ok: false, value: "No price posted yet. The guard posts GME's quote while the market is open.", source: priceSource });
+    checks.push({ name: "The price is fresh", ok: false, value: `No price posted yet. The guard posts ${demo.ticker}'s quote while its round needs one and the market is open.`, source: priceSource });
   } else {
     const px = Number(price.price) * 10 ** price.expo;
     const confBps = Number(price.price) > 0 ? (Number(price.conf) * 1e4) / Number(price.price) : Infinity;
@@ -176,7 +182,7 @@ async function readChecks(round: Addr, p: Params): Promise<Check[]> {
     checks.push({
       name: "The price is fresh",
       ok: age <= p.maxPythAge && confBps <= p.maxConfBps,
-      value: `GME $${px.toFixed(2)}, posted ${ago(Number(price.publishTime))}, ±${confBps.toFixed(0)} bp. Limits: ${p.maxPythAge} s and ${p.maxConfBps} bp.`,
+      value: `${demo.ticker} $${px.toFixed(2)}, posted ${ago(Number(price.publishTime))}, ±${confBps.toFixed(0)} bp. Limits: ${p.maxPythAge} s and ${p.maxConfBps} bp.`,
       source: priceSource,
     });
   }
@@ -213,7 +219,7 @@ function inkFor(s: RoundState): Ink {
 
 function head(round: Addr, s: S): HTMLElement {
   const seal = h("div", { class: "cert__seal" });
-  seal.append(rosette(DEMO.ticker, { detail: "detail", ink: inkFor(s.state), label: `${DEMO.symbol} seal` }));
+  seal.append(rosette(demo.ticker, { detail: "detail", ink: inkFor(s.state), label: `${demo.symbol} seal` }));
   return h(
     "header",
     { class: "cert__head" },
@@ -221,8 +227,8 @@ function head(round: Addr, s: S): HTMLElement {
     h(
       "div",
       {},
-      h("p", { class: "cert__ticker wide" }, DEMO.symbol),
-      h("p", { class: "cert__sub" }, "Demo stock tracking GME. Testnet, no value."),
+      h("p", { class: "cert__ticker wide" }, demo.symbol),
+      h("p", { class: "cert__sub" }, `Demo stock tracking ${demo.ticker}. Testnet, no value.`),
       h("p", { class: "cert__addr" }, "Round ", h("a", { href: explorer("address", round), target: "_blank", rel: "noopener" }, short(round)), " on Base Sepolia"),
     ),
   );
@@ -273,7 +279,7 @@ function body(round: Addr, p: Params, s: S, checks: Check[], redraw: () => Promi
   return h(
     "div",
     { class: "cert__body" },
-    h("div", { class: "cert__main" }, progress, sequence, ramp(p, s), checkList),
+    h("div", { class: "cert__main" }, progress, sequence, ...(s.state === "Filled" ? [pool(round, p)] : []), ramp(p, s), checkList),
     actions(round, p, s, checks.every((c) => c.ok), redraw),
   );
 }
@@ -368,8 +374,8 @@ function actions(round: Addr, p: Params, s: S, conditionsHold: boolean, redraw: 
       h("dd", {}, `${tusdc(m.pledge)} tUSDC`),
       h("dt", {}, "Your tUSDC"),
       h("dd", {}, tusdc(m.usdc)),
-      h("dt", {}, `Your ${DEMO.symbol}`),
-      h("dd", {}, Number(formatUnits(m.stock, DEMO.decimals)).toLocaleString("en-US", { maximumFractionDigits: 4 })),
+      h("dt", {}, `Your ${demo.symbol}`),
+      h("dd", {}, Number(formatUnits(m.stock, DEMO_DECIMALS)).toLocaleString("en-US", { maximumFractionDigits: 4 })),
     ),
   );
   const btn = (label: string, f: () => void, primary = false, disabled = false) => {
@@ -409,13 +415,13 @@ function actions(round: Addr, p: Params, s: S, conditionsHold: boolean, redraw: 
           { address: p.token, abi: erc20Abi, functionName: "approve", args: [round, maxUint256] },
           { address: round, abi: roundAbi as Abi, functionName: "fill", args: [[]] },
         ]), true, !conditionsHold || m.stock === 0n),
-      h("p", { class: "act__note" }, m.stock === 0n ? `Filling needs ${DEMO.symbol}. In the demo, the filler wallet holds it.` : `You deliver ${DEMO.symbol} and receive ${tusdc((p.target * BigInt(10_000 - p.lpBps)) / 10_000n)} tUSDC.`),
+      h("p", { class: "act__note" }, m.stock === 0n ? `Filling needs ${demo.symbol}. In the demo, the filler wallet holds it.` : `You deliver ${demo.symbol} and receive ${tusdc((p.target * BigInt(10_000 - p.lpBps)) / 10_000n)} tUSDC.`),
     );
     if (now() > s.auctionStart + p.windowSeconds) box.append(btn("End the auction", () => void run("End the auction", [{ address: round, abi: roundAbi as Abi, functionName: "endAuction" }])));
   } else if (s.state === "Filled") {
     const owed = p.target > 0n ? (s.backerTokens * m.pledge) / p.target : 0n;
     if (m.pledge > 0n && !m.claimed)
-      box.append(btn(`Claim ${Number(formatUnits(owed, DEMO.decimals)).toFixed(4)} ${DEMO.symbol}`, () => void run("Claim", [{ address: round, abi: roundAbi as Abi, functionName: "claim" }]), true));
+      box.append(btn(`Claim ${Number(formatUnits(owed, DEMO_DECIMALS)).toFixed(4)} ${demo.symbol}`, () => void run("Claim", [{ address: round, abi: roundAbi as Abi, functionName: "claim" }]), true));
     else box.append(h("p", {}, m.pledge > 0n ? "Claimed. Your tokens are in your wallet." : "This round is filled. Its pool is open on Uniswap v4."));
     const unlock = s.filledAt + p.lpLockSeconds;
     if (!s.unwound) box.append(btn(now() >= unlock ? "Unwind the pool position" : `Pool position locked until ${new Date(unlock * 1000).toLocaleString()}`, () => void run("Unwind", [{ address: round, abi: roundAbi as Abi, functionName: "unwindLP" }]), false, now() < unlock));
@@ -425,5 +431,94 @@ function actions(round: Addr, p: Params, s: S, conditionsHold: boolean, redraw: 
     else box.append(h("p", {}, "This round expired without a fill. Every pledge can be refunded."));
   }
   box.append(msg);
+  return box;
+}
+
+/** USD per whole token from a v4 sqrt price, for a stock/USDC pool in either currency order. */
+function poolPriceUsd(sqrtPriceX96: bigint, tokenIs0: boolean): number {
+  const ratio = (Number(sqrtPriceX96) / 2 ** 96) ** 2; // currency1 raw per currency0 raw
+  const scale = 10 ** (DEMO_DECIMALS - 6);
+  return tokenIs0 ? ratio * scale : scale / ratio;
+}
+
+/** After a fill: the summoned stock's pool, and a box to trade it. */
+function pool(round: Addr, p: Params): HTMLElement {
+  const box = h(
+    "section",
+    { class: "pool", "aria-labelledby": "pool-h" },
+    h("h2", { class: "wide", id: "pool-h" }, `${demo.symbol} trades`),
+    h("p", { class: "pool__lede" }, "Reading the Uniswap v4 pool…"),
+  );
+  (async () => {
+    const lede = box.querySelector(".pool__lede")!;
+    try {
+      const key = await client.readContract({ address: round, abi: roundAbi, functionName: "poolKey" });
+      const [sqrtP, , liq] = await client.readContract({ address: D.swap!, abi: swapAbi, functionName: "poolState", args: [key] });
+      const tokenIs0 = key.currency0.toLowerCase() === p.token.toLowerCase();
+      const px = poolPriceUsd(sqrtP, tokenIs0);
+      lede.textContent = `Pool price $${px.toFixed(2)} per ${demo.symbol}. In-range liquidity ${liq.toString()}. Pool fee 0.3%. Anyone can trade it; the backers are its LPs.`;
+      const me = current();
+      if (!me) {
+        box.append(h("p", { class: "act__note" }, "Connect a wallet to trade."));
+        return;
+      }
+      let buying = true;
+      const amount = h("input", { type: "number", min: "0", step: "any", value: "10", "aria-label": "Amount" });
+      const unit = h("span", {}, "tUSDC");
+      const est = h("p", { class: "act__note" });
+      const msg = h("p", { class: "act__msg", role: "status" });
+      const toggle = h("button", { class: "btn", type: "button" }, `Sell ${demo.symbol} instead`);
+      const go = h("button", { class: "btn btn--seal", type: "button" }, `Buy ${demo.symbol}`);
+      const estimate = () => {
+        const n = Number(amount.value) || 0;
+        const out = buying ? (n / px) * 0.997 : n * px * 0.997;
+        est.textContent = `About ${out.toFixed(buying ? 4 : 2)} ${buying ? demo.symbol : "tUSDC"} before price impact. The trade reverts if it would get less than 97% of that.`;
+        return out;
+      };
+      toggle.addEventListener("click", () => {
+        buying = !buying;
+        unit.textContent = buying ? "tUSDC" : demo.symbol;
+        go.textContent = buying ? `Buy ${demo.symbol}` : `Sell ${demo.symbol}`;
+        toggle.textContent = buying ? `Sell ${demo.symbol} instead` : `Buy ${demo.symbol} instead`;
+        estimate();
+      });
+      amount.addEventListener("input", estimate);
+      go.addEventListener("click", async () => {
+        const inDec = buying ? 6 : DEMO_DECIMALS;
+        const outDec = buying ? DEMO_DECIMALS : 6;
+        const amountIn = parseUnits(String(Number(amount.value) || 0), inDec);
+        if (amountIn === 0n) return void (msg.textContent = "Enter an amount above 0.");
+        const minOut = parseUnits((estimate() * 0.97).toFixed(outDec), outDec);
+        const tokenIn = buying ? D.usdc! : p.token;
+        const zeroForOne = (key.currency0.toLowerCase() === tokenIn.toLowerCase());
+        try {
+          const w = walletClient();
+          go.setAttribute("disabled", "");
+          msg.textContent = "Approve in your wallet.";
+          const a = await w.writeContract({ account: me, chain: client.chain, address: tokenIn, abi: erc20Abi, functionName: "approve", args: [D.swap!, amountIn] });
+          await client.waitForTransactionReceipt({ hash: a });
+          msg.textContent = "Confirm the trade in your wallet.";
+          const hash = await w.writeContract({
+            account: me,
+            chain: client.chain,
+            address: D.swap!,
+            abi: swapAbi,
+            functionName: "swapExactIn",
+            args: [key, zeroForOne, amountIn, minOut, me],
+          });
+          const rc = await client.waitForTransactionReceipt({ hash });
+          msg.replaceChildren(rc.status === "success" ? "Traded. " : "The trade reverted. ", h("a", { href: explorer("tx", hash), target: "_blank", rel: "noopener" }, "View transaction"));
+        } catch (e) {
+          msg.textContent = (e as Error).message.split("\n")[0] ?? "The trade failed.";
+        } finally {
+          go.removeAttribute("disabled");
+        }
+      });
+      estimate();
+      box.append(h("div", { class: "act__row" }, h("label", { class: "money" }, amount, unit), go, toggle), est, msg);
+    } catch {
+      lede.textContent = "Could not read the pool just now.";
+    }
+  })();
   return box;
 }

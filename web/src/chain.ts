@@ -2,13 +2,28 @@ import { createPublicClient, http, parseAbi } from "viem";
 import { baseSepolia } from "viem/chains";
 import deployment from "../../deployments/84532.json";
 
-export const D = deployment as Record<string, `0x${string}`>;
+type Addr = `0x${string}`;
+export interface Demo {
+  ticker: string;
+  symbol: string;
+  address: Addr;
+  priceId: Addr;
+}
+const dep = deployment as unknown as Record<string, Addr> & { demoStocks?: Demo[] };
+export const D = dep as Record<string, Addr>;
 export const chain = baseSepolia;
 export const client = createPublicClient({ chain, transport: http("https://sepolia.base.org") });
 export const explorer = (kind: "address" | "tx", x: string) => `https://sepolia.basescan.org/${kind}/${x}`;
 
-/** The demo stock tracks GME's price; its rosette is GME's. */
-export const DEMO = { stock: D.stock!, ticker: "GME", symbol: "sGME", decimals: 8 } as const;
+/** Demo stocks on Base Sepolia: real B20 tokens with no value, each tracking a real ticker's price; each
+ * uses its ticker's rosette. */
+export const DEMOS: Demo[] = dep.demoStocks ?? [{ ticker: "GME", symbol: "sGME", address: D.stock!, priceId: D.priceId! }];
+export const DEMO_DECIMALS = 8;
+export const demoFor = (ticker: string) => DEMOS.find((x) => x.ticker === ticker);
+export const demoAt = (token: string) => DEMOS.find((x) => x.address.toLowerCase() === token.toLowerCase());
+/** Testnet: the register offers to open a round once a ticker's signed intents reach this (USD). */
+export const OPEN_AT_INTENT_USD = 250;
+export const DEMO_ROUND = { target: 300_000_000n, days: 7, maxSpreadBps: 100, lpLockSeconds: 3600 } as const;
 
 export const factoryAbi = parseAbi([
   "function roundCount() view returns (uint256)",
@@ -44,6 +59,12 @@ export const roundAbi = parseAbi([
   "function refund()",
   "function unwindLP()",
   "function claimLP()",
+  "function poolKey() view returns ((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks))",
+]);
+
+export const swapAbi = parseAbi([
+  "function poolState((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key) view returns (uint160 sqrtPriceX96, int24 tick, uint128 liquidity)",
+  "function swapExactIn((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, bool zeroForOne, uint128 amountIn, uint128 minOut, address to) returns (uint256)",
 ]);
 
 export const erc20Abi = parseAbi([

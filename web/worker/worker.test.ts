@@ -17,6 +17,9 @@ class MemKV {
   async put(k: string, v: string) {
     this.m.set(k, v);
   }
+  async list(o: { prefix?: string }) {
+    return { keys: [...this.m.keys()].filter((k) => k.startsWith(o.prefix ?? "")).map((name) => ({ name })), list_complete: true, cursor: "" };
+  }
 }
 
 const snapshot = readFileSync(new URL("../public/b20.json", import.meta.url), "utf8");
@@ -74,6 +77,29 @@ const tests: [string, () => Promise<void>][] = [
       assert.equal((await intent(e, a, "RKT", 250)).status, 200);
       const r = await intent(e, a, "RKT", 400);
       assert.deepEqual(await r.json(), { ok: true, ticker: "RKT", backers: 1, usd: 400 });
+    },
+  ],
+  [
+    "the demand export carries signatures that verify",
+    async () => {
+      const e = env();
+      const a = privateKeyToAccount(generatePrivateKey());
+      await intent(e, a, "SOFI", 120);
+      const body = (await (await worker.fetch(req("/api/demand?ticker=SOFI"), e)).json()) as {
+        intents: { ticker: string; address: string; usd: number; expiry: number; nonce: number; signature: `0x${string}` }[];
+      };
+      assert.equal(body.intents.length, 1);
+      const it = body.intents[0]!;
+      const { verifyTypedData } = await import("viem");
+      const ok = await verifyTypedData({
+        address: a.address,
+        domain,
+        types,
+        primaryType: "Intent",
+        message: { ticker: it.ticker, usd: BigInt(it.usd), expiry: BigInt(it.expiry), nonce: BigInt(it.nonce) },
+        signature: it.signature,
+      });
+      assert.equal(ok, true);
     },
   ],
   [

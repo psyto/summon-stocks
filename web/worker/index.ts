@@ -3,6 +3,8 @@
  *
  *   GET  /api/intents        -> { [ticker]: { backers, usd } }
  *   POST /api/intents        <- { ticker, usd, expiry, nonce, address, signature }
+ *   GET  /api/demand         -> every unexpired intent with its signature, so an issuer can verify the
+ *                               totals itself instead of trusting this Worker (?ticker=GME narrows it)
  *
  * Each intent is an EIP-712 signature checked here. One intent per wallet per ticker (a new one
  * replaces the old). The demo wallets are refused, so the board never counts our own signatures.
@@ -126,6 +128,23 @@ async function post(req: Request, env: Env): Promise<Response> {
   return json({ ok: true, ticker, ...s[ticker] });
 }
 
+async function demand(req: Request, env: Env): Promise<Response> {
+  const only = new URL(req.url).searchParams.get("ticker") ?? undefined;
+  const rows: Record<string, unknown>[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await env.INTENTS.list({ prefix: only ? `i:${only}:` : "i:", cursor });
+    for (const k of page.keys) {
+      const [, ticker, address] = k.name.split(":");
+      const v = (await env.INTENTS.get(k.name, "json")) as { usd: number; expiry: number; nonce: number; signature: string } | null;
+      if (!v || v.expiry < Date.now() / 1000) continue;
+      rows.push({ ticker, address, usd: v.usd, expiry: v.expiry, nonce: v.nonce, signature: v.signature });
+    }
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor);
+  return json({ domain: DOMAIN, types: TYPES, primaryType: "Intent", intents: rows });
+}
+
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const country = (req as Request & { cf?: { country?: string } }).cf?.country;
@@ -134,6 +153,7 @@ export default {
       return new Response(BLOCKED_PAGE, { status: 451, headers: { "content-type": "text/html; charset=utf-8" } });
     }
     const url = new URL(req.url);
+    if (url.pathname === "/api/demand" && req.method === "GET") return demand(req, env);
     if (url.pathname === "/api/intents") {
       if (req.method === "GET") return json(await summary(env));
       if (req.method === "POST") return post(req, env);

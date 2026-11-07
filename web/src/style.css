@@ -925,3 +925,37 @@ a {
   margin: 0;
   color: var(--muted);
 }
+
+.demo {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--rule);
+}
+.demo__label {
+  margin: 0 0 6px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.demo__body {
+  margin: 0;
+  font-size: 15px;
+}
+.demo .btn {
+  margin-top: 12px;
+}
+
+.pool {
+  margin-top: 36px;
+  padding: 20px 22px;
+  border: 1px solid var(--ink);
+  border-radius: 6px;
+}
+.pool h2 {
+  margin: 0 0 8px;
+  font-size: 25px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.pool__lede {
+  margin: 0;
+}

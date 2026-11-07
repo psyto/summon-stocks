@@ -2,7 +2,8 @@ import { h } from "./el";
 import { loadSnapshot, statusLine, usd, type Snapshot, type Stock } from "./data";
 import { rosette, type Ink } from "./rosette";
 import { loadTotals, signIntent, type Totals } from "./intents";
-import { client, D, DEMO, factoryAbi, roundAbi, STATES } from "./chain";
+import { client, D, DEMOS, DEMO_ROUND, demoAt, demoFor, factoryAbi, OPEN_AT_INTENT_USD, roundAbi, STATES } from "./chain";
+import { connect, current, walletClient } from "./wallet";
 
 type Filter = "all" | Ink;
 
@@ -170,6 +171,7 @@ function register(s: Snapshot, totals: Totals): HTMLElement {
       ),
       msg,
     );
+    const demoBox = demoBlock(x.ticker, t.usd);
     detailBox.replaceChildren(
       rosette(x.ticker, { detail: "detail", ink: x.status, label: `${x.ticker} seal` }),
       h("p", { class: "detail__ticker wide" }, x.ticker),
@@ -177,6 +179,7 @@ function register(s: Snapshot, totals: Totals): HTMLElement {
       h("p", { class: "detail__status" }, statusLine[x.status]),
       facts,
       intent,
+      ...(demoBox ? [demoBox] : []),
     );
   }
 
@@ -190,6 +193,65 @@ function register(s: Snapshot, totals: Totals): HTMLElement {
   );
 }
 
+/**
+ * For a ticker with a testnet demo stock: its round if one is running, otherwise the way to open one.
+ * A round opens once the ticker's signed intents reach OPEN_AT_INTENT_USD, the testnet stand-in for
+ * "intents approach the minimum target".
+ */
+function demoBlock(ticker: string, intentUsd: number): HTMLElement | null {
+  const demo = demoFor(ticker);
+  if (!demo) return null;
+  const box = h("div", { class: "demo" }, h("p", { class: "demo__label" }, `Testnet demo: ${demo.symbol}`), h("p", { class: "demo__body" }, "Reading Base Sepolia…"));
+  (async () => {
+    const body = box.querySelector(".demo__body")!;
+    try {
+      const r = await client.readContract({ address: D.factory!, abi: factoryAbi, functionName: "latestRound", args: [demo.address] });
+      const st = r === "0x0000000000000000000000000000000000000000" ? undefined : STATES[await client.readContract({ address: r, abi: roundAbi, functionName: "state" })];
+      if (st && st !== "Expired") {
+        body.replaceChildren(
+          st === "Filled" ? `Summoned on testnet. Its pool is open. ` : `A round is ${st.toLowerCase()}. `,
+          h("a", { href: `#/round/${r}` }, st === "Filled" ? "Trade and claim" : "Open the round"),
+        );
+        return;
+      }
+      const left = Math.max(0, OPEN_AT_INTENT_USD - intentUsd);
+      if (left > 0) {
+        body.replaceChildren(`A round opens once signed intents reach ${usd(OPEN_AT_INTENT_USD)}. ${usd(left)} to go.`);
+        return;
+      }
+      const btn = h("button", { class: "btn btn--seal", type: "button" }, `Open a round for ${demo.symbol}`);
+      const msg = h("p", { class: "intent__msg", role: "status" });
+      btn.addEventListener("click", async () => {
+        try {
+          const me = current() ?? (await connect());
+          btn.setAttribute("disabled", "");
+          msg.textContent = "Confirm in your wallet.";
+          const deadline = BigInt(Math.floor(Date.now() / 1000) + DEMO_ROUND.days * 86_400);
+          const hash = await walletClient().writeContract({
+            account: me,
+            chain: client.chain,
+            address: D.factory!,
+            abi: factoryAbi,
+            functionName: "openRound",
+            args: [demo.address, DEMO_ROUND.target, deadline, DEMO_ROUND.maxSpreadBps, DEMO_ROUND.lpLockSeconds],
+          });
+          msg.textContent = "Opening on Base Sepolia…";
+          await client.waitForTransactionReceipt({ hash });
+          const nr = await client.readContract({ address: D.factory!, abi: factoryAbi, functionName: "latestRound", args: [demo.address] });
+          location.hash = `#/round/${nr}`;
+        } catch (e) {
+          msg.textContent = (e as Error).message.split("\n")[0] ?? "Opening failed.";
+          btn.removeAttribute("disabled");
+        }
+      });
+      body.replaceChildren(`Signed intents passed ${usd(OPEN_AT_INTENT_USD)}. Anyone can open a 300 tUSDC round.`, btn, msg);
+    } catch {
+      body.textContent = "Could not read Base Sepolia just now.";
+    }
+  })();
+  return box;
+}
+
 /** Rounds on Base Sepolia, read from the factory. */
 function rounds(): HTMLElement {
   const box = h("section", { class: "rounds", "aria-labelledby": "rounds-h" });
@@ -199,7 +261,11 @@ function rounds(): HTMLElement {
       "div",
       { class: "rounds__head" },
       h("h2", { class: "wide", id: "rounds-h" }, "Rounds"),
-      h("p", {}, `Testnet. The demo stock ${DEMO.symbol} is a real B20 token that tracks GME's price and has no value.`),
+      h(
+        "p",
+        {},
+        `Testnet. The demo stocks (${DEMOS.map((x) => x.symbol).join(", ")}) are real B20 tokens that track those stocks' prices and have no value.`,
+      ),
     ),
     list,
   );
@@ -216,11 +282,12 @@ function rounds(): HTMLElement {
             client.readContract({ address: a, abi: roundAbi, functionName: "pledged" }),
             client.readContract({ address: a, abi: roundAbi, functionName: "params" }),
           ]);
-          return { a, state: STATES[st]!, pledged: Number(pledged) / 1e6, target: Number(p.target) / 1e6 };
+          const demo = demoAt(p.token);
+          return { a, state: STATES[st]!, pledged: Number(pledged) / 1e6, target: Number(p.target) / 1e6, ticker: demo?.ticker ?? "?", symbol: demo?.symbol ?? "token" };
         }),
       );
       if (rows.length === 0) {
-        list.replaceChildren(h("p", { class: "rounds__empty" }, "No round is open yet. The first one opens for the demo stock when the US market is open."));
+        list.replaceChildren(h("p", { class: "rounds__empty" }, "No round is open yet. Sign intents for a demo stock below; at $250 it can open one."));
         return;
       }
       list.replaceChildren(
@@ -228,8 +295,8 @@ function rounds(): HTMLElement {
           const ink: Ink = r.state === "Filled" ? "trading" : r.state === "Expired" ? "never" : "issued";
           const a = h("a", { class: "round-link", href: `#/round/${r.a}` });
           a.append(
-            rosette(DEMO.ticker, { detail: "mark", ink }),
-            h("span", { class: "round-link__t wide" }, DEMO.symbol),
+            rosette(r.ticker, { detail: "mark", ink }),
+            h("span", { class: "round-link__t wide" }, r.symbol),
             h("span", {}, `${r.state}. ${r.pledged.toLocaleString("en-US")} of ${r.target.toLocaleString("en-US")} tUSDC pledged`),
           );
           return a;
