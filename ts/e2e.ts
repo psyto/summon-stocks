@@ -1,6 +1,7 @@
 /**
- * Spec 001 A1 on Base Sepolia: open a round, three demo backers pledge to target, start the auction,
- * the demo filler fills, backers claim. Prints every transaction. Needs the market open (09:30-16:00 ET
+ * Spec 001 A1 on Base Sepolia: three demo backers pledge to target, start the auction, the demo filler
+ * fills, backers claim. Prints every transaction. Picks up the stock's open round where it stands (other
+ * people may already have pledged); opens a new round only if none is open. Needs the market open (09:30-16:00 ET
  * on weekdays) and the guard running; with PRICE_SOURCE=pyth deployments, also PYTH_API_KEY.
  *
  *   npm run e2e                 # target 300 tUSDC, fill after 120 s
@@ -49,37 +50,53 @@ async function main() {
   const wait = Number(process.env.WAIT_SECONDS ?? "120");
   const deadline = BigInt(Math.floor(Date.now() / 1000) + 3 * 86_400);
 
-  const opened = await send("operator", "openRound", {
-    address: d.factory,
-    abi: summonFactoryAbi,
-    functionName: "openRound",
-    args: [d.stock, target, deadline, 100, 3600],
-  });
-  const ev = opened.logs
-    .map((l) => {
-      try {
-        return decodeEventLog({ abi: summonFactoryAbi, data: l.data, topics: l.topics });
-      } catch {
-        return undefined;
-      }
-    })
-    .find((e) => e?.eventName === "RoundOpened");
-  const round = (ev!.args as { round: Hex }).round;
-  console.log("round", round);
+  let round = await pc.readContract({ address: d.factory, abi: summonFactoryAbi, functionName: "latestRound", args: [d.stock] });
+  let state = round === "0x0000000000000000000000000000000000000000" ? "none" : STATES[await pc.readContract({ address: round, abi: roundAbi, functionName: "state" })];
+  if (state === "none" || state === "Expired" || state === "Filled") {
+    const opened = await send("operator", "openRound", {
+      address: d.factory,
+      abi: summonFactoryAbi,
+      functionName: "openRound",
+      args: [d.stock, target, deadline, 100, 3600],
+    });
+    const ev = opened.logs
+      .map((l) => {
+        try {
+          return decodeEventLog({ abi: summonFactoryAbi, data: l.data, topics: l.topics });
+        } catch {
+          return undefined;
+        }
+      })
+      .find((e) => e?.eventName === "RoundOpened");
+    round = (ev!.args as { round: Hex }).round;
+    state = "Open";
+  }
+  console.log("round", round, state);
 
   const shares = { alice: 150n, bob: 90n, carol: 60n } as const;
-  for (const [who, pct] of Object.entries(shares) as [keyof typeof shares, bigint][]) {
-    const amount = (target * pct) / 300n;
-    await send(who, `${who}: mint tUSDC`, { address: d.usdc, abi: erc20Abi, functionName: "mint", args: [account(who).address, amount] });
-    await send(who, `${who}: approve`, { address: d.usdc, abi: erc20Abi, functionName: "approve", args: [round, amount] });
-    await send(who, `${who}: pledge`, { address: round, abi: roundAbi, functionName: "pledge", args: [amount] });
+  if (state === "Open") {
+    // pledge what is left, split 50/30/20 between the demo backers
+    const goal = (await pc.readContract({ address: round, abi: roundAbi, functionName: "params" })).target;
+    const left = goal - (await pc.readContract({ address: round, abi: roundAbi, functionName: "pledged" }));
+    const whos = Object.keys(shares) as (keyof typeof shares)[];
+    let given = 0n;
+    for (const [i, who] of whos.entries()) {
+      const amount = i === whos.length - 1 ? left - given : (left * shares[who]) / 300n;
+      given += amount;
+      if (amount === 0n) continue;
+      await send(who, `${who}: mint tUSDC`, { address: d.usdc, abi: erc20Abi, functionName: "mint", args: [account(who).address, amount] });
+      await send(who, `${who}: approve`, { address: d.usdc, abi: erc20Abi, functionName: "approve", args: [round, amount] });
+      await send(who, `${who}: pledge`, { address: round, abi: roundAbi, functionName: "pledge", args: [amount] });
+    }
+    state = "Funded";
   }
 
   let p = await pythArgs();
-  await send("operator", "startAuction", { address: round, abi: roundAbi, functionName: "startAuction", args: [p.data], value: p.fee });
-
-  console.log(`waiting ${wait} s for the spread to rise`);
-  await new Promise((r) => setTimeout(r, wait * 1000));
+  if (state === "Funded") {
+    await send("operator", "startAuction", { address: round, abi: roundAbi, functionName: "startAuction", args: [p.data], value: p.fee });
+    console.log(`waiting ${wait} s for the spread to rise`);
+    await new Promise((r) => setTimeout(r, wait * 1000));
+  }
   await send("filler", "filler: approve sGME", { address: d.stock, abi: b20Abi, functionName: "approve", args: [round, 2n ** 255n] });
   p = await pythArgs();
   await send("filler", "fill", { address: round, abi: roundAbi, functionName: "fill", args: [p.data], value: p.fee });
@@ -93,6 +110,8 @@ async function main() {
   console.log(`  filled: ref $${Number(ref) / 1e18}/token, spread now ${spread} bp, backers owed ${Number(owed) / 1e8} sGME, pool liquidity ${liq}`);
 
   for (const who of Object.keys(shares) as (keyof typeof shares)[]) {
+    const mine = await pc.readContract({ address: round, abi: roundAbi, functionName: "pledgeOf", args: [account(who).address] });
+    if (mine === 0n) continue;
     await send(who, `${who}: claim`, { address: round, abi: roundAbi, functionName: "claim" });
     const bal = await pc.readContract({ address: d.stock, abi: b20Abi, functionName: "balanceOf", args: [account(who).address] });
     console.log(`  ${who} holds ${Number(bal) / 1e8} sGME`);
