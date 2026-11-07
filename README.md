@@ -50,7 +50,7 @@ track). **Testnet only (Base Sepolia).** Mainnet data is only read and shown.
 | Web (`web/`) | built 2026-11-07: the register of all 298 stocks; live round pages; signed intents, with a round opening from the register once a demo stock's intents reach $250; trading a summoned pool; a demand export issuers can verify; the US block and per-network limits (7 Worker tests). Runs locally; goes public once the Codex review is addressed |
 
 First use (2026-11-07): the author, in their own browser wallet, signed $250 of intent for SOFI. The
-register then offered a round, they opened it, got test USDC and pledged 50. One fix came out of it: the
+register then offered a round, they opened it, got test USDC, pledged 50 and took it back (the round shows 0 pledged). One fix came out of it: the
 round page now makes the step you can take the primary button (get test USDC first, then pledge). Fills
 and trading follow on the first weekday with the market open.
 
