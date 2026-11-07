@@ -217,11 +217,12 @@ Let `P = target`, `U_lp = P × lpBps / 1e4` (default `lpBps` = 2000), and `U_f =
 - A9: The README quickstart works from a fresh clone.
 
 ## 10. Milestones
-- 11-13: spec approved (Codex r1 after 11-10). B20 Sepolia check: done 11-07 (createB20 ASSET simulates). Section 8: done 11-07.
-- 11-20: contracts and tests (A2–A7).
-- 11-27: Sepolia e2e (A1) and the guard on Sepolia.
+- 11-13: spec approved (Codex r1 after 11-10). B20 Sepolia check: done 11-07. Section 8: done 11-07.
+- 11-20: contracts and tests (A2–A7). Done 11-07 (39 tests).
+- 11-27: Sepolia e2e (A1) and the guard on Sepolia. Deployed and guard running 11-07; e2e needs market
+  hours, first run 11-09.
 - 12-02: UI (board, round page, live counts) and intent signing.
-- 12-05: video, X post (@buildonbase), submission form.
+- 12-04: video, X post (@buildonbase), submission form; 12-05 is spare.
 
 ## 11. Open questions / weakest points
 1. The Pyth `updateData` is chosen by the filler. Can a filler pick a favorable price inside the 60 s

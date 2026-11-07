@@ -7,7 +7,8 @@ that were minted (DJT, AMC, GME) have no pool to trade in. Summon lets a stock's
 
 1. Backers commit USDC to a ticker, up to a target.
 2. When the target is reached and the market is open, anyone holding the stock token fills the round at a
-   live Pyth reference price, through a capped spread auction (at most 1%, shown before anyone commits).
+   live reference price, through a capped spread auction (at most 1%, shown before anyone commits). The
+   price comes from Pyth. On testnet it can instead come from a quote the guard posts (see "Price source").
 3. Part of the round seeds a Uniswap v4 pool. The pool can only be created by the round, and the backers
    own the LP position together.
 4. A public board ranks which ticker comes next. It uses signed, non-binding intents, and no funds move.
@@ -29,7 +30,11 @@ track). **Testnet only (Base Sepolia).** Mainnet data is only read and shown.
 | Spec ([docs/specs/001-summon.md](docs/specs/001-summon.md)) | r3, after one independent review ([docs/reviews](docs/reviews)); Codex review next |
 | Price math (`src/SummonPrice.sol`, spec 5.1) | done, with tests: split invariance, dividend multiplier, fuzzed rounding |
 | Round, factory, pool hook (`src/SummonRound.sol`, `SummonFactory.sol`, `SummonHook.sol`) | done, 33 tests: each fill condition failing alone, pledge cap, withdraw rules, expiry and refunds, claims under transfer policies, LP unwind, pool initialization restricted to the round, the guard price feed. Removing any of 8 checks makes a test fail |
-| Sepolia end-to-end, guard, UI, intent board | next (see spec section 10) |
+| Base Sepolia deployment | done 2026-11-07: factory, hook, registries and a real B20 demo stock (see below) |
+| Guard (`ts/guard.ts`) | done: Nasdaq halts and, for guard pricing, the quote. It writes nothing while the market is closed |
+| End-to-end fill on Base Sepolia (`ts/e2e.ts`) | scripted; first run when the market opens (weekdays 09:30–16:00 ET) |
+| UI: ticker board, round page, intent signing | next |
+
 
 ## The numbers
 
