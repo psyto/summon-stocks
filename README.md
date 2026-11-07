@@ -60,11 +60,12 @@ anvil, so unit tests use mocks and the end-to-end run broadcasts to Base Sepolia
 
 ## Parts used
 
-- [hl-price-guard](https://github.com/fabrknt/hl-price-guard) (pinned at `e82819a`): `PythRef` for the
+- [hl-price-guard](https://github.com/fabrknt/hl-price-guard) (pinned at `v0.3.2`): `PythRef` for the
   Pyth read and confidence bound, and `JumpLatch` for the jump guard. Summon needed a Pyth-only staleness
   check, so it was added upstream first (`PythRef.readFresh`), not worked around here.
-- A market-state guard (halts from Nasdaq Trader, fail-closed when the updater goes quiet) from another of
-  our projects. It will be published as a package before the Sepolia end-to-end.
+- [market-state](https://github.com/fabrknt/market-state) (pinned at `v0.1.0`): the Nasdaq Trader halts
+  guard and `MarketStateRegistry`, which fails closed when the updater goes quiet. It was extracted from
+  another of our projects as a public part, so that Summon could depend on it through a tag.
 - [Uniswap v4-core](https://github.com/Uniswap/v4-core) v4.0.0,
   [pyth-sdk-solidity](https://github.com/pyth-network/pyth-sdk-solidity) v2.2.0,
   [base-std](https://github.com/base/base-std) v1.1.0.

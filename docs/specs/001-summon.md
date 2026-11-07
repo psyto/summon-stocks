@@ -180,11 +180,10 @@ Let `P = target`, `U_lp = P × lpBps / 1e4` (default `lpBps` = 2000), and `U_f =
   updates for a real ticker, mapped to the demo token.
 
 ## 8. Own parts used (dogfooding)
-- the earlier project: `MarketStateRegistry` and `ts/guard.ts` (Nasdaq halts). **Open decision for the founder:**
-  the earlier project is private, so a git dependency breaks a judge's fresh clone. Options: (a) publish these two
-  pieces as a small public package from the earlier project, or (b) make the needed the earlier project rev public. Copying the
-  code into Summon is not an option.
-- hl-price-guard (`fabrknt/hl-price-guard`, public): `JumpLatch` with an anchor (5.2-8), and the
+- market-state (`fabrknt/market-state` v0.1.0, public): `MarketStateRegistry`, `MarketStateCheck.requireOpen`
+  (5.2-2), and the TypeScript guard for Nasdaq halts. Extracted from an earlier private project on
+  2026-11-07, so that a judge's fresh clone builds. Copying the code into Summon was not an option.
+- hl-price-guard (`fabrknt/hl-price-guard` v0.3.2, public): `PythRef.readFresh` (added for Summon), `JumpLatch` with an anchor (5.2-8), and the
   independent-price check (5.1). These are pinned by git rev. If either needs changes to accept Pyth or
   Chainlink shapes, the fix goes into hl-price-guard first.
 
@@ -203,10 +202,10 @@ Let `P = target`, `U_lp = P × lpBps / 1e4` (default `lpBps` = 2000), and `U_f =
 - A7: A third party calling `initialize` for the round's PoolKey reverts.
 - A8: The UI's live counts (registered, minted, unminted, with a Pyth feed, with no pool) match a script run
   at the same time.
-- A9: The README quickstart works from a fresh clone, which requires the decision in section 8.
+- A9: The README quickstart works from a fresh clone.
 
 ## 10. Milestones
-- 11-13: spec approved (Codex r1 after 11-10), B20 Sepolia check, decision in section 8.
+- 11-13: spec approved (Codex r1 after 11-10). B20 Sepolia check: done 11-07 (createB20 ASSET simulates). Section 8: done 11-07.
 - 11-20: contracts and tests (A2–A7).
 - 11-27: Sepolia e2e (A1) and the guard on Sepolia.
 - 12-02: UI (board, round page, live counts) and intent signing.

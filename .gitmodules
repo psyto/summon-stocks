@@ -13,3 +13,6 @@
 [submodule "lib/hl-price-guard"]
 	path = lib/hl-price-guard
 	url = https://github.com/fabrknt/hl-price-guard
+[submodule "lib/market-state"]
+	path = lib/market-state
+	url = https://github.com/fabrknt/market-state
