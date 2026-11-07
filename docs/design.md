@@ -1,0 +1,87 @@
+# Summon web: design plan (2026-11-07)
+
+## Subject, audience, job
+- Subject: tokenized stocks that are registered on Base but have never been issued, and the rounds that
+  bring them on.
+- Audience: Base judges and crypto-native backers first; issuers and authorized participants second.
+- Primary job: in five seconds, show that 227 of 298 registered stocks have never been issued. Then let a
+  visitor back one.
+
+## Concept: the share certificate
+A stock used to arrive as an engraved certificate: security paper, a guilloché rosette, intaglio ink, a
+red seal. Summon "issues" stocks onto Base, so the page takes that vernacular and makes it generative.
+**Every ticker gets its own guilloché rosette**, computed from the ticker. The rosette's state is the data:
+- **never issued**: drawn in faint uninked lines
+- **issued, no pool**: inked
+- **trading on Base**: inked, with the red seal at its centre
+
+The register of all 298 rosettes is the hero visualisation, built from real data.
+
+First idea, rejected: a Base-blue (#0000FF) exchange board with amber LEDs. It is striking, but a page in
+Base's own blue reads as an official Base product. The rules (§6) forbid implying endorsement.
+
+## Tokens
+Color (security paper, intaglio ink; no cream, no terracotta, no near-black field):
+- `--paper`   #ECF0EC  cool green-grey security paper
+- `--ink`     #0E4A3B  intaglio green (the main ink: text, inked rosettes)
+- `--ink-2`   #14211C  green-black for body text
+- `--faint`   #B7C7BF  uninked engraving lines (never issued)
+- `--seal`    #A4161A  certificate seal red. Used only for "trading", the primary action, and halts
+- `--rule`    #CBD6D0  hairlines in tables
+
+Type: one family, two widths. Archivo (variable width axis).
+- Tickers, numerals and display: Archivo Expanded (wdth 125), weight 700–800. Tickers are capitals by
+  nature; nothing else is set in all caps.
+- Body and UI: Archivo, wdth 100, weight 400/500. Tabular figures for numbers.
+- Scale (1.25): 13 / 16 / 20 / 25 / 31 / 39 / 61 / 96.
+
+Layout:
+```
+ Summon                                   Base Sepolia testnet   [Connect wallet]
+ ┌───────────────────────────────────────────────────────────────────────────┐
+ │  (large rosette, drawing itself)   227 of 298 stocks registered on Base   │
+ │                                    have never been issued.                │
+ │                                    Back one. When the round fills, it     │
+ │                                    trades, with a pool its backers own.   │
+ └───────────────────────────────────────────────────────────────────────────┘
+ Register  [Never issued 227] [Issued, no pool 26] [Trading 45]     search
+ ┌──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┐   ┌─ selected ticker ───────────────────┐
+ │◌ │◌ │◉ │◌ │◎ │…                │   │ rosette  GME                        │
+ │  register: 298 cells, rosette   │   │ GameStop Corp. · status · feed      │
+ │  + ticker, sorted by intent     │   │ backers, total intent               │
+ └─────────────────────────────────┘   │ [$ amount] [Sign intent]            │
+                                        └─────────────────────────────────────┘
+ How a round fills  (a real sequence, so it is numbered)
+ 1 Backers pledge  2 The auction opens  3 A holder fills  4 Backers claim
+```
+- Left-aligned throughout. The certificate frame (a guilloché border) appears in two places only: the hero
+  and the round page.
+- Round page: one certificate. The fields are the ticker, pledged / target, the state sequence, a spread
+  ramp chart, and the fill conditions read live from Base Sepolia (each one names its source).
+
+Principles:
+1. The rosette is the one bold thing. Everything else is quiet: hairlines, paper, ink.
+2. State is drawn, not badged: ink density and the seal carry status. No coloured pills.
+3. One orchestrated motion: the hero rosette draws itself on load. Nothing else animates by itself.
+   Reduced motion shows it drawn.
+4. Every number names where it came from (API snapshot time, block, feed age).
+5. Honest testnet: the demo stock, test USDC and demo wallets say so wherever they appear.
+
+## Review against the brief
+- Is it generic? The closest default is the cream and serif "editorial" look. This plan uses cool green
+  paper, a seal red rather than terracotta, and one variable grotesk family with no serif display. The
+  rosette system exists only because of this subject.
+- Risks: a rosette in every cell could look busy. Answer: cells are small, lines are 0.6 px, and only
+  state changes the ink. Check this on a screenshot.
+- Data honesty: the snapshot shows its time. Volume and pool data come from GeckoTerminal.
+
+## Built (2026-11-07)
+- Hero: the seal engraves itself once (2.6 s, staggered strands); reduced motion shows it drawn. The
+  headline is "Registered on Base. Never issued." The seal carries the number, like a certificate's
+  denomination. Changed after the first screenshot: the first headline repeated "227", and a single dense
+  band read as a wreath, not engraving. Now there are two bands of fine, translucent lines.
+- Register: 298 seals in a stamp-sheet grid, sorted by signed intent. A cell shows its total in seal red.
+- Round page: one certificate (double rule). Pledged, the state sequence, the spread ramp chart, and six
+  fill conditions read live from Base Sepolia (about 2 s, refreshed every 15 s). Each condition names its
+  source.
+- Checked: 1440 px and 390 px (no horizontal scroll), light and dark.

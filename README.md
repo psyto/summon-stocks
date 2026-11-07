@@ -45,7 +45,7 @@ track). **Testnet only (Base Sepolia).** Mainnet data is only read and shown.
 | Base Sepolia deployment | done 2026-11-07: factory, hook, registries and a real B20 demo stock (see below) |
 | Guard (`ts/guard.ts`) | done: Nasdaq halts and, for guard pricing, the quote. It writes nothing while the market is closed |
 | End-to-end fill on Base Sepolia (`ts/e2e.ts`) | scripted; first run when the market opens (weekdays 09:30–16:00 ET) |
-| UI: ticker board, round page, intent signing | next |
+| Web (`web/`): the register, round pages, signed intents | built and run locally; not deployed yet |
 
 
 ## The numbers
@@ -131,6 +131,20 @@ Pyth `0xA2aa501b19aff244D90cc15a4Cf739D2725B5729`, and the B20 policy registry p
 `0x8453…0002`. Three contracts exist on testnet only, and all are labelled as such: `TestUSDC`, which
 anyone can mint; `DemoOracleRegistry`, which stands in for Coinbase's mainnet oracle registry; and
 `GuardPriceFeed`.
+
+## Web
+
+`web/` is the page and a Cloudflare Worker. The page shows the register of all 298 stocks, each with
+its own guilloché seal, and a round page that reads the fill conditions live from Base Sepolia. The
+Worker stores signed intents. It checks each EIP-712 signature, keeps one intent per wallet per ticker,
+and refuses the project's own demo wallets, so the board never counts them. The design notes are in
+[docs/design.md](docs/design.md).
+
+```sh
+python3 scripts/snapshot.py        # refresh web/public/b20.json (the Coinbase API has no CORS)
+cd web && npm install
+npm run build && npx wrangler dev  # page and Worker on http://localhost:8787
+```
 
 ## Parts used
 

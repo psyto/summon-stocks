@@ -1,0 +1,20 @@
+{
+  "name": "summon-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "worker": "wrangler dev --port 8787",
+    "deploy": "vite build && wrangler deploy"
+  },
+  "dependencies": {
+    "viem": "2.55.11"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241106.0",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.0",
+    "wrangler": "^3.90.0"
+  }
+}
