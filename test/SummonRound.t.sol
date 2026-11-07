@@ -16,6 +16,7 @@ import {SummonRound} from "../src/SummonRound.sol";
 import {SummonHook, ISummonRegistry} from "../src/SummonHook.sol";
 import {SummonPrice} from "../src/SummonPrice.sol";
 import {SummonPool} from "../src/SummonPool.sol";
+import {SummonSwap} from "../src/SummonSwap.sol";
 import {MockERC20, MockB20, MockPolicyRegistry, MockOracleRegistry} from "./mocks/Mocks.sol";
 import {GuardPriceFeed} from "../src/testnet/GuardPriceFeed.sol";
 
@@ -508,6 +509,42 @@ contract SummonRoundTest is Test {
         uint256 before = address(this).balance;
         round.startAuction{value: 0.1 ether}(_fresh());
         assertEq(before - address(this).balance, 1); // only the Pyth fee
+    }
+
+    // ------------------------------------------------------------------ trading the summoned pool
+
+    function test_swapOnSummonedPool() public {
+        _start();
+        _fillAfter(60);
+        SummonSwap router = new SummonSwap(IPoolManager(address(pm)));
+        PoolKey memory key = round.poolKey();
+        bool usdcIs0 = address(usdc) < address(token);
+        (uint160 p0,, uint128 l0) = router.poolState(key);
+        assertGt(l0, 0);
+
+        // a backer buys the stock with 100 USDC
+        vm.startPrank(alice);
+        usdc.approve(address(router), type(uint256).max);
+        uint256 before = token.balanceOf(alice);
+        uint256 got = router.swapExactIn(key, usdcIs0, 100e6, 1, alice);
+        vm.stopPrank();
+        assertEq(token.balanceOf(alice) - before, got);
+        // about $100 of stock at $23.45, less the 0.3% fee and the price impact of a 2,000-USDC pool
+        uint256 worth = got * 23.45e18 / 1e8 / 1e12;
+        assertGt(worth, 90e6);
+        assertLt(worth, 100e6);
+        (uint160 p1,,) = router.poolState(key);
+        assertTrue(p1 != p0, "price moved");
+
+        // and sells it back, with a minimum out it cannot meet
+        vm.startPrank(alice);
+        token.approve(address(router), type(uint256).max);
+        vm.expectRevert();
+        router.swapExactIn(key, !usdcIs0, uint128(got), 100e6, alice);
+        uint256 back = router.swapExactIn(key, !usdcIs0, uint128(got), 1, alice);
+        vm.stopPrank();
+        assertLt(back, 100e6, "a round trip costs fees");
+        assertEq(usdc.balanceOf(address(router)) + token.balanceOf(address(router)), 0, "router holds nothing");
     }
 
     // ------------------------------------------------------------------ the guard's price feed (testnet)
