@@ -1,178 +1,211 @@
 # 001: Summon — backers bring a stock onto Base
 
-Status: draft r1 (Claude). For Base "Stocksmaxxing" (submission 2026-12-05). Testnet only.
+Status: draft r2 (Claude), answering docs/reviews/001-spec-r1-claude.md. Prepared for Base "Stocksmaxxing",
+track Programmable Stock Markets, submission 2026-12-05. Testnet only.
 
 ## 1. Why
 
 Coinbase has registered 298 B20 tokenized stocks on Base. On 2026-11-07, 227 had a total supply of 0
 (`/v1/tokenized-stocks/total-supply`). About 15 carry nearly all Base volume. DJT, AMC, GME, RIVN and RDDT
-are minted but have no pool at all. The stocks with the most devoted retail communities are the ones that
-cannot be bought onchain.
+are minted but have no pool at all. Chainlink feeds exist only for 10 liquid tickers, and the API's
+`nav_price` is null for GMEc and DJTc. Pyth publishes US equity prices for 213 of the 298 tickers, including
+154 of the 227 unminted ones (Hermes `price_feeds?asset_type=equity`, 1,277 equity feeds, checked
+2026-11-07).
 
-Summon lets a stock's backers call it onto Base. Backers commit USDC to a ticker. When the target is reached,
-anyone who holds the stock token fills the round at the reference price plus a capped spread. Part of the
-round seeds a pool whose LP position the backers own together. A public board ranks which ticker comes next.
+Summon lets a stock's backers call it onto Base. Backers commit USDC to a ticker. When the target is reached
+and the market is open, anyone who holds the stock token fills the round at the reference price plus a
+small capped spread. Part of the round seeds a pool that the backers own together. A public board ranks
+which ticker comes next.
 
-Issuers lack a demand signal for which of the 227 tickers to mint first. Summon gives them one.
+Issuers lack a demand signal for which tickers to mint first. Summon gives them one.
 
 ## 2. Scope
 
 In scope (all contracts on Base Sepolia):
-- `SummonRound`: one funding round per ticker, with pledge, fill, LP seeding and claims.
+- `SummonRound`: one round per ticker, covering pledge, auction, fill, LP seed, claims, refunds and LP
+  unwind.
 - `SummonFactory`: opens rounds and keeps the list of rounds.
-- Fill conditions: the market is open and not halted, the reference price is fresh, there is no
-  corporate-action window, and the token can be transferred to the round and to backers.
-- A real B20 Asset on Base Sepolia created through `createB20`, used as the demo stock. Section 7 has the
-  fallback.
-- An intent board: backers sign non-binding EIP-712 intents ("I would put $X into TICKER"). The signatures
-  are stored off-chain. No funds move.
-- Read-only mainnet data in the UI: the B20 list, supplies, NAV, Chainlink feeds and Nasdaq halts.
+- `SummonHook`: a Uniswap v4 hook whose only job is to let the round initialize its own pool.
+- Fill conditions (5.2).
+- A real B20 Asset on Base Sepolia created through `createB20`, if the ASSET variant is active there.
+  Section 7 has the fallback.
+- An intent board: backers sign non-binding EIP-712 intents. They are stored off-chain and no funds move.
+- Read-only mainnet data in the UI: the B20 list, supplies, which tickers have a Pyth feed, and which have a
+  pool.
 
 Non-goals:
-- No mainnet contracts, no custody of real funds, no real issuer or authorized participant.
-- No KYC or eligibility checks. The UI shows a Reg S notice and blocks US IPs. B20 transfer policies are
-  respected onchain (section 5.4).
-- No price feed for tickers that do not have one. A round can open only for a token with a configured feed.
-- No governance token. Summon has no token of its own.
+- No mainnet contracts, no real funds, and no real issuer or authorized participant.
+- No KYC. The UI blocks US IPs and shows a Reg S notice. B20 transfer policies are respected onchain
+  (5.4).
+- No round for a ticker without a Pyth US equity feed. The board shows such tickers as "needs a price
+  feed".
+- No Summon token.
+- No fee claims at any time. There is one locked LP position per round, unwound once (5.6).
 
 ## 3. Actors
 
-- Summoner: opens a round for a ticker (anyone).
-- Backer: pledges test USDC into a round, and can withdraw while the round is Open.
-- Filler: holds the stock token and delivers it at the auction price. Any address can fill. In the demo the
-  filler is our own script playing the issuer or authorized participant (the earlier project `MockItnIssuer` flow).
-- Guard: the off-chain updater that writes halt and session state into the earlier project's `MarketStateRegistry`.
+- Summoner: anyone; opens a round.
+- Backer: pledges test USDC and may withdraw while the round is Open.
+- Filler: any address holding the stock token. In the demo this is our script playing the issuer or
+  authorized participant.
+- Guard: an off-chain updater that writes halt state into `MarketStateRegistry` (8). It is a trusted key,
+  and the UI says so on every round page.
 
 ## 4. Round lifecycle
 
 ```
-Open ──(pledged >= target)──> Auction ──fill()──> Filled ──claim()──> (per backer)
-  │                              │
-  └──(now > deadline)──> Expired <──(auction window ends, no fill)
+Open ──(pledged == target)──> Funded ──startAuction()──> Auction ──fill()──> Filled ──unwindLP() after lpLock
+  │                             │                          │
+  └─(now > deadline)──> Expired <──(deadline passes)───────┴─(now > auctionStart + window, no fill) → back to Funded (max 3 auctions) → Expired
                            └── refund() per backer
 ```
 
-- Open: `pledge(amount)` and `withdraw(amount)` are allowed. When a pledge brings the total to `target` or
-  more, the round moves to Auction and records `auctionStart`. After that point, pledges and withdrawals
-  are frozen.
-- Auction: a Dutch auction on the spread. The allowed spread rises linearly from 0 at `auctionStart` to
-  `maxSpreadBps` at `auctionStart + auctionWindow`. The first valid `fill()` takes the round at the current
-  spread. Time spent while the fill conditions fail still counts toward the window, so a closed market can
-  run the auction out and cause expiry. `auctionWindow` defaults to 2 trading hours, and the round should be
-  opened so that its auction falls in a session.
-- Expired: reached when there is no fill by `deadline`, or by `auctionStart + auctionWindow`. Each backer
-  can call `refund()`.
-- Filled: terminal for the auction. Backers `claim()`.
+- Open: `pledge(amount)` accepts at most `target − pledged`; any excess is not taken. `withdraw(amount)`
+  is allowed. When `pledged == target`, the round becomes Funded and pledges and withdrawals are frozen.
+- Funded → Auction: `startAuction()` is permissionless and succeeds only if every condition in 5.2 holds at
+  that moment. It records `auctionStart` and the jump anchor (5.2-8). A round never starts an auction while
+  the market is closed.
+- Auction: the spread rises linearly from 0 to `maxSpreadBps` over `rampSeconds` (default 1800), then stays
+  at `maxSpreadBps` until `auctionStart + window` (default 3600). The first valid `fill()` wins at the current
+  spread. If no one fills, the round returns to Funded, at most 3 times, then becomes Expired.
+- `maxSpreadBps` is set at open, capped at 100, and shown to every backer before they pledge. It is the
+  worst price a backer can pay. A single filler waiting for the maximum is therefore an accepted outcome,
+  not an attack.
+- Self-fill: a backer who also holds the stock can fill their own round. At worst they earn
+  `maxSpreadBps` from the other backers, which the backers accepted when they pledged.
+- Expired: reached when `now > deadline` in Open or Funded, or after 3 failed auctions. Each backer calls
+  `refund()`, and the refunds sum to `pledged`.
 
 ## 5. Mechanics
 
-### 5.1 Price
-- `feedPrice` comes from Chainlink `latestRoundData()` (8 decimals). Base documents the feed as
-  **total-return: it already equals underlying price × multiplier, per token unit**. Summon must not apply
-  the multiplier again. Fill price per raw token unit = `feedPrice × (1 + spreadBps/1e4)`, converted to
-  USDC (6 decimals) and to the token's decimals. Rounding always goes against the filler.
-- Invariant P1: the USDC paid for N raw token units equals N × the per-unit fill price, rounded down. No
-  path multiplies by `multiplier()`.
+### 5.1 Reference price and units
+- Source: the Pyth pull oracle on Base Sepolia (`0xA2aa501b19aff244D90cc15a4Cf739D2725B5729`, which has
+  code). Feed `Equity.US.<TICKER>/USD`, with the id fixed at round open. The filler passes `updateData` into
+  `fill()` (paying the Pyth fee). The round reads `getPriceNoOlderThan(id, maxAge)` with `maxAge` = 60 s.
+- Pyth gives the **underlying share price** (`price × 10^expo`). The B20 token is worth underlying ×
+  multiplier per whole token (Base docs: "Token Price = Underlying Equity Market Price × Multiplier").
+  So, on this path, Summon **must** apply the multiplier, using `multiplier()` (WAD). This is the opposite
+  of the Chainlink path, which is already total-return.
+- Reference price per whole token, in USD with 18 decimals:
+  `ref = price × 10^(18+expo) × multiplier / 1e18`.
+- USDC (6 decimals) owed for `qRaw` raw token units at spread `s` bps:
+  `usdc = floor(qRaw × ref × (1e4 + s) / (1e4 × 10^dec × 1e12))`, rounded against the filler.
+  Raw tokens owed for `u` USDC: `qRaw = ceil(u × 1e4 × 10^dec × 1e12 / (ref × (1e4 + s)))`, rounded
+  against the filler (the filler delivers the rounding).
+- Confidence: refuse if `conf × 1e4 > price × maxConfBps` (default 50 bps).
+- Where the ticker also has a Base Chainlink feed (the 10 liquid ones), it is an optional cross-check:
+  refuse if it disagrees by more than `maxCrossBps`, using hl-price-guard's independent-price check (8).
+- P1: no code path multiplies a Chainlink price by `multiplier`, and every Pyth price is multiplied exactly
+  once.
 
-### 5.2 Fill conditions (all must hold, checked inside `fill`)
-1. The round is in Auction, and `now <= auctionStart + auctionWindow`.
+### 5.2 Fill conditions (checked in both `startAuction` and `fill`)
+1. Lifecycle state, per section 4.
 2. Market state: `MarketStateRegistry.stateOf(token)` reports not halted, `updatedAt` is within
-   `maxGuardAge` (fail closed), and `now >= resumeAfter`. This uses the earlier project's contract as is.
-3. Feed fresh: `answer > 0`, `updatedAt <= now`, and `now - updatedAt <= maxFeedAge` (default 15 min,
-   session only). Base documents the feed as freezing off-hours, so it holds stale values on nights and
-   weekends; the age check is what rejects them.
-4. Registry pause: the Coinbase-style oracle registry pause flag for the token is false. In the demo this is
-   a mock registry with the same `(multiplier, paused)` read.
-5. Multiplier window: there is no scheduled ERC-8056 update whose `effectiveAt` falls within
-   `[now - cooldown, now + cooldown]`. This follows the earlier project `checkMarketOpen`'s multiplier-window rule.
-6. Token not paused for transfers. The B20 pause vectors are checked, and an unreadable result counts as
-   paused.
-7. Policy: `isAuthorized` is true for the round contract as receiver and sender. Claims check backers at
-   claim time (5.4).
-8. Jump guard: if the feed moved more than `maxJumpBps` between its previous round and its latest round, no
-   fill is allowed until the next update. This is to be taken from hl-price-guard's jump latch if that latch
-   is generic enough (section 8).
+   `maxGuardAge`, and `now >= resumeAfter`. Fail closed.
+3. Price is fresh (60 s) and the confidence bound holds (5.1). Pyth equity feeds stop publishing outside
+   the session, so this check also enforces session hours.
+4. Issuer registry, mainnet shape `getOracleParams(address) → (uint256 multiplier, bool paused)`
+   (selector `0xd4197e82`; ABI inferred from the selector name and decoded output, so treat it as
+   unverified). On Sepolia this is a mock with the same ABI. Refuse if `paused`, or if its multiplier does
+   not equal the token's `multiplier()`.
+5. Multiplier window: refuse if the token's `effectiveAt()` is non-zero and within
+   `[now − cooldown, now + cooldown]`. Also refuse if `multiplier()` changed since `auctionStart`, because
+   an instant `updateMultiplier` clears the pending value.
+6. Token not paused: `isPaused(TRANSFER)` is false. A reverting call counts as paused.
+7. Policies (read `policyId(scope)` from the token and require `policyExists`; an unknown id counts as a
+   refusal):
+   - `TRANSFER_SENDER_POLICY`: the filler, the round and the PoolManager.
+   - `TRANSFER_RECEIVER_POLICY`: the round and the PoolManager.
+   - `TRANSFER_EXECUTOR_POLICY`: the round and the PoolManager.
+   - Backers are checked at claim time (5.4).
+8. Jump guard: in `fill`, the reference price must be within `maxJumpBps` (default 300) of the anchor
+   recorded at `startAuction`. Otherwise `fill` reverts, and the round can only return to Funded when the
+   window ends. This uses hl-price-guard's `JumpLatch` with the anchor set by `startAuction`. Re-arming
+   happens only through a new `startAuction`.
 
 ### 5.3 What a fill moves
-Let `P` be the total pledged USDC and `lpBps` the share that seeds the pool (default 2000).
-- The filler delivers `Q = (P × (1 − lpBps/1e4)) / price + Qlp` raw tokens, where
-  `Qlp = (P × lpBps/1e4) / price` is paired with the LP USDC.
-- The filler receives `P − P × lpBps/1e4` USDC. The LP USDC stays with the round and seeds the pool.
-- The round creates or joins a Uniswap v4 pool (stock/USDC, full range, Base Sepolia PoolManager) with
-  `Qlp` tokens and `P × lpBps/1e4` USDC. The position is held by the round contract.
-- Backers get `(P − LP USDC)/price` tokens pro rata to their pledges, plus pro-rata claims on the LP
-  position and its fees.
-- Invariant F1: after `fill`, the round holds exactly the tokens owed to backers plus the LP position. The
-  round's USDC balance equals 0 plus dust, and dust goes to the last claimer or is swept to backers.
+Let `P = target`, `U_lp = P × lpBps / 1e4` (default `lpBps` = 2000), and `U_f = P − U_lp`.
+- The filler delivers `Q = qRaw(U_f, s)` raw tokens and receives `U_f` USDC.
+- From `Q`, the round puts `Qlp = qRaw(U_lp, 0)` tokens and `U_lp` USDC into the pool at the reference price
+  `ref`, with no spread. The remaining `Q − Qlp` tokens are owed to backers pro rata.
+- F2: the filler's USDC received is ≥ the USDC value of the tokens it delivered at price `ref × (1 + s)`,
+  minus at most 1 USDC unit. Equality holds up to rounding, and rounding favors backers.
+- F1: after `fill`, the round's token balance is ≥ the tokens owed to backers. Its USDC balance is ≥ 0 and
+  ≤ `dustBound`, and the LP position's liquidity is greater than 0. Any dust goes pro rata in `unwindLP`.
 
-### 5.4 Claims and policy
-- `claim()` transfers the backer's tokens. If the B20 receiver policy rejects the backer, the claim
-  reverts with `NotAuthorized` and the tokens stay claimable. The round never seizes tokens or redirects
-  them.
-- LP: `claimFees()` pays pro-rata fees at any time. `exitLP()` is allowed after `lpLock` (default 30 days),
-  and each backer burns their share of liquidity.
+### 5.4 Claims
+- `claim()` transfers the backer's tokens. If a policy rejects the backer, it reverts with `NotAuthorized`.
+  The tokens stay claimable, and the round never redirects them.
 
-### 5.5 Pool price at seeding
-The pool is seeded at the fill price. If a pool already exists, the round adds liquidity only when the pool
-price is within `maxSeedDeviationBps` of the fill price. Otherwise it keeps the LP USDC and tokens as plain
-balances and backers claim them pro rata. Summon does not arbitrage the existing pool.
+### 5.5 Pool
+- PoolKey = (token, USDC, fee 3000, tickSpacing 60, hooks = `SummonHook`). `SummonHook.beforeInitialize`
+  requires `sender` to be a round registered in the factory for that token. Nobody else can initialize the
+  key, so there is no "join an existing pool" branch.
+- Seed full range at `ref` (no spread), so the pool does not open overpriced.
+
+### 5.6 LP unwind
+- One position, held by the round. After `lpLock` (default 7 days in the demo), anyone can call
+  `unwindLP()` once. It removes all liquidity, collects fees, and records the tokens and USDC owed per
+  backer pro rata. Backers then call `claimLP()`. Policy checks apply as in 5.4.
 
 ## 6. Intent board (off-chain, no funds)
-- EIP-712 `Intent{ticker, usd, expiry, nonce}`, signed with the user's wallet (Base Account). Stored in a
-  Worker together with the signer. The board shows the number of unique signers and the total USD per
-  ticker.
-- An intent is labelled non-binding everywhere. Sybil resistance is out of scope; the board shows the
-  number of unique addresses and does not claim they are people.
-- Tickers on the board: the 227 unminted, plus minted tickers with no pool, from the live API.
+- EIP-712 `Intent{ticker, usd, expiry, nonce}`, signed with the user's wallet (Base Account) and stored in a
+  Worker. The board shows unique signers and total USD per ticker, and labels every intent non-binding.
+  Sybil resistance is out of scope.
+- Rows: every B20 ticker with zero supply or no pool, from the live API. Each row is tagged "Pyth feed" or
+  "needs a price feed".
 
 ## 7. B20 on Base Sepolia
-- The factory precompile `0xB20f…0000` and the registries `0x8453…0001/0002` respond on Base Sepolia
-  (checked 2026-11-07). Step 1 of implementation: confirm that the ASSET variant is activated on Sepolia, then
-  create a demo stock token with multiplier, pause and policy roles.
-- If ASSET is not activated: a mock that implements the subset of `IB20Asset` Summon reads (`multiplier`,
-  `uiMultiplier`, pending update `effectiveAt`, pause vectors, `isAuthorized` through a mock policy
-  registry). It is deployed as a normal contract and labelled a mock in the UI.
-- Foundry unit tests always use the mock, because anvil has no B20 precompiles. One fork e2e runs against
-  Base Sepolia when ASSET is live.
+- The factory precompile `0xB20f…0000` answers calls on Sepolia, and the registries `0x8453…0001/0002`
+  have code (checked 2026-11-07). Step 1: check that the ASSET variant is activated, then create the demo
+  stock with operator, pause and policy roles.
+- If ASSET is not active: a mock with the same subset of functions (`multiplier`, `effectiveAt`,
+  `isPaused`, `policyId`, and a mock policy registry), deployed as a normal contract and labelled a mock in
+  the UI.
+- Foundry unit tests use the mock, because anvil has no B20 precompiles, even on a fork. The B20 e2e
+  broadcasts to live Sepolia.
+- Pyth on Sepolia: tests use Pyth's `MockPyth`. The e2e uses the real Sepolia Pyth contract with Hermes
+  updates for a real ticker, mapped to the demo token.
 
 ## 8. Own parts used (dogfooding)
-- the earlier project (an earlier private project): `MarketStateRegistry`, `ts/guard.ts`
-  (`parseNasdaqFeed`, `inRegularSession`, `marketStateFor`), and the multiplier-window rule in
-  `checkMarketOpen`. Installed as a git dependency at a pinned rev, not by path or by copying.
-- hl-price-guard (`fabrknt/hl-price-guard`, public): use its jump latch for 5.2(8) if it accepts a
-  Chainlink-shaped price. If it is HyperEVM-specific, record why in an issue on that repo and implement the
-  minimal check here, linking the issue.
+- the earlier project: `MarketStateRegistry` and `ts/guard.ts` (Nasdaq halts). **Open decision for the founder:**
+  the earlier project is private, so a git dependency breaks a judge's fresh clone. Options: (a) publish these two
+  pieces as a small public package from the earlier project, or (b) make the needed the earlier project rev public. Copying the
+  code into Summon is not an option.
+- hl-price-guard (`fabrknt/hl-price-guard`, public): `JumpLatch` with an anchor (5.2-8), and the
+  independent-price check (5.1). These are pinned by git rev. If either needs changes to accept Pyth or
+  Chainlink shapes, the fix goes into hl-price-guard first.
 
 ## 9. Acceptance criteria
-- A1: The full flow on Base Sepolia — open → pledges from 3 wallets → Auction → fill at the current spread
-  → claims → LP fees claimable — is scripted, and each step's tx hash is printed.
-- A2: Each fill condition in 5.2 has a test where only that condition fails and `fill` reverts with its own
+- A1: The full flow on Base Sepolia is scripted, and each step prints its tx hash: open → 3 wallets pledge
+  to target → startAuction → fill with a Pyth update → claims → (time-warped in a fork test) unwindLP →
+  claimLP.
+- A2: Each condition in 5.2 has a test where only that condition fails, and the call reverts with its own
   error.
-- A3: P1 and F1 hold under fuzzing (random pledges, decimals 6/8/18, prices, spreads, multipliers ≠ 1).
-- A4: Changing the multiplier mid-test does not change the fill price (it is total-return). A test that
-  applies the multiplier on top fails, showing the check is real.
-- A5: Withdrawing during Open, and attempting to withdraw during Auction (reverts), are both covered.
-- A6: Expiry by deadline and by auction window, with full refunds summing to P.
-- A7: The UI shows the live mainnet counts (registered, minted, unminted, with no pool) from the API, and the
-  number matches a script run at the same time.
-- A8: The README quickstart works from a fresh clone.
+- A3: P1, F1 and F2 hold under fuzzing over decimals 6/8/18, Pyth expo −5…−8, multipliers 0.5–20 WAD and
+  spreads 0–100 bps.
+- A4: A 10:1 split on the mock (multiplier ×10, mock Pyth price ÷10) leaves the reference price per token
+  unchanged. A deliberately wrong version that ignores the multiplier fails this test.
+- A5: pledge cap at target; withdraw in Open; withdraw in Funded or Auction reverts.
+- A6: Expiry by deadline and after 3 failed auctions. Refunds sum to `pledged`.
+- A7: A third party calling `initialize` for the round's PoolKey reverts.
+- A8: The UI's live counts (registered, minted, unminted, with a Pyth feed, with no pool) match a script run
+  at the same time.
+- A9: The README quickstart works from a fresh clone, which requires the decision in section 8.
 
 ## 10. Milestones
-- 11-13: spec approved (Codex), repo skeleton, B20 Sepolia check (step 1 of section 7).
-- 11-20: contracts + tests (A2–A6).
-- 11-27: Sepolia e2e (A1) + guard on Sepolia.
-- 12-02: UI (board, round page, mainnet counts) + intent signing.
+- 11-13: spec approved (Codex r1 after 11-10), B20 Sepolia check, decision in section 8.
+- 11-20: contracts and tests (A2–A7).
+- 11-27: Sepolia e2e (A1) and the guard on Sepolia.
+- 12-02: UI (board, round page, live counts) and intent signing.
 - 12-05: video, X post (@buildonbase), submission form.
 
-## 11. Open questions / weakest points (reviewers: start here)
-1. Dutch auction on the spread: the first filler can wait for the maximum spread. Is a linear ramp with
-   first-fill-wins right, or should the window be shorter and the maximum lower? Can a filler grief by never
-   filling?
-2. Pledge withdrawal during Open lets a whale push a round into Auction, which freezes everyone. Pledges
-   cannot be withdrawn after that, and a whale cannot withdraw either. Is that enough?
-3. LP seeding into an existing pool with a manipulated price (5.5): is the deviation check enough, given a
-   spot read on the same block?
-4. The fill conditions depend on our own guard (`MarketStateRegistry` updater). A stopped guard fails
-   closed, but a malicious guard could open a halted market. For the testnet demo the guard is our key.
-   State this in the README.
-5. Rounding and dust across 6/8/18 decimals and pro-rata claims.
+## 11. Open questions / weakest points
+1. The Pyth `updateData` is chosen by the filler. Can a filler pick a favorable price inside the 60 s
+   window, and is the confidence bound enough? Should the window be 15 s?
+2. Halts: does Pyth keep publishing during an LULD halt? If it does, the guard is the only defense. How long
+   does the guard take to see a halt in the Nasdaq RSS?
+3. Policies can change between `fill` and `claim`, which leaves tokens stuck in the round. Is that
+   acceptable, given that the tokens remain claimable once the policy allows it?
+4. With fee 3000 and a full-range position, the pool is thin for its range. Should the demo use a
+   concentrated range around `ref` instead, at the cost of more code?
