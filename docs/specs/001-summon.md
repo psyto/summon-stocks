@@ -1,6 +1,7 @@
 # 001: Summon — backers bring a stock onto Base
 
-Status: draft r2 (Claude), answering docs/reviews/001-spec-r1-claude.md. Prepared for Base "Stocksmaxxing",
+Status: draft r3 (Claude): r2 answering docs/reviews/001-spec-r1-claude.md, plus two decisions made while
+implementing it (section 2a). Prepared for Base "Stocksmaxxing",
 track Programmable Stock Markets, submission 2026-12-05. Testnet only.
 
 ## 1. Why
@@ -41,6 +42,13 @@ Non-goals:
   feed".
 - No Summon token.
 - No fee claims at any time. There is one locked LP position per round, unwound once (5.6).
+
+## 2a. Decisions made during implementation (r3)
+- **The owner binds each token to its Pyth feed, once** (`SummonFactory.list(token, priceId)`). In r2 the
+  summoner chose the feed id, so anyone could open a GME round priced off another stock's feed, and a
+  filler would then deliver GME at that other stock's price. Summoners open rounds only for listed tokens.
+- **One Summon pool per token.** A new round may open after an earlier one expired, but not after one
+  filled: the pool key can be initialized only once, and r2 has no "join an existing pool" path.
 
 ## 3. Actors
 

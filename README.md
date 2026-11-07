@@ -26,10 +26,10 @@ track). **Testnet only (Base Sepolia).** Mainnet data is only read and shown.
 
 | Part | State |
 |---|---|
-| Spec ([docs/specs/001-summon.md](docs/specs/001-summon.md)) | r2, after one independent review ([docs/reviews](docs/reviews)); Codex review next |
+| Spec ([docs/specs/001-summon.md](docs/specs/001-summon.md)) | r3, after one independent review ([docs/reviews](docs/reviews)); Codex review next |
 | Price math (`src/SummonPrice.sol`, spec 5.1) | done, with tests: split invariance, dividend multiplier, fuzzed rounding |
-| Round, factory, pool hook (spec 4–5) | next |
-| Sepolia end-to-end, guard, UI, intent board | planned (see spec section 10) |
+| Round, factory, pool hook (`src/SummonRound.sol`, `SummonFactory.sol`, `SummonHook.sol`) | done, 30 tests: each fill condition failing alone, pledge cap, withdraw rules, expiry and refunds, claims under transfer policies, LP unwind, pool initialization restricted to the round. Removing any of 8 checks makes a test fail |
+| Sepolia end-to-end, guard, UI, intent board | next (see spec section 10) |
 
 ## The numbers
 
@@ -63,8 +63,9 @@ anvil, so unit tests use mocks and the end-to-end run broadcasts to Base Sepolia
 - [hl-price-guard](https://github.com/fabrknt/hl-price-guard) (pinned at `v0.3.2`): `PythRef` for the
   Pyth read and confidence bound, and `JumpLatch` for the jump guard. Summon needed a Pyth-only staleness
   check, so it was added upstream first (`PythRef.readFresh`), not worked around here.
-- [market-state](https://github.com/fabrknt/market-state) (pinned at `v0.1.0`): the Nasdaq Trader halts
-  guard and `MarketStateRegistry`, which fails closed when the updater goes quiet. It was extracted from
+- [market-state](https://github.com/fabrknt/market-state) (pinned at `v0.1.0`): `MarketStateCheck.requireOpen`
+  on every auction start and fill, and the Nasdaq Trader halts guard. The registry fails closed when the
+  updater goes quiet. It was extracted from
   another of our projects as a public part, so that Summon could depend on it through a tag.
 - [Uniswap v4-core](https://github.com/Uniswap/v4-core) v4.0.0,
   [pyth-sdk-solidity](https://github.com/pyth-network/pyth-sdk-solidity) v2.2.0,
