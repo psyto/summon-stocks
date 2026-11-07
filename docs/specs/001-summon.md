@@ -165,7 +165,10 @@ Let `P = target`, `U_lp = P × lpBps / 1e4` (default `lpBps` = 2000), and `U_f =
   Worker. The board shows unique signers and total USD per ticker, and labels every intent non-binding.
   Sybil resistance is out of scope.
 - Rows: every B20 ticker with zero supply or no pool, from the live API. Each row is tagged "Pyth feed" or
-  "needs a price feed".
+  "needs a price feed". A ticker with no feed still takes intents: the demand tells issuers, and feed
+  providers, what to add.
+- Limits (Worker): 20 intent writes an hour and 5 new wallets a day per network. The demo wallets are
+  refused. The site and API are closed to US visitors (HTTP 451).
 
 ## 6a. UI rules from the Official Rules (base.org/stocksmaxxing/rules, read 2026-11-07)
 - Tickers appear as text only. No company or issuer logos, and no wording that implies a relationship with,
@@ -221,7 +224,8 @@ Let `P = target`, `U_lp = P × lpBps / 1e4` (default `lpBps` = 2000), and `U_f =
 - 11-20: contracts and tests (A2–A7). Done 11-07 (39 tests).
 - 11-27: Sepolia e2e (A1) and the guard on Sepolia. Deployed and guard checked against it 11-07; e2e needs market
   hours, first run 11-09.
-- 12-02: UI (board, round page, live counts) and intent signing.
+- 12-02: UI (board, round page, live counts) and intent signing. Built 11-07, ahead of plan: the register, round
+  pages with live fill conditions, a Worker that verifies intents, the US block and per-network limits.
 - 12-04: video, X post (@buildonbase), submission form; 12-05 is spare.
 
 ## 11. Open questions / weakest points
