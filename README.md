@@ -137,7 +137,10 @@ anyone can mint; `DemoOracleRegistry`, which stands in for Coinbase's mainnet or
 `web/` is the page and a Cloudflare Worker. The page shows the register of all 298 stocks, each with
 its own guilloché seal, and a round page that reads the fill conditions live from Base Sepolia. The
 Worker stores signed intents. It checks each EIP-712 signature, keeps one intent per wallet per ticker,
-and refuses the project's own demo wallets, so the board never counts them. The design notes are in
+and refuses the project's own demo wallets, so the board never counts them. Each network may write 20
+intents an hour and add 5 new wallets a day. The whole site, page and API, is closed to US visitors
+(HTTP 451): Coinbase tokenized stocks are not offered to US persons, and projects that enable trading for
+US users are out of scope. `npm run test:worker` checks these rules. The design notes are in
 [docs/design.md](docs/design.md).
 
 ```sh
