@@ -6,6 +6,12 @@ compatibility_date = "2024-11-01"
 directory = "./dist"
 not_found_handling = "single-page-application"
 binding = "ASSETS"
+# the Worker sees every request first, so the US block covers the page too, not only the API
+run_worker_first = true
+
+[vars]
+# "on" in production. .dev.vars sets it "off" locally, where wrangler's mock request.cf says US.
+GEO_BLOCK = "on"
 
 [[kv_namespaces]]
 binding = "INTENTS"

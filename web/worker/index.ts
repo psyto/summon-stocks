@@ -12,7 +12,21 @@ import { verifyTypedData, getAddress, isAddress } from "viem";
 interface Env {
   ASSETS: Fetcher;
   INTENTS: KVNamespace;
+  GEO_BLOCK?: string;
 }
+
+/** Projects that enable trading for US users are out of scope (Stocks Maxxing FAQ), and Coinbase
+ * tokenized stocks are not offered to US persons. The whole site is closed to US visitors. */
+const BLOCKED_COUNTRIES = new Set(["US", "PR", "VI", "GU", "AS", "MP", "UM"]);
+
+/** Per IP: intent writes per hour, and new wallets per day (a cheap brake on one person signing from
+ * many wallets; the board still says it counts wallets, not people). */
+const WRITES_PER_HOUR = 20;
+const NEW_WALLETS_PER_DAY = 5;
+
+const BLOCKED_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Summon</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#ecf0ec;color:#14211c;font:17px/1.5 system-ui,sans-serif;padding:24px}main{max-width:34em}h1{color:#0e4a3b;font-size:28px;margin:0 0 12px}</style></head>
+<body><main><h1>Summon is not available in the United States.</h1><p>Coinbase tokenized stocks are not offered to US persons, and Summon is not offered there either.</p></main></body></html>`;
 
 const DOMAIN = { name: "Summon", version: "1", chainId: 84532 } as const;
 const TYPES = {
@@ -51,6 +65,26 @@ async function tickers(env: Env, req: Request): Promise<Map<string, { status: st
   return new Map(snap.stocks.map((s) => [s.ticker, { status: s.status, pyth: !!s.pythFeed }]));
 }
 
+async function underLimit(env: Env, req: Request, address: string, isNew: boolean): Promise<string | null> {
+  const ip = req.headers.get("cf-connecting-ip") ?? "local";
+  const hour = Math.floor(Date.now() / 3_600_000);
+  const day = Math.floor(Date.now() / 86_400_000);
+  const wKey = `rl:w:${ip}:${hour}`;
+  const writes = Number((await env.INTENTS.get(wKey)) ?? 0);
+  if (writes >= WRITES_PER_HOUR) return `Too many intents from this network this hour. Try again after ${new Date((hour + 1) * 3_600_000).toISOString().slice(11, 16)} UTC.`;
+  const aKey = `rl:a:${ip}:${day}`;
+  const wallets = new Set(((await env.INTENTS.get(aKey, "json")) as string[] | null) ?? []);
+  if (isNew && !wallets.has(address) && wallets.size >= NEW_WALLETS_PER_DAY) {
+    return `This network has signed from ${NEW_WALLETS_PER_DAY} wallets today. Intents count wallets, so the limit keeps one person from looking like many.`;
+  }
+  await env.INTENTS.put(wKey, String(writes + 1), { expirationTtl: 7200 });
+  if (!wallets.has(address)) {
+    wallets.add(address);
+    await env.INTENTS.put(aKey, JSON.stringify([...wallets]), { expirationTtl: 172_800 });
+  }
+  return null;
+}
+
 async function post(req: Request, env: Env): Promise<Response> {
   let b: { ticker?: string; usd?: number; expiry?: number; nonce?: number; address?: string; signature?: string };
   try {
@@ -82,6 +116,8 @@ async function post(req: Request, env: Env): Promise<Response> {
 
   const key = `i:${ticker}:${address.toLowerCase()}`;
   const prev = (await env.INTENTS.get(key, "json")) as { usd: number } | null;
+  const limited = await underLimit(env, req, address.toLowerCase(), !prev);
+  if (limited) return json({ error: limited }, 429);
   await env.INTENTS.put(key, JSON.stringify({ usd, expiry, nonce, signature, at: Date.now() }));
   const s = await summary(env);
   const row = s[ticker] ?? { backers: 0, usd: 0 };
@@ -92,6 +128,11 @@ async function post(req: Request, env: Env): Promise<Response> {
 
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
+    const country = (req as Request & { cf?: { country?: string } }).cf?.country;
+    if (env.GEO_BLOCK !== "off" && country && BLOCKED_COUNTRIES.has(country)) {
+      if (new URL(req.url).pathname.startsWith("/api/")) return json({ error: "Summon is not available in the United States." }, 451);
+      return new Response(BLOCKED_PAGE, { status: 451, headers: { "content-type": "text/html; charset=utf-8" } });
+    }
     const url = new URL(req.url);
     if (url.pathname === "/api/intents") {
       if (req.method === "GET") return json(await summary(env));
