@@ -160,8 +160,8 @@ npm run build && npx wrangler dev  # page and Worker on http://localhost:8787
   check, so it was added upstream first (`PythRef.readFresh`), not worked around here.
 - [market-state](https://github.com/fabrknt/market-state) (pinned at `v0.1.0`): `MarketStateCheck.requireOpen`
   on every auction start and fill, and the Nasdaq Trader halts guard. The registry fails closed when the
-  updater goes quiet. It was extracted from
-  another of our projects as a public part, so that Summon could depend on it through a tag.
+  updater goes quiet. It was extracted from another of our projects as a public part, so that Summon could
+  depend on it through a tag. That project now depends on the same tag.
 - [Uniswap v4-core](https://github.com/Uniswap/v4-core) v4.0.0,
   [pyth-sdk-solidity](https://github.com/pyth-network/pyth-sdk-solidity) v2.2.0,
   [base-std](https://github.com/base/base-std) v1.1.0.
