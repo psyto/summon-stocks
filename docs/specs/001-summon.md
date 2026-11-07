@@ -155,6 +155,18 @@ Let `P = target`, `U_lp = P × lpBps / 1e4` (default `lpBps` = 2000), and `U_f =
 - Rows: every B20 ticker with zero supply or no pool, from the live API. Each row is tagged "Pyth feed" or
   "needs a price feed".
 
+## 6a. UI rules from the Official Rules (base.org/stocksmaxxing/rules, read 2026-11-07)
+- Tickers appear as text only. No company or issuer logos, and no wording that implies a relationship with,
+  or endorsement by, Base, Coinbase, a partner, or the listed company (§6).
+- Backers "receive a token that tracks the stock". Never "become a shareholder", and never any mention of
+  voting or other shareholder rights (§6).
+- Demo wallets are labelled as demo wallets everywhere they appear. The intent board never counts our own
+  wallets, because manipulating traction metrics is grounds for disqualification (§13).
+- US IPs are blocked and a Reg S notice is shown, because projects that enable trading for US users are out
+  of scope (FAQ).
+- The README and the submission form state what was built during the Quest Period (2026-11-05 to 12-05),
+  separately from the pre-existing parts in section 8 (§6).
+
 ## 7. B20 on Base Sepolia
 - The factory precompile `0xB20f…0000` answers calls on Sepolia, and the registries `0x8453…0001/0002`
   have code (checked 2026-11-07). Step 1: check that the ASSET variant is activated, then create the demo

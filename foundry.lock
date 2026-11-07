@@ -1,0 +1,32 @@
+{
+  "lib/base-std": {
+    "tag": {
+      "name": "v1.1.0",
+      "rev": "bbfb352e9fe2f67bf6ca33ea4d9a7f2fe0cca20d"
+    }
+  },
+  "lib/forge-std": {
+    "tag": {
+      "name": "v1.17.0",
+      "rev": "f3dae6e6ee381f25eb6a246f7da9b85c91a68219"
+    }
+  },
+  "lib/hl-price-guard": {
+    "tag": {
+      "name": "v0.3.1",
+      "rev": "f151b2d5f7ba6b19c056fe199ce35f6ddad0a188"
+    }
+  },
+  "lib/pyth-sdk-solidity": {
+    "tag": {
+      "name": "v2.2.0",
+      "rev": "11d6bcfc2e56885535a9a8e3c8417847cb20be14"
+    }
+  },
+  "lib/v4-core": {
+    "tag": {
+      "name": "v4.0.0",
+      "rev": "e50237c43811bd9b526eff40f26772152a42daba"
+    }
+  }
+}
