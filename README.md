@@ -58,6 +58,31 @@ forge test
 Requires [Foundry](https://getfoundry.sh). The B20 precompiles exist only on Base and Base Sepolia, not on
 anvil, so unit tests use mocks and the end-to-end run broadcasts to Base Sepolia.
 
+## Run it on Base Sepolia
+
+Everything runs on Base Sepolia with testnet funds. The demo stock is a real B20 Asset, the same standard
+as Coinbase's tokenized stocks, created through the B20 factory precompile. Its symbol is `sGME`, it
+tracks GME's Pyth price, and it has no value.
+
+```sh
+npm install
+# .env: DEMO_MNEMONIC (testnet wallets: 0 operator, 1-3 backers, 4 filler) and PYTH_API_KEY
+#       (Pyth Terminal, app.pyth.com: Hermes needs a key since 2026-08-26; keep it server-side)
+npm run fund                                   # operator -> demo wallets, for gas
+DRY_RUN=1 npm run create-stock                 # simulate; needs no funds
+npm run create-stock                           # prints STOCK_TOKEN
+STOCK_TOKEN=0x… PRICE_ID=0x6f9cd89ef1b7fd39f667101a91ad578b6c6ace4579d5f7f285a4b06aa4504be6 \
+  forge script script/Deploy.s.sol --rpc-url base_sepolia --broadcast --mnemonics "$DEMO_MNEMONIC"
+npm run guard                                  # keep running: Nasdaq halts -> MarketStateRegistry
+npm run e2e                                    # weekdays 09:30-16:00 ET, when Pyth's GME feed publishes
+```
+
+The deploy script finds a CREATE2 salt that puts the hook at an address with BEFORE_INITIALIZE as its
+only flag. Contracts used on Base Sepolia: Uniswap v4 PoolManager `0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408`,
+Pyth `0xA2aa501b19aff244D90cc15a4Cf739D2725B5729`, and the B20 policy registry precompile
+`0x8453…0002`. Two contracts exist on testnet only, and both are labelled as such: `TestUSDC`, which
+anyone can mint, and `DemoOracleRegistry`, which stands in for Coinbase's mainnet oracle registry.
+
 ## Parts used
 
 - [hl-price-guard](https://github.com/fabrknt/hl-price-guard) (pinned at `v0.3.2`): `PythRef` for the

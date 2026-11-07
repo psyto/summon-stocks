@@ -1,0 +1,20 @@
+{
+  "name": "summon-stocks",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "create-stock": "tsx ts/create-stock.ts",
+    "guard": "tsx ts/guard.ts",
+    "e2e": "tsx ts/e2e.ts",
+    "typecheck": "tsc --noEmit",
+    "fund": "tsx ts/fund.ts"
+  },
+  "dependencies": {
+    "@fabrknt/market-state": "github:fabrknt/market-state#v0.1.0",
+    "viem": "2.55.11"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}
