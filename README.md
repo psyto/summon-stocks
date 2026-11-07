@@ -41,11 +41,11 @@ track). **Testnet only (Base Sepolia).** Mainnet data is only read and shown.
 |---|---|
 | Spec ([docs/specs/001-summon.md](docs/specs/001-summon.md)) | r3, after one independent review ([docs/reviews](docs/reviews)). The Codex review of the spec and the code is written up ([docs/reviews/codex-r1-request.md](docs/reviews/codex-r1-request.md)) and runs from 2026-11-10 |
 | Price math (`src/SummonPrice.sol`, spec 5.1) | done, with tests: split invariance, dividend multiplier, fuzzed rounding |
-| Round, factory, pool hook (`src/SummonRound.sol`, `SummonFactory.sol`, `SummonHook.sol`) | done, 34 tests: each fill condition failing alone, pledge cap, withdraw rules, expiry and refunds, claims under transfer policies, LP unwind, pool initialization restricted to the round, the guard price feed. Removing any of 8 checks makes a test fail |
+| Round, factory, pool hook, swap (`src/SummonRound.sol`, `SummonFactory.sol`, `SummonHook.sol`, `SummonSwap.sol`) | done, 35 tests: each fill condition failing alone, pledge cap, withdraw rules, expiry and refunds, claims under transfer policies, LP unwind, pool initialization restricted to the round, the guard price feed, trading the summoned pool. Removing any of 8 checks makes a test fail |
 | Base Sepolia deployment | done 2026-11-07: factory, hook, registries and a real B20 demo stock (see below). The first demo round is open: [`0xa799…046D`](https://sepolia.basescan.org/address/0xa799fC499Af97a474D02878fC10fB8B733b1046D) (target 300 tUSDC) |
 | Guard (`ts/guard.ts`) | done: Nasdaq halts and, for guard pricing, the quote. It writes nothing while the market is closed |
 | End-to-end fill on Base Sepolia (`ts/e2e.ts`) | scripted. It picks up the stock's open round wherever it stands, so pledges made from the web page count. First run when the market opens (weekdays 09:30–16:00 ET) |
-| Web (`web/`) | built 2026-11-07: the register of all 298 stocks, live round pages, signed intents, the US block and per-network limits (6 Worker tests). Runs locally; goes public once the Codex review is addressed |
+| Web (`web/`) | built 2026-11-07: the register of all 298 stocks; live round pages; signed intents, with a round opening from the register once a demo stock's intents reach $250; trading a summoned pool; a demand export issuers can verify; the US block and per-network limits (7 Worker tests). Runs locally; goes public once the Codex review is addressed |
 
 Docs:
 - [docs/specs/001-summon.md](docs/specs/001-summon.md): the spec (r3)
@@ -143,6 +143,11 @@ therefore stops fills.
 | SummonFactory | [`0xe0594Aa1c935306F711e4542504b8E84b06Bc691`](https://sepolia.basescan.org/address/0xe0594Aa1c935306F711e4542504b8E84b06Bc691) |
 | SummonHook | [`0xE1e98787dcC2b0093B33123bD51F15301Af82000`](https://sepolia.basescan.org/address/0xE1e98787dcC2b0093B33123bD51F15301Af82000) |
 | Demo stock sGME (B20 Asset) | [`0xB20000000000000000000065bC5A9eB6218d9E68`](https://sepolia.basescan.org/address/0xB20000000000000000000065bC5A9eB6218d9E68) |
+| Demo stock sAMC (B20 Asset, tracks AMC) | [`0xb20000000000000000000084246F11C15C326DD9`](https://sepolia.basescan.org/address/0xb20000000000000000000084246F11C15C326DD9) |
+| Demo stock sRIVN (B20 Asset, tracks RIVN) | [`0xB2000000000000000000007ad0F0FeF5d2b4A11E`](https://sepolia.basescan.org/address/0xB2000000000000000000007ad0F0FeF5d2b4A11E) |
+| Demo stock sSOFI (B20 Asset, tracks SOFI) | [`0xB2000000000000000000006b9fb9a28A08243AC4`](https://sepolia.basescan.org/address/0xB2000000000000000000006b9fb9a28A08243AC4) |
+| Demo stock sRDDT (B20 Asset, tracks RDDT) | [`0xb200000000000000000000Ba2c05b1Ca0D438CF8`](https://sepolia.basescan.org/address/0xb200000000000000000000Ba2c05b1Ca0D438CF8) |
+| SummonSwap | [`0xbDcD54Ece175f14b1C10DAcb6ffD16dEdB35de3D`](https://sepolia.basescan.org/address/0xbDcD54Ece175f14b1C10DAcb6ffD16dEdB35de3D) |
 | GuardPriceFeed (testnet) | [`0x7D875Ee915a12c0CF6DD206f4CA37181ca0a75EC`](https://sepolia.basescan.org/address/0x7D875Ee915a12c0CF6DD206f4CA37181ca0a75EC) |
 | MarketStateRegistry | [`0x73c0114eE2ba4e70e03059B2C26c0888CB21C752`](https://sepolia.basescan.org/address/0x73c0114eE2ba4e70e03059B2C26c0888CB21C752) |
 | DemoOracleRegistry (testnet) | [`0x164B4e102A1F668aFfbC0E2019e6287A50e2812D`](https://sepolia.basescan.org/address/0x164B4e102A1F668aFfbC0E2019e6287A50e2812D) |
@@ -159,7 +164,8 @@ anyone can mint; `DemoOracleRegistry`, which stands in for Coinbase's mainnet or
 
 `web/` is the page and a Cloudflare Worker. The page shows the register of all 298 stocks, each with
 its own guilloché seal, and a round page that reads the fill conditions live from Base Sepolia. The
-Worker stores signed intents. It checks each EIP-712 signature, keeps one intent per wallet per ticker,
+Worker stores signed intents and exports them at `/api/demand`, with signatures, so an issuer can verify the
+totals itself. It checks each EIP-712 signature, keeps one intent per wallet per ticker,
 and refuses the project's own demo wallets, so the board never counts them. Each network may write 20
 intents an hour and add 5 new wallets a day. The whole site, page and API, is closed to US visitors
 (HTTP 451): Coinbase tokenized stocks are not offered to US persons, and projects that enable trading for

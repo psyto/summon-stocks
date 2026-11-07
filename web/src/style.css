@@ -959,3 +959,10 @@ a {
 .pool__lede {
   margin: 0;
 }
+.filter[aria-pressed="true"] .rosette path,
+.filter[aria-pressed="true"] .rosette__ring {
+  stroke: var(--paper);
+}
+.filter[aria-pressed="true"] .rosette__seal circle {
+  fill: var(--paper);
+}
