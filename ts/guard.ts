@@ -14,6 +14,8 @@ import { guardFeedAbi, marketAbi } from "./abi.js";
 import { deployment, publicClient, wallet } from "./env.js";
 
 const SYMBOL = "GME";
+const INTERVAL_SECONDS = Number(process.env.GUARD_INTERVAL ?? "30"); // price posts; rounds accept prices up to 60 s old
+const HEARTBEAT_SECONDS = 240; // under the rounds' maxGuardAge of 300 s
 const policy: GuardPolicy = { market: { haltSync: true, issuerSync: false, badPrintBandBps: 0, session: "regular-hours", maxStateAgeSeconds: 300 } };
 
 async function tick() {
@@ -26,6 +28,18 @@ async function tick() {
   const s = marketStateFor(policy, SYMBOL, now, { halts: feed.halts, fetchedAt: feed.publishedAt }, GUARD_FEED_MAX_AGE_SECONDS);
   const cur = await pc.readContract({ address: d.marketState, abi: marketAbi, functionName: "stateOf", args: [d.stock] });
   const same = cur.halted === s.halted && cur.reason === s.reason && cur.resumeAfter === BigInt(s.resumeAfter);
+  // closed and already recorded closed (or never written): write nothing; a stale state reads as closed
+  // anyway (MarketStateCheck fails closed), so the guard spends no gas while the market is shut
+  if (s.halted && (same || cur.updatedAt === 0n)) {
+    console.log(new Date().toISOString(), SYMBOL, `halted (${s.detail}), nothing to write`);
+    return;
+  }
+  // open and confirmed recently: skip the heartbeat until it nears the rounds' 300 s limit
+  const age = now - Number(cur.updatedAt);
+  if (same && age < HEARTBEAT_SECONDS) {
+    await postPrice(s.halted, now);
+    return;
+  }
   const hash = same
     ? await op.writeContract({ address: d.marketState, abi: marketAbi, functionName: "heartbeat", args: [[d.stock]] })
     : await op.writeContract({
@@ -35,8 +49,13 @@ async function tick() {
         args: [d.stock, s.halted, s.reason, BigInt(s.resumeAfter)],
       });
   console.log(new Date().toISOString(), SYMBOL, s.halted ? `halted (${s.detail})` : "open", same ? "heartbeat" : "setState", hash);
+  await postPrice(s.halted, now);
+}
 
-  if (d.priceSource.toLowerCase() !== d.guardFeed.toLowerCase() || s.halted) return;
+async function postPrice(halted: boolean, now: number) {
+  const d = deployment();
+  const op = wallet("operator");
+  if (d.priceSource.toLowerCase() !== d.guardFeed.toLowerCase() || halted) return;
   const q = await quote(SYMBOL);
   const price = BigInt(Math.round(q.last * 1e5));
   // no published spread: say 10 bp, under the rounds' 50 bp confidence limit
@@ -94,7 +113,7 @@ async function main() {
     } catch (e) {
       console.error(new Date().toISOString(), "no write:", (e as Error).message);
     }
-    await new Promise((r) => setTimeout(r, 30_000));
+    await new Promise((r) => setTimeout(r, INTERVAL_SECONDS * 1000));
   }
 }
 

@@ -95,6 +95,19 @@ Both sources go through the same checks in the round: the price is at most 60 s 
 within 50 bp, and it has not jumped more than 3% since the auction started. A guard that stops posting
 therefore stops fills.
 
+**Deployed on Base Sepolia** (2026-11-07, priced from the guard feed; addresses also in
+`deployments/84532.json`):
+
+| Contract | Address |
+|---|---|
+| SummonFactory | [`0xe0594Aa1c935306F711e4542504b8E84b06Bc691`](https://sepolia.basescan.org/address/0xe0594Aa1c935306F711e4542504b8E84b06Bc691) |
+| SummonHook | [`0xE1e98787dcC2b0093B33123bD51F15301Af82000`](https://sepolia.basescan.org/address/0xE1e98787dcC2b0093B33123bD51F15301Af82000) |
+| Demo stock sGME (B20 Asset) | [`0xB20000000000000000000065bC5A9eB6218d9E68`](https://sepolia.basescan.org/address/0xB20000000000000000000065bC5A9eB6218d9E68) |
+| GuardPriceFeed (testnet) | [`0x7D875Ee915a12c0CF6DD206f4CA37181ca0a75EC`](https://sepolia.basescan.org/address/0x7D875Ee915a12c0CF6DD206f4CA37181ca0a75EC) |
+| MarketStateRegistry | [`0x73c0114eE2ba4e70e03059B2C26c0888CB21C752`](https://sepolia.basescan.org/address/0x73c0114eE2ba4e70e03059B2C26c0888CB21C752) |
+| DemoOracleRegistry (testnet) | [`0x164B4e102A1F668aFfbC0E2019e6287A50e2812D`](https://sepolia.basescan.org/address/0x164B4e102A1F668aFfbC0E2019e6287A50e2812D) |
+| TestUSDC (testnet) | [`0xdAA34F28c1D0Fd3c6a5B52a7B41505D12Dd4D109`](https://sepolia.basescan.org/address/0xdAA34F28c1D0Fd3c6a5B52a7B41505D12Dd4D109) |
+
 The deploy script finds a CREATE2 salt that puts the hook at an address with BEFORE_INITIALIZE as its
 only flag. Contracts used on Base Sepolia: Uniswap v4 PoolManager `0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408`,
 Pyth `0xA2aa501b19aff244D90cc15a4Cf739D2725B5729`, and the B20 policy registry precompile
