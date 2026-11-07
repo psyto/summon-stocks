@@ -464,6 +464,18 @@ contract SummonRoundTest is Test {
         assertTrue(address(r2) != address(round));
     }
 
+    function test_minTarget() public {
+        assertEq(factory.minTarget(), 0); // testnet: no minimum
+        vm.prank(alice);
+        vm.expectRevert(SummonFactory.NotOwner.selector);
+        factory.setMinTarget(1_000e6);
+        factory.setMinTarget(20_000e6);
+        vm.warp(block.timestamp + 8 days); // the setUp round has expired, so a new one may open
+        vm.expectRevert(abi.encodeWithSelector(SummonFactory.TargetTooSmall.selector, 10_000e6, 20_000e6));
+        factory.openRound(address(token), 10_000e6, uint64(block.timestamp + 1 days), 100, 1 days);
+        factory.openRound(address(token), 20_000e6, uint64(block.timestamp + 1 days), 100, 1 days);
+    }
+
     function test_noNewRoundAfterFill() public {
         _start();
         _fillAfter(60);
