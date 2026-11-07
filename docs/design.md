@@ -85,3 +85,6 @@ Principles:
   fill conditions read live from Base Sepolia (about 2 s, refreshed every 15 s). Each condition names its
   source.
 - Checked: 1440 px and 390 px (no horizontal scroll), light and dark.
+- First use by the author (11-07): with Pledge always enabled, the order (get test USDC, then pledge) was
+  unclear. The round page now makes whichever step can be taken the primary button. Pledge stays disabled
+  until there is test USDC, and the amount is checked against the balance and the room left.
