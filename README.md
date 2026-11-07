@@ -20,6 +20,18 @@ A round fills only when every condition below holds:
 - the token is not paused;
 - every transfer policy allows the transfer.
 
+## Why it matters
+
+- **For issuers:** 227 registered stocks have no supply. A funded Summon round is a demand signal any
+  issuer can read: these backers have committed this much USDC to this ticker, and they are waiting for a
+  fill.
+- **For Base:** stocks reach Base in order of demand. Each one arrives with a pool, and its backers are
+  the LPs.
+- **For launchpads and apps:** a stock with no pool cannot be paired, routed or lent against. Once a stock
+  is summoned, any launchpad can pair against it.
+- **For backers:** the worst price is shown before you commit (at most 1% over the reference). If the
+  round does not fill, every pledge is refunded.
+
 Built for Base's [Stocks Maxxing](https://www.base.org/stocksmaxxing) season (Programmable Stock Markets
 track). **Testnet only (Base Sepolia).** Mainnet data is only read and shown.
 
