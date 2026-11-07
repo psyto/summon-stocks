@@ -5,3 +5,4 @@ broadcast/*/31337/
 node_modules/
 broadcast/*/*/dry-run/
 cache/
+.uitest-signer.mjs

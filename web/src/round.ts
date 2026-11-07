@@ -386,23 +386,50 @@ function actions(round: Addr, p: Params, s: S, conditionsHold: boolean, redraw: 
   const row = h("div", { class: "act__row" });
 
   if (s.state === "Open") {
+    // two steps, in order: get test USDC, then pledge. The step you can take now is the primary button.
+    const room = p.target - s.pledged;
+    const hasUsdc = m.usdc > 0n;
     const amount = h("input", { type: "number", min: "1", step: "1", value: "50", "aria-label": "Amount in tUSDC" });
-    row.append(h("label", { class: "money" }, amount, h("span", {}, "tUSDC")));
-    row.append(
-      btn("Pledge", () => {
-        const n = parseUnits(String(Math.max(0, Math.floor(Number(amount.value)))), 6);
-        if (n === 0n) return void (msg.textContent = "Enter a whole number of tUSDC, 1 or more.");
-        void run("Pledge", [
-          { address: D.usdc!, abi: erc20Abi, functionName: "approve", args: [round, n] },
-          { address: round, abi: roundAbi as Abi, functionName: "pledge", args: [n] },
-        ]);
-      }, true),
-    );
-    box.append(row);
+    const pledgeBtn = btn("Pledge", () => {
+      const n = parseUnits(String(Math.max(0, Math.floor(Number(amount.value)))), 6);
+      if (n === 0n) return void (msg.textContent = "Enter a whole number of tUSDC, 1 or more.");
+      void run("Pledge", [
+        { address: D.usdc!, abi: erc20Abi, functionName: "approve", args: [round, n] },
+        { address: round, abi: roundAbi as Abi, functionName: "pledge", args: [n] },
+      ]);
+    }, hasUsdc);
+    const mintBtn = btn("Get 1,000 test USDC", () => void run("Get test USDC", [{ address: D.usdc!, abi: erc20Abi, functionName: "mint", args: [me, 1_000_000_000n] }]), !hasUsdc);
+    const hint = h("p", { class: "act__note" });
+    const check = () => {
+      const n = parseUnits(String(Math.max(0, Math.floor(Number(amount.value) || 0))), 6);
+      if (!hasUsdc) {
+        pledgeBtn.setAttribute("disabled", "");
+        hint.textContent = "Step 1: get test USDC. Step 2: pledge it. Test USDC has no value.";
+      } else if (n === 0n) {
+        pledgeBtn.setAttribute("disabled", "");
+        hint.textContent = "Enter a whole number of tUSDC, 1 or more.";
+      } else if (n > m.usdc) {
+        pledgeBtn.setAttribute("disabled", "");
+        hint.textContent = `You have ${tusdc(m.usdc)} tUSDC. Pledge that much or less, or get more test USDC.`;
+      } else {
+        pledgeBtn.removeAttribute("disabled");
+        hint.textContent = n > room ? `Only ${tusdc(room)} tUSDC still fits; the rest stays in your wallet.` : `You have ${tusdc(m.usdc)} tUSDC. Pledging asks your wallet twice: approve, then pledge.`;
+      }
+    };
+    amount.addEventListener("input", check);
+    if (hasUsdc) {
+      row.append(h("label", { class: "money" }, amount, h("span", {}, "tUSDC")), pledgeBtn);
+      box.append(row, hint);
+    } else {
+      box.append(h("div", { class: "act__row" }, mintBtn), row);
+      row.append(h("label", { class: "money" }, amount, h("span", {}, "tUSDC")), pledgeBtn);
+      box.append(hint);
+    }
+    check();
     const more = h("div", { class: "act__row" });
-    more.append(btn("Get 1,000 test USDC", () => void run("Mint test USDC", [{ address: D.usdc!, abi: erc20Abi, functionName: "mint", args: [me, 1_000_000_000n] }])));
+    if (hasUsdc) more.append(mintBtn);
     if (m.pledge > 0n) more.append(btn("Take my pledge back", () => void run("Withdraw", [{ address: round, abi: roundAbi as Abi, functionName: "withdraw", args: [m.pledge] }])));
-    box.append(more, h("p", { class: "act__note" }, "Test USDC has no value. Until the target is reached, you can take your pledge back."));
+    box.append(more, h("p", { class: "act__note" }, "Until the target is reached, you can take your pledge back."));
   } else if (s.state === "Funded") {
     box.append(
       btn("Start the auction", () => void run("Start the auction", [{ address: round, abi: roundAbi as Abi, functionName: "startAuction", args: [[]] }]), true, !conditionsHold),
