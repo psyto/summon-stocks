@@ -51,6 +51,14 @@ Non-goals:
   `GuardPriceFeed` (Pyth's read interface, written by the guard). Hermes needs an API key since
   2026-08-26, and the onchain GME price on Base Sepolia was last pushed in April 2025, so the testnet demo
   defaults to the guard feed. Both sources go through the same 5.1/5.2 checks.
+- **A minimum target, set later** (`SummonFactory.setMinTarget`, 0 on testnet). A tiny round cannot cover
+  a filler's fixed cost per mint (at most 1% of a $300 round is $3). The number comes from issuers' real
+  costs, asked after the hackathon; it is not guessed now. Before money is asked for, signed intents show
+  whether a ticker could reach it: a round opens once its intents approach the minimum.
+- **Mainnet policies, checked 2026-11-07:** NVDAc, MSTRc and GMEc use policy 5 for every transfer scope.
+  Policy 5 has an admin (0xEC0F…2812) and lets an arbitrary address receive, so it acts as a blocklist:
+  secondary transfers are open except to blocked addresses. Summon checks these policies before a fill
+  and at every claim, so if the issuer tightens them, Summon follows.
 - **One Summon pool per token.** A new round may open after an earlier one expired, but not after one
   filled: the pool key can be initialized only once, and r2 has no "join an existing pool" path.
 

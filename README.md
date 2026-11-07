@@ -41,7 +41,7 @@ track). **Testnet only (Base Sepolia).** Mainnet data is only read and shown.
 |---|---|
 | Spec ([docs/specs/001-summon.md](docs/specs/001-summon.md)) | r3, after one independent review ([docs/reviews](docs/reviews)). The Codex review of the spec and the code is written up ([docs/reviews/codex-r1-request.md](docs/reviews/codex-r1-request.md)) and runs from 2026-11-10 |
 | Price math (`src/SummonPrice.sol`, spec 5.1) | done, with tests: split invariance, dividend multiplier, fuzzed rounding |
-| Round, factory, pool hook (`src/SummonRound.sol`, `SummonFactory.sol`, `SummonHook.sol`) | done, 33 tests: each fill condition failing alone, pledge cap, withdraw rules, expiry and refunds, claims under transfer policies, LP unwind, pool initialization restricted to the round, the guard price feed. Removing any of 8 checks makes a test fail |
+| Round, factory, pool hook (`src/SummonRound.sol`, `SummonFactory.sol`, `SummonHook.sol`) | done, 34 tests: each fill condition failing alone, pledge cap, withdraw rules, expiry and refunds, claims under transfer policies, LP unwind, pool initialization restricted to the round, the guard price feed. Removing any of 8 checks makes a test fail |
 | Base Sepolia deployment | done 2026-11-07: factory, hook, registries and a real B20 demo stock (see below). The first demo round is open: [`0xa799…046D`](https://sepolia.basescan.org/address/0xa799fC499Af97a474D02878fC10fB8B733b1046D) (target 300 tUSDC) |
 | Guard (`ts/guard.ts`) | done: Nasdaq halts and, for guard pricing, the quote. It writes nothing while the market is closed |
 | End-to-end fill on Base Sepolia (`ts/e2e.ts`) | scripted. It picks up the stock's open round wherever it stands, so pledges made from the web page count. First run when the market opens (weekdays 09:30–16:00 ET) |
@@ -51,6 +51,25 @@ Docs:
 - [docs/specs/001-summon.md](docs/specs/001-summon.md): the spec (r3)
 - [docs/reviews/](docs/reviews): reviews, and the request for the next one
 - [docs/design.md](docs/design.md): the web design
+
+## Open question: who fills
+
+Summon gives issuers a demand signal. It does not prove they will act on it. Stocks may sit unissued for
+reasons other than demand: each mint has a fixed cost, plus legal and custody work. So the open question is
+whether an issuer or authorized participant will fill a funded round. For them a fill is a mint against a
+known buyer at the live price plus up to 1%, during market hours, so there is little inventory risk. But a
+small round cannot cover a mint's fixed cost.
+
+How Summon handles it:
+- **A minimum target.** `SummonFactory.minTarget` is set by the owner (0 on testnet). It will be set from
+  issuers' real fixed costs, which have not been asked yet.
+- **Intents before money.** Signed intents are free and show whether a ticker could reach that minimum. A
+  round opens once they get close, so backers do not lock money in a round that cannot fill.
+- **A clean exit.** If nobody fills, every pledge is refunded.
+
+Issuer policies on mainnet: Coinbase's stock tokens (NVDAc, MSTRc, GMEc, checked 2026-11-07) use a
+blocklist-style transfer policy (id 5). Secondary transfers are open except to blocked addresses. Summon
+checks these policies before every fill and claim.
 
 ## The numbers
 
