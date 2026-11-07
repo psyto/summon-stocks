@@ -3,7 +3,13 @@
 **Backers bring a stock onto Base.**
 
 Coinbase has registered 298 tokenized stocks (B20) on Base. 227 of them have never been minted, and some
-that were minted (DJT, AMC, GME) have no pool to trade in. Summon lets a stock's backers call it onchain:
+that were minted (DJT, AMC, GME) have no pool to trade in.
+
+Summon is a primary-market primitive for tokenized stocks. Committed demand becomes a fill and a pool only
+when the stock's market conditions hold onchain. The round contract checks them at every auction start and
+fill, caps the price, refunds if nothing fills, and is the only thing that can create the stock's pool. It
+reads its market data from registries and price feeds. On testnet, the guard key writes those. A stock's
+backers call it onchain like this:
 
 1. Backers commit USDC to a ticker, up to a target.
 2. When the target is reached and the market is open, anyone holding the stock token fills the round at a
