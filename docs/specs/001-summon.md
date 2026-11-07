@@ -169,9 +169,12 @@ Let `P = target`, `U_lp = P × lpBps / 1e4` (default `lpBps` = 2000), and `U_f =
   backer pro rata. Backers then call `claimLP()`. Policy checks apply as in 5.4.
 
 ## 6. Intent board (off-chain, no funds)
-- EIP-712 `Intent{ticker, usd, expiry, nonce}`, signed with the user's wallet (Base Account) and stored in a
-  Worker. The board shows unique signers and total USD per ticker, and labels every intent non-binding.
-  Sybil resistance is out of scope.
+- EIP-712 `Intent{ticker, token, usd, expiry, nonce}` (domain version 2, 2026-11-08), signed with the user's
+  wallet (Base Account) and stored in a Worker. `token` is the stock's B20 contract address and must match
+  the snapshot: Base's docs say to identify a stock by address, because its symbol can change. One intent
+  per wallet per token. The board shows unique signers and total USD per ticker, and labels every intent
+  non-binding. Sybil resistance is out of scope beyond the limits below (Base Verify, which runs on Base
+  Sepolia, is a candidate for showing verified signers separately).
 - Rows: every B20 ticker with zero supply or no pool, from the live API. Each row is tagged "Pyth feed" or
   "needs a price feed". A ticker with no feed still takes intents: the demand tells issuers, and feed
   providers, what to add.
