@@ -39,14 +39,18 @@ track). **Testnet only (Base Sepolia).** Mainnet data is only read and shown.
 
 | Part | State |
 |---|---|
-| Spec ([docs/specs/001-summon.md](docs/specs/001-summon.md)) | r3, after one independent review ([docs/reviews](docs/reviews)); Codex review next |
+| Spec ([docs/specs/001-summon.md](docs/specs/001-summon.md)) | r3, after one independent review ([docs/reviews](docs/reviews)). The Codex review of the spec and the code is written up ([docs/reviews/codex-r1-request.md](docs/reviews/codex-r1-request.md)) and runs from 2026-11-10 |
 | Price math (`src/SummonPrice.sol`, spec 5.1) | done, with tests: split invariance, dividend multiplier, fuzzed rounding |
 | Round, factory, pool hook (`src/SummonRound.sol`, `SummonFactory.sol`, `SummonHook.sol`) | done, 33 tests: each fill condition failing alone, pledge cap, withdraw rules, expiry and refunds, claims under transfer policies, LP unwind, pool initialization restricted to the round, the guard price feed. Removing any of 8 checks makes a test fail |
 | Base Sepolia deployment | done 2026-11-07: factory, hook, registries and a real B20 demo stock (see below). The first demo round is open: [`0xa799…046D`](https://sepolia.basescan.org/address/0xa799fC499Af97a474D02878fC10fB8B733b1046D) (target 300 tUSDC) |
 | Guard (`ts/guard.ts`) | done: Nasdaq halts and, for guard pricing, the quote. It writes nothing while the market is closed |
-| End-to-end fill on Base Sepolia (`ts/e2e.ts`) | scripted; first run when the market opens (weekdays 09:30–16:00 ET) |
+| End-to-end fill on Base Sepolia (`ts/e2e.ts`) | scripted. It picks up the stock's open round wherever it stands, so pledges made from the web page count. First run when the market opens (weekdays 09:30–16:00 ET) |
 | Web (`web/`) | built 2026-11-07: the register of all 298 stocks, live round pages, signed intents, the US block and per-network limits (6 Worker tests). Runs locally; goes public once the Codex review is addressed |
 
+Docs:
+- [docs/specs/001-summon.md](docs/specs/001-summon.md): the spec (r3)
+- [docs/reviews/](docs/reviews): reviews, and the request for the next one
+- [docs/design.md](docs/design.md): the web design
 
 ## The numbers
 
