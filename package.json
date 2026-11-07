@@ -10,7 +10,7 @@
     "fund": "tsx ts/fund.ts"
   },
   "dependencies": {
-    "@fabrknt/market-state": "github:fabrknt/market-state#v0.1.0",
+    "@fabrknt/market-state": "github:fabrknt/market-state#v0.2.0",
     "viem": "2.55.11"
   },
   "devDependencies": {
