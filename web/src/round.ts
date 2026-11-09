@@ -172,9 +172,9 @@ async function readChecks(round: Addr, p: Params): Promise<Check[]> {
     source: "MarketStateRegistry, written by the guard from Nasdaq Trader's halts feed",
   });
 
-  const priceSource = guardSource ? "GuardPriceFeed (testnet; the guard posts a public Nasdaq quote)" : "Pyth Core";
+  const priceSource = guardSource ? "GuardPriceFeed (testnet; the guard posts the Hyperliquid HIP-3 oracle price, demo data)" : "Pyth Core";
   if (!price) {
-    checks.push({ name: "The price is fresh", ok: false, value: `No price posted yet. The guard posts ${demo.ticker}'s quote while its round needs one and the market is open.`, source: priceSource });
+    checks.push({ name: "The price is fresh", ok: false, value: `No price posted yet. The guard posts ${demo.ticker}'s price while its round needs one and the market is open.`, source: priceSource });
   } else {
     const px = Number(price.price) * 10 ** price.expo;
     const confBps = Number(price.price) > 0 ? (Number(price.conf) * 1e4) / Number(price.price) : Infinity;
