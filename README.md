@@ -52,7 +52,7 @@ track). **Testnet only (Base Sepolia).** Mainnet data is only read and shown.
 | Round, factory, pool hook, swap (`src/SummonRound.sol`, `SummonFactory.sol`, `SummonHook.sol`, `SummonSwap.sol`) | done, 41 tests: each fill condition failing alone, pledge cap, withdraw rules, expiry and refunds, claims under transfer policies, LP unwind, pool initialization and liquidity restricted to the round, the guard price feed, trading the summoned pool, and the pool that knows the stock's market (below). Removing any of 8 fill checks, or any of the hook's 6 rules, makes a test fail |
 | Stock-aware pool (`SummonHook`, `SummonRound.realign`, spec 5.5 and 5.5a, r4) | built 2026-11-08, not yet deployed: no swaps in a corporate action window, while the multiplier differs from the one the pool was priced at, or while the listing exchange has the stock halted; a 1.00% fee instead of 0.30% while the session is closed or the guard is quiet; after a split or a dividend in shares, anyone can `realign` the backers' pool to the new multiplier, so the first trader cannot take the difference. No fills in the first 15 and last 25 minutes of the session, while US LULD bands are doubled (market-state `core-hours`). Holidays and 13:00 early closes from market-state `v0.2.0` |
 | Base Sepolia deployment | done 2026-11-07: factory, hook, swap router, registries and five real B20 demo stocks (see below). Open rounds: sGME [`0xa799…046D`](https://sepolia.basescan.org/address/0xa799fC499Af97a474D02878fC10fB8B733b1046D) and sSOFI [`0xAae4…DbEE`](https://sepolia.basescan.org/address/0xAae40400113c32D8D0345EBad6F781E56ECDDbEE) (both target 300 tUSDC) |
-| Guard (`ts/guard.ts`) | done: Nasdaq halts and, for guard pricing, the quote. It writes nothing while the market is closed |
+| Guard (`ts/guard.ts`) | done: Nasdaq Trader halts (once a minute) and, for guard pricing, the HIP-3 oracle price from Hyperliquid's chain. It writes nothing while the market is closed. `npm run guard -- --quote GME` prints the price it would post and writes nothing |
 | End-to-end fill on Base Sepolia (`ts/e2e.ts`) | scripted. It picks up the stock's open round wherever it stands, so pledges made from the web page count. First run when the market opens (weekdays 09:45–15:35 ET: the session without the LULD doubled-band edges) |
 | Web (`web/`) | built 2026-11-07: the register of all 298 stocks; live round pages; signed intents, with a round opening from the register once a demo stock's intents reach $250; trading a summoned pool; a demand export issuers can verify; the US block and per-network limits (8 Worker tests). Runs locally; goes public once the Codex review is addressed |
 | Demand from elsewhere | planned (from 2026-11-14): marks on the register for never-minted stocks that already trade elsewhere, by amount, not by listing. Hyperliquid HIP-3 open interest and volume; Robinhood Chain token supply. Display only: fills still price from Pyth. Counts are under "The numbers" |
@@ -150,12 +150,15 @@ npm run e2e                                    # trading days 09:45-15:35 ET (12
 - `PRICE_SOURCE=pyth`: Pyth Core, with update data from Hermes. This is the design Summon is built for.
   Since 2026-08-26 Hermes needs an API key, which must stay on a server.
 - `PRICE_SOURCE=guard` (the default on testnet): `GuardPriceFeed`, which has Pyth's read interface. The
-  demo guard posts GME's quote there while GME is open and not halted. The quote comes from Nasdaq.com's
-  public endpoint, which is undocumented and possibly delayed. Treat it as demo data only:
-  - Nasdaq's terms for its other products forbid automated copying, so check the site's terms before you
-    run the guard;
-  - a delayed price would let a filler fill only when the delay favors them, so it must never back
-    real funds.
+  demo guard posts a stock's price there while it is open and not halted, and only while its round is
+  Funded or in its auction. The price is the HIP-3 oracle price of the stock's perp on Hyperliquid
+  (GME, RIVN and RDDT on `xyz`, SOFI on `para`; AMC has none, so sAMC cannot fill with guard pricing).
+  It is public chain state, read through Hyperliquid's info API with no key. Treat it as demo data only:
+  - a HIP-3 deployer sets its own oracle price, so it is not a price to back real funds;
+  - until 2026-11-09 the guard read Nasdaq.com's quote endpoint. Nasdaq's terms (nasdaq.com/legal) forbid
+    "any process, whether automated or manual, to capture data or content from the Service", so it no
+    longer does. The halts still come from Nasdaq Trader's Trade Halt RSS feed, whose own terms allow
+    this use (they forbid altering the feed), read at most once a minute as its page asks.
 
   The guard key already decides whether the market is open. With guard pricing, it also sets the price.
 
@@ -213,10 +216,11 @@ npm run build && npx wrangler dev  # page and Worker on http://localhost:8787
 - [hl-price-guard](https://github.com/fabrknt/hl-price-guard) (pinned at `v0.3.2`): `PythRef` for the
   Pyth read and confidence bound, and `JumpLatch` for the jump guard. Summon needed a Pyth-only staleness
   check, so it was added upstream first (`PythRef.readFresh`), not worked around here.
-- [market-state](https://github.com/fabrknt/market-state) (pinned at `v0.2.0`): `MarketStateCheck.requireOpen`
+- [market-state](https://github.com/fabrknt/market-state) (pinned at `v0.3.0`): `MarketStateCheck.requireOpen`
   on every auction start and fill, and the Nasdaq Trader halts guard. Using it here showed the guard did
   not know exchange holidays (Thanksgiving read as open), so `v0.2.0` added NYSE's 2026-2028 holidays and
-  13:00 early closes upstream first. The registry fails closed when the
+  13:00 early closes upstream first, and `v0.3.0` the `core-hours` session (no fills while US LULD bands
+  are doubled). The registry fails closed when the
   updater goes quiet. It was extracted from another of our projects as a public part, so that Summon could
   depend on it through a tag. That project now depends on the same tag.
 - [Uniswap v4-core](https://github.com/Uniswap/v4-core) v4.0.0,

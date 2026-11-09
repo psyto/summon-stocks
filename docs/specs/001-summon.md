@@ -51,7 +51,10 @@ Non-goals:
 - **The price source is per listing** (`list(token, source, priceId)`): Pyth Core, or the testnet-only
   `GuardPriceFeed` (Pyth's read interface, written by the guard). Hermes needs an API key since
   2026-08-26, and the onchain GME price on Base Sepolia was last pushed in April 2025, so the testnet demo
-  defaults to the guard feed. Both sources go through the same 5.1/5.2 checks.
+  defaults to the guard feed. Both sources go through the same 5.1/5.2 checks. The guard's price is the
+  HIP-3 oracle price on Hyperliquid (public chain state, no key) since 2026-11-09; before that it read
+  Nasdaq.com's quote endpoint, whose terms forbid automated capture. It is demo data: a HIP-3 deployer
+  sets it.
 - **A minimum target, set later** (`SummonFactory.setMinTarget`, 0 on testnet). A tiny round cannot cover
   a filler's fixed cost per mint (at most 1% of a $300 round is $3). The number comes from issuers' real
   costs, asked after the hackathon; it is not guessed now. Before money is asked for, signed intents show
@@ -241,7 +244,7 @@ Let `P = target`, `U_lp = P × lpBps / 1e4` (default `lpBps` = 2000), and `U_f =
   updates for a real ticker, mapped to the demo token.
 
 ## 8. Own parts used (dogfooding)
-- market-state (`fabrknt/market-state` v0.1.0, public): `MarketStateRegistry`, `MarketStateCheck.requireOpen`
+- market-state (`fabrknt/market-state` v0.3.0, public): `MarketStateRegistry`, `MarketStateCheck.requireOpen`
   (5.2-2), and the TypeScript guard for Nasdaq halts. Extracted from an earlier private project on
   2026-11-07, so that a judge's fresh clone builds. Copying the code into Summon was not an option.
 - hl-price-guard (`fabrknt/hl-price-guard` v0.3.2, public): `PythRef.readFresh` (added for Summon), `JumpLatch` with an anchor (5.2-8), and the
