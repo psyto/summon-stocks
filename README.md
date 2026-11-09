@@ -51,7 +51,7 @@ track). **Testnet only (Base Sepolia).** Mainnet data is only read and shown.
 | Price math (`src/SummonPrice.sol`, spec 5.1) | done, with tests: split invariance, dividend multiplier, fuzzed rounding |
 | Round, factory, pool hook, swap (`src/SummonRound.sol`, `SummonFactory.sol`, `SummonHook.sol`, `SummonSwap.sol`) | done, 35 tests: each fill condition failing alone, pledge cap, withdraw rules, expiry and refunds, claims under transfer policies, LP unwind, pool initialization restricted to the round, the guard price feed, trading the summoned pool. Removing any of 8 checks makes a test fail |
 | Base Sepolia deployment | done 2026-11-07: factory, hook, swap router, registries and five real B20 demo stocks (see below). Open rounds: sGME [`0xa799…046D`](https://sepolia.basescan.org/address/0xa799fC499Af97a474D02878fC10fB8B733b1046D) and sSOFI [`0xAae4…DbEE`](https://sepolia.basescan.org/address/0xAae40400113c32D8D0345EBad6F781E56ECDDbEE) (both target 300 tUSDC) |
-| Guard (`ts/guard.ts`) | done: Nasdaq halts and, for guard pricing, the quote. It writes nothing while the market is closed |
+| Guard (`ts/guard.ts`) | done: Nasdaq Trader halts (once a minute) and, for guard pricing, the HIP-3 oracle price from Hyperliquid's chain. It writes nothing while the market is closed. `npm run guard -- --quote GME` prints the price it would post and writes nothing |
 | End-to-end fill on Base Sepolia (`ts/e2e.ts`) | scripted. It picks up the stock's open round wherever it stands, so pledges made from the web page count. First run when the market opens (weekdays 09:30–16:00 ET) |
 | Web (`web/`) | built 2026-11-07: the register of all 298 stocks; live round pages; signed intents, with a round opening from the register once a demo stock's intents reach $250; trading a summoned pool; a demand export issuers can verify; the US block and per-network limits (8 Worker tests). Runs locally; goes public once the Codex review is addressed |
 | Demand from elsewhere | planned (from 2026-11-14): marks on the register for never-minted stocks that already trade elsewhere, by amount, not by listing. Hyperliquid HIP-3 open interest and volume; Robinhood Chain token supply. Display only: fills still price from Pyth. Counts are under "The numbers" |
@@ -149,12 +149,15 @@ npm run e2e                                    # weekdays 09:30-16:00 ET
 - `PRICE_SOURCE=pyth`: Pyth Core, with update data from Hermes. This is the design Summon is built for.
   Since 2026-08-26 Hermes needs an API key, which must stay on a server.
 - `PRICE_SOURCE=guard` (the default on testnet): `GuardPriceFeed`, which has Pyth's read interface. The
-  demo guard posts GME's quote there while GME is open and not halted. The quote comes from Nasdaq.com's
-  public endpoint, which is undocumented and possibly delayed. Treat it as demo data only:
-  - Nasdaq's terms for its other products forbid automated copying, so check the site's terms before you
-    run the guard;
-  - a delayed price would let a filler fill only when the delay favors them, so it must never back
-    real funds.
+  demo guard posts a stock's price there while it is open and not halted, and only while its round is
+  Funded or in its auction. The price is the HIP-3 oracle price of the stock's perp on Hyperliquid
+  (GME, RIVN and RDDT on `xyz`, SOFI on `para`; AMC has none, so sAMC cannot fill with guard pricing).
+  It is public chain state, read through Hyperliquid's info API with no key. Treat it as demo data only:
+  - a HIP-3 deployer sets its own oracle price, so it is not a price to back real funds;
+  - until 2026-11-09 the guard read Nasdaq.com's quote endpoint. Nasdaq's terms (nasdaq.com/legal) forbid
+    "any process, whether automated or manual, to capture data or content from the Service", so it no
+    longer does. The halts still come from Nasdaq Trader's Trade Halt RSS feed, whose own terms allow
+    this use (they forbid altering the feed), read at most once a minute as its page asks.
 
   The guard key already decides whether the market is open. With guard pricing, it also sets the price.
 

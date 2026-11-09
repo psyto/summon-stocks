@@ -8,7 +8,7 @@ Read docs/specs/001-summon.md (r3) first, then:
 - tests: test/SummonRound.t.sol, test/SummonPrice.t.sol, test/mocks/Mocks.sol
 - parts it depends on: lib/hl-price-guard (PythRef.readFresh/updateAndReadFresh, JumpLatch), lib/market-state
   (MarketStateRegistry, MarketStateCheck.requireOpen), lib/v4-core v4.0.0, lib/base-std v1.1.0 (B20 interfaces)
-- off-chain: ts/guard.ts (writes halts and, for guard pricing, a Nasdaq quote), ts/e2e.ts, web/worker/index.ts
+- off-chain: ts/guard.ts (writes halts and, for guard pricing, the Hyperliquid HIP-3 oracle price), ts/e2e.ts, web/worker/index.ts
   (stores EIP-712 intents, the /api/demand export, US block, per-network limits), web/src/round.ts (what the
   round page tells users), web/src/board.ts (opens a round once a stock's intents reach $250)
 
