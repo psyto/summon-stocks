@@ -1,20 +1,21 @@
 You are Codex, reviewing work written by Claude (a different model). Do not defer to it; your job is to break it.
 
-Repo: ~/src/summon-stocks (Base Sepolia only, hackathon entry, solo builder, submission 2026-12-05).
-Read docs/specs/001-summon.md (r3) first, then:
+Repo: a review worktree, branch stock-aware-pool (Base Sepolia only, hackathon entry, solo builder,
+submission 2026-12-05). This branch is not deployed yet; deployments/84532.json is the older main deployment.
+Read docs/specs/001-summon.md (r4) first, then:
 - contracts: src/SummonRound.sol, src/SummonFactory.sol, src/SummonHook.sol, src/SummonPool.sol, src/SummonPrice.sol,
   src/SummonSwap.sol,
   src/testnet/GuardPriceFeed.sol, src/testnet/DemoOracleRegistry.sol, src/testnet/TestUSDC.sol
 - tests: test/SummonRound.t.sol, test/SummonPrice.t.sol, test/mocks/Mocks.sol
-- parts it depends on: lib/hl-price-guard (PythRef.readFresh/updateAndReadFresh, JumpLatch), lib/market-state
-  (MarketStateRegistry, MarketStateCheck.requireOpen), lib/v4-core v4.0.0, lib/base-std v1.1.0 (B20 interfaces)
+- parts it depends on: lib/hl-price-guard (PythRef.readFresh/updateAndReadFresh, JumpLatch), lib/market-state v0.3.0
+  (MarketStateRegistry, MarketStateCheck.requireOpen; ts/guard.ts regularSession, core-hours, the exchange calendar), lib/v4-core v4.0.0, lib/base-std v1.1.0 (B20 interfaces)
 - off-chain: ts/guard.ts (writes halts and, for guard pricing, the Hyperliquid HIP-3 oracle price), ts/e2e.ts, web/worker/index.ts
   (stores EIP-712 intents, the /api/demand export, US block, per-network limits), web/src/round.ts (what the
   round page tells users), web/src/board.ts (opens a round once a stock's intents reach $250)
 
 Facts already checked on Base Sepolia (do not re-derive): the demo stock is a real B20 Asset created with
 createB20; multiplier 1e18, effectiveAt 0, all three transfer policies are id 0 (always allow). Deployed
-addresses are in deployments/84532.json. `forge test` passes 47 tests; `cd web && npm run test:worker` passes 8 (checked 2026-11-08).
+addresses are in deployments/84532.json. `forge test` passes 47 tests; `cd web && npm run test:worker` passes 8 (checked 2026-11-10 on this branch).
 
 Where Claude thinks it is weakest (start here):
 1. Price manipulation by the filler: the filler supplies the price update (Pyth) or the guard posts it
