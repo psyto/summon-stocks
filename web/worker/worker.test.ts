@@ -283,24 +283,21 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
-    "totals follow the token, so a renamed ticker leaves nothing behind (Codex r4 #4)",
+    "the board names totals by the current snapshot: a rename or a reassigned ticker shows at once (Codex r4 #4, r5 #2)",
     async () => {
-      const e = env() as unknown as { INTENTS: ReturnType<typeof memStore> };
-      const store = e.INTENTS.get();
-      const now = Date.now();
-      const put = (ticker: string, usd: number, expiry: number, nonce: number) =>
-        store.fetch("https://store/put", { method: "POST", body: JSON.stringify({ ticker, token: "0xAbC", address: "0xa", usd, expiry, nonce, signature: "0x", ip: "203.0.113.7" }) });
-      await put("RKT", 250, Math.floor(now / 1000) + 5, now);
-      // the snapshot renames the stock; the wallet replaces its intent under the new ticker
-      await put("NEW", 100, Math.floor(now / 1000) + 5, now + 1);
-      assert.deepEqual(await (await store.fetch("https://store/totals")).json(), { NEW: { backers: 1, usd: 100 } });
-      const realNow = Date.now;
-      Date.now = () => now + 10_000;
-      try {
-        assert.deepEqual(await (await store.fetch("https://store/totals")).json(), {});
-      } finally {
-        Date.now = realNow;
-      }
+      const e = env() as unknown as { ASSETS: unknown };
+      await intent(e as never, privateKeyToAccount(generatePrivateKey()), "RKT", 250);
+      assert.deepEqual(await (await worker.fetch(req("/api/intents"), e as never)).json(), { RKT: { backers: 1, usd: 250 } });
+      // the snapshot renames RKT's token to NEW, and gives the ticker RKT to SOFI's token
+      const snap = JSON.parse(snapshot) as { stocks: { ticker: string; address: string }[] };
+      const rkt = snap.stocks.find((x) => x.ticker === "RKT")!;
+      const sofi = snap.stocks.find((x) => x.ticker === "SOFI")!;
+      [rkt.ticker, sofi.ticker] = ["NEW", "RKT"];
+      e.ASSETS = { fetch: async () => new Response(JSON.stringify(snap)) };
+      assert.deepEqual(await (await worker.fetch(req("/api/intents"), e as never)).json(), { NEW: { backers: 1, usd: 250 } });
+      // and a token dropped from the snapshot drops from the board
+      snap.stocks = snap.stocks.filter((x) => x !== rkt);
+      assert.deepEqual(await (await worker.fetch(req("/api/intents"), e as never)).json(), {});
     },
   ],
   [

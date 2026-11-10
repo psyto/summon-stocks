@@ -57,14 +57,15 @@ Non-goals:
   Nasdaq.com's quote endpoint, whose terms forbid automated capture. It is demo data: a HIP-3 deployer
   sets it.
 - **Round terms are bounded, and a stalled round can be replaced** (r5, Codex r2 #8, r3 #1). A round lasts
-  at most 30 days and locks its LP at most 30 days. An Open round with less than 10% of its target pledged,
-  and no pledge of at least 0.1% of its target for a day (or since it opened, Codex r4 #2), may be replaced
-  by a new `openRound`; a round still gathering pledges is never cancelled, and dust pledges do not keep a
-  stalled one; the factory cancels the old round in the same
-  transaction (it becomes Expired, so every pledge in it is refundable and no new pledge can land in it).
-  A dust pledge therefore cannot hold a ticker. A round at 10% or more is not replaced. A Funded round frees
-  itself: anyone may start its auctions while the market is open, and after three that nobody fills it is
-  Expired.
+  at most 30 days and locks its LP at most 30 days. An Open round at least a day old that is **behind pace**
+  may be replaced by a new `openRound` (Codex r3 #1, r4 #2, r5 #1). Behind pace: less than half the pledges
+  that a steady climb to the target by the deadline would have by now. The factory cancels the old round in
+  the same transaction (it becomes Expired, so every pledge in it is refundable and no new pledge can land
+  in it). A round on pace is never cancelled, however small its pledges. To hold a ticker, a squatter must
+  keep a growing share of the target locked (half of it by the deadline), and at the target the round is
+  Funded, where anyone may start its auctions; after three that nobody fills it is Expired. A squatter's
+  reachable target can simply be filled by other backers. On testnet tUSDC is free to mint, so none of this
+  costs a griefer money there; on mainnet it is real USDC, and the minimum target applies.
 - **A minimum target, set later** (`SummonFactory.setMinTarget`, 0 on testnet). A tiny round cannot cover
   a filler's fixed cost per mint (at most 1% of a $300 round is $3). The number comes from issuers' real
   costs, asked after the hackathon; it is not guessed now. Before money is asked for, signed intents show

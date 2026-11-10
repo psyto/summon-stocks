@@ -66,6 +66,23 @@ async function pythArgs(): Promise<{ data: Hex[]; fee: bigint }> {
   return { data: u.data, fee };
 }
 
+/**
+ * startAuction or fill with the price they need. A pull listing can meet a 10 s band in which Pyth printed
+ * nothing, and the next band has a price, so it tries up to three bands (Codex r5 #3); a guard feed, once.
+ */
+async function priced(role: keyof typeof ROLES, fn: "startAuction" | "fill", round: Hex) {
+  const pull = d.priceSource.toLowerCase() !== d.guardFeed.toLowerCase();
+  for (let tries = pull ? 3 : 1; ; tries--) {
+    const p = await pythArgs();
+    try {
+      return await send(role, fn, { address: round, abi: roundAbi, functionName: fn, args: [p.data], value: p.fee });
+    } catch (e) {
+      if (tries <= 1) throw e;
+      console.log(`  ${fn} refused (${(e as Error).message.split("\n")[0]}); trying the next ${PYTH_WINDOW_SECONDS} s band`);
+    }
+  }
+}
+
 async function main() {
   const target = parseUnits(process.env.TARGET ?? "300", 6);
   const wait = Number(process.env.WAIT_SECONDS ?? "120");
@@ -112,25 +129,13 @@ async function main() {
     state = "Funded";
   }
 
-  let p = await pythArgs();
   if (state === "Funded") {
-    await send("operator", "startAuction", { address: round, abi: roundAbi, functionName: "startAuction", args: [p.data], value: p.fee });
+    await priced("operator", "startAuction", round);
     console.log(`waiting ${wait} s for the spread to rise`);
     await new Promise((r) => setTimeout(r, wait * 1000));
   }
   await send("filler", `filler: approve ${demo.symbol}`, { address: d.stock, abi: b20Abi, functionName: "approve", args: [round, 2n ** 255n] });
-  // a pull listing can meet a band in which Pyth printed nothing; the next band has a price, so try again
-  const pull = d.priceSource.toLowerCase() !== d.guardFeed.toLowerCase();
-  for (let tries = pull ? 3 : 1; ; tries--) {
-    p = await pythArgs();
-    try {
-      await send("filler", "fill", { address: round, abi: roundAbi, functionName: "fill", args: [p.data], value: p.fee });
-      break;
-    } catch (e) {
-      if (tries <= 1) throw e;
-      console.log(`  fill refused (${(e as Error).message.split("\n")[0]}); trying the next ${PYTH_WINDOW_SECONDS} s band`);
-    }
-  }
+  await priced("filler", "fill", round);
 
   const [spread, ref, owed, liq] = await Promise.all([
     pc.readContract({ address: round, abi: roundAbi, functionName: "currentSpreadBps" }),

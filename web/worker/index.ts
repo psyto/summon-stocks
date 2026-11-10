@@ -74,6 +74,22 @@ async function tickers(env: Env, req: Request): Promise<Map<string, { address: s
   return new Map(snap.stocks.map((s) => [s.ticker, { address: s.address, status: s.status, pyth: !!s.pythFeed }]));
 }
 
+/** { [ticker]: { backers, usd } }: the store's totals by token, named by the current snapshot. A token no
+ * longer in the snapshot is dropped (Codex r5 #2). */
+async function board(env: Env, req: Request): Promise<Record<string, { backers: number; usd: number }>> {
+  const [byToken, snap] = await Promise.all([
+    store(env)("/totals").then((r) => r.json() as Promise<Record<string, { backers: number; usd: number }>>),
+    tickers(env, req),
+  ]);
+  const tickerOf = new Map([...snap].map(([ticker, s]) => [s.address.toLowerCase(), ticker]));
+  const out: Record<string, { backers: number; usd: number }> = {};
+  for (const [token, row] of Object.entries(byToken)) {
+    const ticker = tickerOf.get(token);
+    if (ticker) out[ticker] = row;
+  }
+  return out;
+}
+
 async function post(req: Request, env: Env): Promise<Response> {
   let b: { ticker?: string; token?: string; usd?: number; expiry?: number; nonce?: number; address?: string; signature?: string };
   try {
@@ -139,7 +155,7 @@ export default {
     const url = new URL(req.url);
     if (url.pathname === "/api/demand" && req.method === "GET") return demand(req, env);
     if (url.pathname === "/api/intents") {
-      if (req.method === "GET") return json(await (await store(env)("/totals")).json());
+      if (req.method === "GET") return json(await board(env, req));
       if (req.method === "POST") return post(req, env);
       return json({ error: "Use GET or POST." }, 405);
     }

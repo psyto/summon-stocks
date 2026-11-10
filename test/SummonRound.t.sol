@@ -472,41 +472,51 @@ contract SummonRoundTest is Test {
         vm.prank(carol);
         fair.refund();
 
-        // a round with a tenth of its target pledged is not replaced
+        // a round on pace (10% a day into a 7-day round; pace needs half of 1/7) is not replaced
         vm.startPrank(alice);
         usdc.approve(address(next), type(uint256).max);
         next.pledge(1_000e6);
         vm.stopPrank();
-        vm.warp(block.timestamp + 2 days);
+        vm.warp(block.timestamp + 1 days);
         vm.expectRevert(abi.encodeWithSelector(SummonFactory.RoundActive.selector, address(next)));
         factory.openRound(address(t3), 10_000e6, uint64(block.timestamp + 7 days), 100, 7 days);
     }
 
-    /// Codex r4 #2: a round under 10% that is still gathering pledges cannot be cancelled by a replacement,
-    /// and dust pledges do not keep a stalled one alive.
-    function test_aRoundStillGatheringPledgesIsNotReplaced() public {
+    /// Codex r4 #2, r5 #1: a round keeping pace is never cancelled, however small its pledges; a squatter
+    /// topping up 0.1% a day falls behind and is replaced, and so is the next round it opens.
+    function test_aRoundMustKeepPaceToHoldItsTicker() public {
         MockB20 t3 = new MockB20(policies);
         factory.list(address(t3), address(pyth), GME, 60, false);
-        SummonRound r = factory.openRound(address(t3), 10_000e6, uint64(block.timestamp + 20 days), 100, 7 days);
+        // a healthy 7-day round, with many small pledges adding up to 750 tUSDC a day (pace needs 714)
+        SummonRound r = factory.openRound(address(t3), 10_000e6, uint64(block.timestamp + 7 days), 100, 7 days);
         vm.prank(alice);
         usdc.approve(address(r), type(uint256).max);
-        vm.prank(bob);
-        usdc.approve(address(r), type(uint256).max);
-        // 9.9% pledged over three days, a backer arriving every day
-        for (uint256 i; i < 3; ++i) {
-            vm.warp(block.timestamp + 23 hours);
-            vm.prank(alice);
-            r.pledge(330e6);
+        for (uint256 day; day < 3; ++day) {
+            for (uint256 i; i < 75; ++i) {
+                vm.prank(alice);
+                r.pledge(10e6);
+            }
+            vm.warp(block.timestamp + 1 days);
             vm.expectRevert(abi.encodeWithSelector(SummonFactory.RoundActive.selector, address(r)));
             factory.openRound(address(t3), 1e30, uint64(block.timestamp + 30 days), 100, 30 days);
         }
-        // then it stalls; pledges under 0.1% of the target do not count as activity
-        vm.warp(block.timestamp + 12 hours);
-        vm.prank(bob);
-        r.pledge(9e6);
-        vm.warp(block.timestamp + 12 hours);
-        factory.openRound(address(t3), 10_000e6, uint64(block.timestamp + 7 days), 100, 7 days);
+        // it stalls: by day 5 pace needs 3,571 and it has 2,250
+        vm.warp(block.timestamp + 2 days);
+        SummonRound squat = factory.openRound(address(t3), 10_000e6, uint64(block.timestamp + 30 days), 100, 30 days);
         assertEq(uint8(r.state()), uint8(SummonRound.State.Expired));
+
+        // the squatter tops up 0.1% (10 tUSDC) a day; a day in, pace needs 166
+        vm.startPrank(carol);
+        usdc.approve(address(squat), type(uint256).max);
+        squat.pledge(10e6);
+        vm.warp(block.timestamp + 1 days);
+        squat.pledge(10e6);
+        vm.stopPrank();
+        SummonRound fair = factory.openRound(address(t3), 10_000e6, uint64(block.timestamp + 7 days), 100, 7 days);
+        assertEq(uint8(squat.state()), uint8(SummonRound.State.Expired));
+        assertEq(factory.latestRound(address(t3)), address(fair));
+        vm.prank(carol);
+        squat.refund();
     }
 
     function _print(int64 px, uint64 t, uint64 prev) internal pure returns (bytes[] memory u) {

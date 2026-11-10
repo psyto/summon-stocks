@@ -62,3 +62,16 @@ and two new issues, verdict CHANGES.
 
 On testnet tUSDC is free to mint, so no rule here costs a griefer money; on mainnet the minimum target and
 real USDC do. `forge test`: 53. Worker tests: 22.
+
+## Codex r5 (2026-11-11): what changed
+
+Codex r5 ([codex-r5.md](codex-r5.md)) accepted the band-selection argument (r4 #1), found r4 #3 and #5
+fixed, and verdict CHANGES on three points.
+
+| # | Finding | Fix | Test |
+|---|---|---|---|
+| 1 blocker | A 0.1%-a-day top-up keeps a round "active" for 30 days, then the squatter opens the next one | The activity rule is gone. An Open round a day old is replaceable when it is **behind pace**: under half the pledges a steady climb to the target by the deadline would have now. Holding a ticker means keeping a growing share of the target locked, and reaching the target makes the round Funded, where anyone may run its auctions. A round on pace is never cancelled, whatever the size of its pledges | `test_aRoundMustKeepPaceToHoldItsTicker` (a healthy round of many small pledges is kept for three days, then replaced when it stalls; a 0.1%-a-day squatter is replaced a day in, and refunds); `test_roundsCannotSquatATicker` |
+| 2 major | The board keeps a renamed ticker until each signer posts again; a reassigned ticker merges two tokens | The store returns totals by token; the Worker names them from the current snapshot and drops tokens no longer in it | "the board names totals by the current snapshot: a rename or a reassigned ticker shows at once" |
+| 3 minor | The e2e retry covers fill, not startAuction | One wrapper (`priced`) retries both, up to three bands, for pull listings | - |
+
+`forge test`: 53 (pace rule: making it always true or "unpledged only" fails 2 tests each). Worker tests: 22.

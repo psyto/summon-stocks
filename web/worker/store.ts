@@ -6,7 +6,8 @@
  * longer both pass a check that only one should.
  *
  * Bounded (Codex r3 #3, r4 #3): totals are kept as one row per stock, keyed by its token address (a
- * ticker can change, Codex r4 #4), so the board reads at most one row per stock. Every request first deletes the intents that have expired (through the expiry index, so it reads
+ * ticker can change, Codex r4 #4), so the board reads at most one row per stock. They are returned by
+ * token; the Worker names them from the current snapshot. Every request first deletes the intents that have expired (through the expiry index, so it reads
  * only those) and takes them off the totals, so an expired intent stops counting at once. Live intents are
  * capped at MAX_LIVE. A nonce is the signing time in ms and an intent may last at most MAX_EXPIRY_DAYS from
  * it, so a stored nonce is dropped MAX_EXPIRY_DAYS after it: any older signature has expired by then. Stored
@@ -145,15 +146,12 @@ export class IntentStore {
     this.sql.exec(`DELETE FROM totals WHERE backers <= 0`);
   }
 
-  /** { [ticker]: { backers, usd } } over unexpired intents (the request already swept the expired ones). */
+  /** { [token]: { backers, usd } } over unexpired intents (the request already swept the expired ones). The
+   * Worker names each token by the current snapshot, so a renamed or reassigned ticker shows at once
+   * (Codex r5 #2). */
   private totals(): Record<string, { backers: number; usd: number }> {
     const t: Record<string, { backers: number; usd: number }> = {};
-    const rows = this.sql.exec(`SELECT ticker, backers, usd FROM totals`).toArray();
-    for (const r of rows) {
-      const row = (t[r.ticker as string] ??= { backers: 0, usd: 0 });
-      row.backers += r.backers as number;
-      row.usd += r.usd as number;
-    }
+    for (const r of this.sql.exec(`SELECT token, backers, usd FROM totals`).toArray()) t[r.token as string] = { backers: r.backers as number, usd: r.usd as number };
     return t;
   }
 

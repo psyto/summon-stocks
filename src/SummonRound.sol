@@ -97,9 +97,6 @@ contract SummonRound is IUnlockCallback {
     uint256 public pledged;
     mapping(address => uint256) public pledgeOf;
 
-    /// When the round last took a pledge of at least 0.1% of its target. The factory replaces only a round
-    /// that has had none for a day, so a round that is still gathering pledges is never cancelled (Codex r4 #2).
-    uint64 public lastPledgeAt;
     uint64 public auctionStart;
     uint8 public auctionsRun;
     uint256 public multiplierAtStart;
@@ -223,7 +220,6 @@ contract SummonRound is IUnlockCallback {
         uint256 room = p.target - pledged;
         uint256 take = amount < room ? amount : room;
         if (take == 0) revert NothingToDo();
-        if (take * 1000 >= p.target) lastPledgeAt = uint64(block.timestamp);
         pledgeOf[msg.sender] += take;
         pledged += take;
         emit Pledged(msg.sender, take, pledged);

@@ -38,11 +38,12 @@ contract SummonFactory {
     uint32 public constant MAX_LP_LOCK_SECONDS = 30 days;
     /// A round nobody has pledged to may be replaced this long after it opened.
     uint64 public constant REPLACE_UNPLEDGED_AFTER = 1 days;
-    /// An Open round with less than this share of its target pledged, and no pledge of at least 0.1% of its
-    /// target for a day (or since it opened), may be replaced; the old one is cancelled and refunds. A dust
-    /// pledge cannot hold a ticker (Codex r3 #1), and a round still gathering pledges is never cancelled
-    /// (Codex r4 #2).
-    uint16 public constant REPLACE_BELOW_BPS = 1000;
+    /// An Open round at least a day old that is behind pace may be replaced; the factory cancels it in the
+    /// same transaction and every pledge in it refunds. Behind pace: less than half the pledges a steady
+    /// climb to the target by the deadline would have by now (Codex r3 #1, r4 #2, r5 #1). To hold a ticker,
+    /// a squatter must keep a growing share of the target locked, and at the target the round is Funded,
+    /// where anyone may run its auctions. A round on pace is never cancelled, whatever its pledges' sizes.
+    uint16 public constant PACE_BPS = 5000;
 
     /// The smallest target a round may have, in USDC (6 decimals). 0 = no minimum (testnet). Set from what
     /// a fill costs the filler (an issuer's fixed cost per mint), not guessed; the owner can change it.
@@ -112,9 +113,8 @@ contract SummonFactory {
         if (prev != address(0)) {
             SummonRound.State s = SummonRound(prev).state();
             if (s == SummonRound.State.Filled) revert TokenLive(prev);
-            bool stale = s == SummonRound.State.Open
-                && SummonRound(prev).pledged() * 1e4 < SummonRound(prev).params().target * REPLACE_BELOW_BPS
-                && block.timestamp >= _max(openedAt[prev], SummonRound(prev).lastPledgeAt()) + REPLACE_UNPLEDGED_AFTER;
+            bool stale = s == SummonRound.State.Open && block.timestamp >= openedAt[prev] + REPLACE_UNPLEDGED_AFTER
+                && _behindPace(SummonRound(prev), openedAt[prev]);
             if (s != SummonRound.State.Expired && !stale) revert RoundActive(prev);
             if (stale) SummonRound(prev).cancel();
         }
@@ -156,7 +156,9 @@ contract SummonFactory {
         return deps;
     }
 
-    function _max(uint64 a, uint64 b) internal pure returns (uint64) {
-        return a > b ? a : b;
+    /// pledged < PACE_BPS of target × (time since opening) / (deadline − opening).
+    function _behindPace(SummonRound r, uint64 opened) internal view returns (bool) {
+        SummonRound.Params memory rp = r.params();
+        return r.pledged() * 1e4 * (rp.deadline - opened) < rp.target * PACE_BPS * (block.timestamp - opened);
     }
 }
