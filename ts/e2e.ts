@@ -9,7 +9,7 @@
  *   WAIT_SECONDS=900 npm run e2e
  */
 import { decodeEventLog, parseUnits, type Abi, type Hex } from "viem";
-import { STATES, b20Abi, erc20Abi, pythAbi, roundAbi, summonFactoryAbi } from "./abi.js";
+import { STATES, b20Abi, erc20Abi, guardFeedAbi, pythAbi, roundAbi, summonFactoryAbi } from "./abi.js";
 import { account, deployment, publicClient, wallet, type ROLES } from "./env.js";
 import { latestUpdate } from "./hermes.js";
 
@@ -51,6 +51,25 @@ async function pythArgs(): Promise<{ data: Hex[]; fee: bigint }> {
   const age = Math.floor(Date.now() / 1000) - u.publishTime;
   console.log(`  Pyth GME ${Number(u.price) * 10 ** u.expo} (${age} s old)`);
   return { data: u.data, fee };
+}
+
+/**
+ * The guard posts a price only once the round is Funded, so the first round of a stock waits for that
+ * post (up to 90 s) before starting; otherwise startAuction finds no price (PriceFeedNotFound).
+ */
+async function guardPrice() {
+  if (d.priceSource.toLowerCase() !== d.guardFeed.toLowerCase()) return;
+  const since = Math.floor(Date.now() / 1000);
+  for (let i = 0; i < 45; i++) {
+    const at = await pc
+      .readContract({ address: d.guardFeed, abi: guardFeedAbi, functionName: "getPriceUnsafe", args: [d.priceId] })
+      .then((x) => Number(x.publishTime))
+      .catch(() => 0);
+    if (at >= since) return;
+    if (i === 0) console.log("  waiting for the guard to post a price for the Funded round");
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  throw new Error("The guard posted no price in 90 s. Is `npm run guard` running?");
 }
 
 async function main() {
@@ -99,6 +118,7 @@ async function main() {
     state = "Funded";
   }
 
+  if (state === "Funded") await guardPrice();
   let p = await pythArgs();
   if (state === "Funded") {
     await send("operator", "startAuction", { address: round, abi: roundAbi, functionName: "startAuction", args: [p.data], value: p.fee });

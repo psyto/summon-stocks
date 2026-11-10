@@ -54,6 +54,7 @@ export const roundAbi = parseAbi([
 
 export const guardFeedAbi = parseAbi([
   "function post(bytes32 id, int64 price, uint64 conf, int32 expo, uint256 publishTime)",
+  "function getPriceUnsafe(bytes32 id) view returns ((int64 price, uint64 conf, int32 expo, uint256 publishTime))",
 ]);
 
 export const pythAbi = parseAbi(["function getUpdateFee(bytes[] updateData) view returns (uint256)"]);

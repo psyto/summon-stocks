@@ -50,9 +50,9 @@ track). **Testnet only (Base Sepolia).** Mainnet data is only read and shown.
 | Spec ([docs/specs/001-summon.md](docs/specs/001-summon.md)) | r3, after one independent review ([docs/reviews](docs/reviews)). The Codex review of the spec and the code is written up ([docs/reviews/codex-r1-request.md](docs/reviews/codex-r1-request.md)) and runs from 2026-11-10 |
 | Price math (`src/SummonPrice.sol`, spec 5.1) | done, with tests: split invariance, dividend multiplier, fuzzed rounding |
 | Round, factory, pool hook, swap (`src/SummonRound.sol`, `SummonFactory.sol`, `SummonHook.sol`, `SummonSwap.sol`) | done, 35 tests: each fill condition failing alone, pledge cap, withdraw rules, expiry and refunds, claims under transfer policies, LP unwind, pool initialization restricted to the round, the guard price feed, trading the summoned pool. Removing any of 8 checks makes a test fail |
-| Base Sepolia deployment | done 2026-11-07: factory, hook, swap router, registries and five real B20 demo stocks (see below). Open rounds: sGME [`0xa799…046D`](https://sepolia.basescan.org/address/0xa799fC499Af97a474D02878fC10fB8B733b1046D) and sSOFI [`0xAae4…DbEE`](https://sepolia.basescan.org/address/0xAae40400113c32D8D0345EBad6F781E56ECDDbEE) (both target 300 tUSDC) |
+| Base Sepolia deployment | done 2026-11-07: factory, hook, swap router, registries and five real B20 demo stocks (see below). Rounds: sGME [`0xa799…046D`](https://sepolia.basescan.org/address/0xa799fC499Af97a474D02878fC10fB8B733b1046D) (filled 2026-11-10) and sSOFI (open) [`0xAae4…DbEE`](https://sepolia.basescan.org/address/0xAae40400113c32D8D0345EBad6F781E56ECDDbEE) (both target 300 tUSDC) |
 | Guard (`ts/guard.ts`) | done: Nasdaq Trader halts (once a minute) and, for guard pricing, the HIP-3 oracle price from Hyperliquid's chain. It writes nothing while the market is closed. `npm run guard -- --quote GME` prints the price it would post and writes nothing |
-| End-to-end fill on Base Sepolia (`ts/e2e.ts`) | scripted. It picks up the stock's open round wherever it stands, so pledges made from the web page count. First run when the market opens (weekdays 09:30–16:00 ET) |
+| End-to-end fill on Base Sepolia (`ts/e2e.ts`) | **first fill done 2026-11-10 (ET), sGME**: three demo backers pledged 300 tUSDC, the auction started, and the demo filler filled at a $25.115 reference (the HIP-3 oracle price the guard posted), 6 bp under it; the Uniswap v4 pool was seeded and every backer claimed. [pledge](https://sepolia.basescan.org/tx/0x3dbe7c7ad11fdd223ddeab48fbc05393fa85a334a9a2b7ed7054433b7cd7a60c) · [auction start](https://sepolia.basescan.org/tx/0x4b5831f2ca5fc62b8695315ca29670eb433421307826bad32aef927df572bb9a) · [fill](https://sepolia.basescan.org/tx/0xb71b8eb7f4cf16fd1bb060b11247b29741a0caf7151036d79965f09497ffb9eb) · [claim](https://sepolia.basescan.org/tx/0xda9dddb16b677e784f2d4bd6868c5e01fefbd6b699f63f7cc8d36d9e75b3b5dc). It picks up the stock's open round wherever it stands, so pledges made from the web page count. Weekdays 09:30–16:00 ET |
 | Web (`web/`) | built 2026-11-07: the register of all 298 stocks; live round pages; signed intents, with a round opening from the register once a demo stock's intents reach $250; trading a summoned pool; a demand export issuers can verify; the US block and per-network limits (8 Worker tests). Runs locally; goes public once the Codex review is addressed |
 | Demand from elsewhere | planned (from 2026-11-14): marks on the register for never-minted stocks that already trade elsewhere, by amount, not by listing. Hyperliquid HIP-3 open interest and volume; Robinhood Chain token supply. Display only: fills still price from Pyth. Counts are under "The numbers" |
 
@@ -60,8 +60,8 @@ First use (2026-11-07, with v1 intents; v2 also signs the token address, so that
 again): the author, in their own browser wallet, signed $250 of intent for SOFI. The
 register then offered a round, they opened it, got test USDC, pledged 50 and took it back (the round
 shows 0 pledged). One fix came out of it: the round page now makes the step you can take the primary
-button (get test USDC first, then pledge). Fills and trading follow on the first weekday with the market
-open.
+button (get test USDC first, then pledge). The first fill ran from the script on 2026-11-10 (above); a
+fill and a trade from the page are next.
 
 Docs:
 - [docs/specs/001-summon.md](docs/specs/001-summon.md): the spec (r3)
