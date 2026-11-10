@@ -5,28 +5,34 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
-import worker from "./index";
+import { DatabaseSync } from "node:sqlite";
+import worker, { IntentStore } from "./index";
 
-class MemKV {
-  m = new Map<string, string>();
-  async get(k: string, type?: string) {
-    const v = this.m.get(k);
-    if (v === undefined) return null;
-    return type === "json" ? JSON.parse(v) : v;
-  }
-  async put(k: string, v: string) {
-    this.m.set(k, v);
-  }
-  async list(o: { prefix?: string }) {
-    return { keys: [...this.m.keys()].filter((k) => k.startsWith(o.prefix ?? "")).map((name) => ({ name })), list_complete: true, cursor: "" };
-  }
+/** The Durable Object namespace, with IntentStore over an in-memory node:sqlite database. */
+function memStore() {
+  const db = new DatabaseSync(":memory:");
+  let alarm: number | null = null;
+  const storage = {
+    sql: {
+      // run each statement at once, as ctx.storage.sql.exec does; rows only for SELECT
+      exec: (q: string, ...b: unknown[]) => {
+        const st = db.prepare(q);
+        const rows = /^\s*SELECT/i.test(q) ? (st.all(...(b as never[])) as Record<string, unknown>[]) : (st.run(...(b as never[])), []);
+        return { toArray: () => rows };
+      },
+    },
+    getAlarm: async () => alarm,
+    setAlarm: async (at: number) => void (alarm = at),
+  };
+  const obj = new IntentStore({ storage });
+  return { idFromName: () => "all", get: () => ({ fetch: (u: string, i?: RequestInit) => obj.fetch(new Request(u, i)) }), obj, db };
 }
 
 const snapshot = readFileSync(new URL("../public/b20.json", import.meta.url), "utf8");
 const ASSETS = { fetch: async () => new Response(snapshot, { headers: { "content-type": "application/json" } }) };
 
 function env(geo = "on") {
-  return { ASSETS, INTENTS: new MemKV(), GEO_BLOCK: geo } as never;
+  return { ASSETS, INTENTS: memStore(), GEO_BLOCK: geo } as never;
 }
 
 function req(path: string, init: RequestInit = {}, country = "JP", ip = "203.0.113.7") {
@@ -166,6 +172,72 @@ const tests: [string, () => Promise<void>][] = [
       assert.equal((await intent(e, a, "RKT", 1, "203.0.113.7", undefined, { nonce: 2 })).status, 200);
       assert.equal((await intent(e, a, "RKT", 250, "203.0.113.7", undefined, { nonce: 1 })).status, 409);
       assert.deepEqual(await (await worker.fetch(req("/api/intents"), e)).json(), { RKT: { backers: 1, usd: 1 } });
+    },
+  ],
+  [
+    "a replay sent at the same time as its replacement cannot win (Codex r2 #3)",
+    async () => {
+      const e = env();
+      const a = privateKeyToAccount(generatePrivateKey());
+      assert.equal((await intent(e, a, "RKT", 250, "203.0.113.7", undefined, { nonce: 1 })).status, 200);
+      // the replacement and a replay of the first, in flight together (KV could keep either)
+      const [next, replay] = await Promise.all([
+        intent(e, a, "RKT", 1, "203.0.113.7", undefined, { nonce: 2 }),
+        intent(e, a, "RKT", 250, "203.0.113.7", undefined, { nonce: 1 }),
+      ]);
+      assert.equal(next.status, 200);
+      assert.equal(replay.status, 409);
+      assert.deepEqual(await (await worker.fetch(req("/api/intents"), e)).json(), { RKT: { backers: 1, usd: 1 } });
+    },
+  ],
+  [
+    "the per-network limit holds when the writes arrive at once (Codex r2 #3)",
+    async () => {
+      const e = env();
+      const rs = await Promise.all(Array.from({ length: 8 }, () => intent(e, privateKeyToAccount(generatePrivateKey()), "RKT", 10)));
+      assert.equal(rs.filter((r) => r.status === 200).length, 5);
+      assert.equal(rs.filter((r) => r.status === 429).length, 3);
+    },
+  ],
+  [
+    "the hourly sweep deletes expired intents but keeps their nonces (Codex r2 #9)",
+    async () => {
+      const e = env() as unknown as { INTENTS: ReturnType<typeof memStore> };
+      const a = privateKeyToAccount(generatePrivateKey());
+      const now = Date.now();
+      await intent(e as never, a, "RKT", 250, "203.0.113.7", undefined, { expiry: Math.floor(now / 1000) + 5, nonce: 7 });
+      await intent(e as never, privateKeyToAccount(generatePrivateKey()), "SOFI", 40);
+      const realNow = Date.now;
+      Date.now = () => now + 10_000;
+      try {
+        await e.INTENTS.obj.alarm();
+        assert.deepEqual(e.INTENTS.db.prepare("SELECT ticker FROM intents").all().map((r) => r.ticker), ["SOFI"]);
+        // the expired intent's signature still cannot come back
+        assert.equal((await intent(e as never, a, "RKT", 250, "203.0.113.7", undefined, { expiry: Math.floor(now / 1000) + 86_400, nonce: 7 })).status, 409);
+      } finally {
+        Date.now = realNow;
+      }
+    },
+  ],
+  [
+    "the demand export comes in pages, and next continues it (Codex r2 #9)",
+    async () => {
+      const e = env() as unknown as { INTENTS: ReturnType<typeof memStore> };
+      const at = Math.floor(Date.now() / 1000) + 86_400;
+      const ins = e.INTENTS.db.prepare("INSERT INTO intents VALUES (?, ?, 'RKT', 'X', 1, ?, 1, '0x', 0)");
+      for (let i = 0; i < 1203; i++) ins.run("0xrkt", `0x${String(i).padStart(40, "0")}`, at);
+      const seen = new Set<string>();
+      let after: string | null = "";
+      let pages = 0;
+      do {
+        const body = (await (await worker.fetch(req(`/api/demand${after ? `?after=${after}` : ""}`), e as never)).json()) as { intents: { address: string }[]; next: string | null };
+        assert.ok(body.intents.length <= 500);
+        for (const it of body.intents) seen.add(it.address);
+        after = body.next;
+        pages++;
+      } while (after);
+      assert.equal(seen.size, 1203);
+      assert.equal(pages, 3);
     },
   ],
   [
