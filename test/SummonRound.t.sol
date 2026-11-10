@@ -81,14 +81,13 @@ contract SummonRoundTest is Test {
                 windowSeconds: 3600,
                 maxAuctions: 3,
                 maxGuardAge: 300,
-                maxPythAge: 60,
                 maxConfBps: 50,
                 maxJumpBps: 300,
                 cooldownSeconds: 3600
             })
         );
         hook.setFactory(ISummonRegistry(address(factory)));
-        factory.list(address(token), address(pyth), GME);
+        factory.list(address(token), address(pyth), GME, 60);
         round = factory.openRound(address(token), 10_000e6, uint64(block.timestamp + 7 days), 100, 7 days);
 
         for (uint256 i; i < 3; ++i) {
@@ -409,6 +408,69 @@ contract SummonRoundTest is Test {
         assertEq(round.fillRef(), SummonPrice.refPerToken(uint256(uint64(PX)) * 10 ** uint256(int256(18 + EXPO)), 1e18));
     }
 
+    /// Codex r2 #8: nobody can hold a ticker's only round open for good.
+    function test_roundsCannotSquatATicker() public {
+        MockB20 t3 = new MockB20(policies);
+        factory.list(address(t3), address(pyth), GME, 60);
+        vm.expectRevert(SummonFactory.BadRoundTerms.selector);
+        factory.openRound(address(t3), 10_000e6, uint64(block.timestamp + 31 days), 100, 7 days);
+        vm.expectRevert(SummonFactory.BadRoundTerms.selector);
+        factory.openRound(address(t3), 10_000e6, uint64(block.timestamp + 7 days), 100, 31 days);
+        // a squatter's round with a target nobody will meet...
+        vm.prank(carol);
+        SummonRound squat = factory.openRound(address(t3), 1e30, uint64(block.timestamp + 30 days), 100, 30 days);
+        // ...blocks a new one for a day, then anyone may replace it while nobody has pledged
+        vm.expectRevert(abi.encodeWithSelector(SummonFactory.RoundActive.selector, address(squat)));
+        factory.openRound(address(t3), 10_000e6, uint64(block.timestamp + 7 days), 100, 7 days);
+        vm.warp(block.timestamp + 1 days);
+        SummonRound fair = factory.openRound(address(t3), 10_000e6, uint64(block.timestamp + 7 days), 100, 7 days);
+        assertEq(factory.latestRound(address(t3)), address(fair));
+        // a round someone pledged to is never replaced
+        vm.startPrank(alice);
+        usdc.approve(address(fair), type(uint256).max);
+        fair.pledge(1e6);
+        vm.stopPrank();
+        vm.warp(block.timestamp + 2 days);
+        vm.expectRevert(abi.encodeWithSelector(SummonFactory.RoundActive.selector, address(fair)));
+        factory.openRound(address(t3), 10_000e6, uint64(block.timestamp + 7 days), 100, 7 days);
+    }
+
+    /// Codex r2 #1: where the filler supplies the price, the listing accepts only a recent one.
+    function test_pullFeedFillNeedsARecentPrice() public {
+        MockB20 t3 = new MockB20(policies);
+        market.setState(address(t3), false, 0, 0);
+        factory.list(address(t3), address(pyth), GME, 5);
+        SummonRound r = factory.openRound(address(t3), 10_000e6, uint64(block.timestamp + 7 days), 100, 7 days);
+        for (uint256 i; i < 3; ++i) {
+            address b = [alice, bob, carol][i];
+            vm.startPrank(b);
+            usdc.approve(address(r), type(uint256).max);
+            r.pledge([5_000e6, 3_000e6, 2_000e6][i]);
+            vm.stopPrank();
+        }
+        t3.mint(ap, 1_000e8);
+        vm.prank(ap);
+        t3.approve(address(r), type(uint256).max);
+        r.startAuction{value: 1}(_fresh());
+        // a print from after the start, but 10 s old, is outside the 5 s window
+        vm.warp(block.timestamp + 20);
+        _heartbeat();
+        market.heartbeat(_one(address(t3)));
+        bytes[] memory old = _update(PX, CONF, uint64(block.timestamp - 10));
+        vm.prank(ap);
+        vm.expectRevert(abi.encodeWithSelector(PythRef.PythStale.selector, GME, 10, 5));
+        r.fill{value: 1}(old);
+        bytes[] memory recent = _update(PX, CONF, uint64(block.timestamp - 2));
+        vm.prank(ap);
+        r.fill{value: 1}(recent);
+        assertEq(uint8(r.state()), uint8(SummonRound.State.Filled));
+    }
+
+    function _one(address a) internal pure returns (address[] memory x) {
+        x = new address[](1);
+        x[0] = a;
+    }
+
     function test_expiresAtDeadline() public {
         vm.prank(alice);
         round.pledge(3_000e6);
@@ -476,10 +538,10 @@ contract SummonRoundTest is Test {
         vm.expectRevert(abi.encodeWithSelector(SummonFactory.RoundActive.selector, address(round)));
         factory.openRound(address(token), 1e6, uint64(block.timestamp + 1 days), 100, 1 days);
         vm.expectRevert(abi.encodeWithSelector(SummonFactory.AlreadyListed.selector, address(token)));
-        factory.list(address(token), address(pyth), bytes32(uint256(1)));
+        factory.list(address(token), address(pyth), bytes32(uint256(1)), 60);
         vm.prank(alice);
         vm.expectRevert(SummonFactory.NotOwner.selector);
-        factory.list(address(usdc), address(pyth), bytes32(uint256(1)));
+        factory.list(address(usdc), address(pyth), bytes32(uint256(1)), 60);
         // spread above 1% is refused
         vm.warp(block.timestamp + 8 days);
         vm.expectRevert(SummonRound.BadParams.selector);
@@ -713,7 +775,7 @@ contract SummonRoundTest is Test {
         t2 = new MockB20(policies);
         market.setState(address(t2), false, 0, 0);
         oracle.set(1e18, false);
-        factory.list(address(t2), address(feed), GME);
+        factory.list(address(t2), address(feed), GME, 60);
         r = factory.openRound(address(t2), 10_000e6, uint64(block.timestamp + 1 days), 100, 1 days);
         for (uint256 i; i < 3; ++i) {
             address b = [alice, bob, carol][i];

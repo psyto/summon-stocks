@@ -430,6 +430,12 @@ function actions(round: Addr, p: Params, s: S, conditionsHold: boolean, redraw: 
     if (hasUsdc) more.append(mintBtn);
     if (m.pledge > 0n) more.append(btn("Take my pledge back", () => void run("Withdraw", [{ address: round, abi: roundAbi as Abi, functionName: "withdraw", args: [m.pledge] }])));
     box.append(more, h("p", { class: "act__note" }, "Until the target is reached, you can take your pledge back."));
+  } else if ((s.state === "Funded" || s.state === "Auction") && p.priceSource.toLowerCase() !== D.guardFeed!.toLowerCase()) {
+    // a Pyth-priced round needs a signed Pyth update with each call, and Hermes needs a key that must stay
+    // on a server; this page has none, so it does not offer calls that would only revert (Codex r2 #10)
+    box.append(
+      h("p", { class: "act__note" }, "This round prices from Pyth. Starting the auction and filling need a signed Pyth update, which this page cannot fetch. Run them with the filler script: npm run e2e."),
+    );
   } else if (s.state === "Funded") {
     box.append(
       btn("Start the auction", () => void run("Start the auction", [{ address: round, abi: roundAbi as Abi, functionName: "startAuction", args: [[]] }]), true, !conditionsHold),

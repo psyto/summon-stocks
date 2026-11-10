@@ -169,6 +169,15 @@ const tests: [string, () => Promise<void>][] = [
     },
   ],
   [
+    "a nonce far ahead is refused, so it cannot lock the wallet out (Codex r2 #11)",
+    async () => {
+      const e = env();
+      const a = privateKeyToAccount(generatePrivateKey());
+      assert.equal((await intent(e, a, "RKT", 10, "203.0.113.7", undefined, { nonce: Date.now() + 365 * 86_400_000 })).status, 400);
+      assert.equal((await intent(e, a, "RKT", 10)).status, 200);
+    },
+  ],
+  [
     "a request with no country is refused (Codex r1 #6)",
     async () => {
       const r = new Request("https://summon.test/api/intents", { headers: { "cf-connecting-ip": "203.0.113.7" } });

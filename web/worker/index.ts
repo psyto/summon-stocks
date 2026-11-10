@@ -158,6 +158,8 @@ async function post(req: Request, env: Env): Promise<Response> {
   const nKey = `n:${t}:${a}`;
   const lastNonce = Number((await env.INTENTS.get(nKey)) ?? -1);
   if (nonce! <= lastNonce) return json({ error: "This signature is older than one already used for this stock. Sign a new intent." }, 409);
+  // the page signs Date.now(): a nonce far ahead would lock this wallet out of the stock (Codex r2 #11)
+  if (nonce! > Date.now() + 86_400_000) return json({ error: "nonce is too far ahead. Check your device's clock and sign again." }, 400);
   const prev = (await env.INTENTS.get(key, "json")) as { usd: number } | null;
   const limited = await underLimit(env, req, a, !prev);
   if (limited) return json({ error: limited }, 429);

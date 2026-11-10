@@ -58,7 +58,8 @@ contract Deploy is Script {
         hook.setFactory(ISummonRegistry(o.factory));
         o.swap = address(new SummonSwap(IPoolManager(POOL_MANAGER), ISummonPools(o.factory)));
         o.source = usePyth ? PYTH : o.guardFeed;
-        SummonFactory(o.factory).list(o.stock, o.source, o.priceId);
+        // a guard posts one price at a time: 60 s; Pyth, where the filler supplies the update: 5 s
+        SummonFactory(o.factory).list(o.stock, o.source, o.priceId, o.source == o.guardFeed ? 60 : 5);
         vm.stopBroadcast();
 
         _write(o);
@@ -97,7 +98,6 @@ contract Deploy is Script {
                 windowSeconds: 3600,
                 maxAuctions: 3,
                 maxGuardAge: 300,
-                maxPythAge: 60,
                 maxConfBps: 50,
                 maxJumpBps: 300,
                 cooldownSeconds: 3600
