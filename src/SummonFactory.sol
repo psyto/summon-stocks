@@ -25,10 +25,11 @@ contract SummonFactory {
     struct Feed {
         address source; // Pyth, or a feed with Pyth's read interface
         bytes32 priceId;
-        // The oldest price a round accepts. Short where the filler supplies the price update (Pyth: it could
-        // pick the most favorable print within this window), longer where a trusted guard posts one price
-        // at a time (Codex r2 #1).
+        // Push feed (a trusted guard posts one price at a time): the oldest price a round accepts. Pull feed
+        // (Pyth, where the caller supplies the update): the settlement window; a round settles on the first
+        // print at or after the start of the previous window, which no caller chooses (Codex r2 #1, r3 #2).
         uint32 maxAge;
+        bool pull;
     }
 
     /// A round lasts at most this long, and locks its LP position at most this long, so nobody can hold a
@@ -37,6 +38,9 @@ contract SummonFactory {
     uint32 public constant MAX_LP_LOCK_SECONDS = 30 days;
     /// A round nobody has pledged to may be replaced this long after it opened.
     uint64 public constant REPLACE_UNPLEDGED_AFTER = 1 days;
+    /// An Open round a day old with less than this share of its target pledged may be replaced; the old one is
+    /// cancelled and refunds. A dust pledge therefore cannot hold a ticker (Codex r3 #1).
+    uint16 public constant REPLACE_BELOW_BPS = 1000;
 
     /// The smallest target a round may have, in USDC (6 decimals). 0 = no minimum (testnet). Set from what
     /// a fill costs the filler (an issuer's fixed cost per mint), not guessed; the owner can change it.
@@ -56,7 +60,7 @@ contract SummonFactory {
     error TargetTooSmall(uint256 target, uint256 minTarget);
     error BadRoundTerms();
 
-    event Listed(address indexed token, address source, bytes32 priceId, uint32 maxAge);
+    event Listed(address indexed token, address source, bytes32 priceId, uint32 maxAge, bool pull);
     event RoundOpened(address indexed token, address round, uint256 target, uint64 deadline, uint16 maxSpreadBps);
     event OwnerTransferred(address indexed newOwner);
     event MinTargetSet(uint256 minTarget);
@@ -84,11 +88,11 @@ contract SummonFactory {
 
     /// Binds a token to its price feed (source contract, feed id, oldest accepted price). Once, so a live
     /// round's feed can never change under it.
-    function list(address token, address source, bytes32 priceId, uint32 maxAge) external onlyOwner {
+    function list(address token, address source, bytes32 priceId, uint32 maxAge, bool pull) external onlyOwner {
         if (feedOf[token].source != address(0)) revert AlreadyListed(token);
         if (source == address(0) || priceId == bytes32(0) || maxAge == 0) revert NotListed(token);
-        feedOf[token] = Feed(source, priceId, maxAge);
-        emit Listed(token, source, priceId, maxAge);
+        feedOf[token] = Feed(source, priceId, maxAge, pull);
+        emit Listed(token, source, priceId, maxAge, pull);
     }
 
     /// Anyone may open a round for a listed token, unless one is still running or one already filled
@@ -106,9 +110,11 @@ contract SummonFactory {
         if (prev != address(0)) {
             SummonRound.State s = SummonRound(prev).state();
             if (s == SummonRound.State.Filled) revert TokenLive(prev);
-            bool stale = s == SummonRound.State.Open && SummonRound(prev).pledged() == 0
+            bool stale = s == SummonRound.State.Open
+                && SummonRound(prev).pledged() * 1e4 < SummonRound(prev).params().target * REPLACE_BELOW_BPS
                 && block.timestamp >= openedAt[prev] + REPLACE_UNPLEDGED_AFTER;
             if (s != SummonRound.State.Expired && !stale) revert RoundActive(prev);
+            if (stale) SummonRound(prev).cancel();
         }
         Defaults memory df = defaults;
         round = new SummonRound(
@@ -127,6 +133,7 @@ contract SummonFactory {
                 lpLockSeconds: lpLockSeconds,
                 maxGuardAge: df.maxGuardAge,
                 maxPythAge: feed.maxAge,
+                pull: feed.pull,
                 maxConfBps: df.maxConfBps,
                 maxJumpBps: df.maxJumpBps,
                 cooldownSeconds: df.cooldownSeconds

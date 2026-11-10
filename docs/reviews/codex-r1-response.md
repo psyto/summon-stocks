@@ -28,3 +28,21 @@ new issues (one blocker), verdict CHANGES.
 | 10 major | The round page sends empty Pyth updates, so a Pyth-priced round cannot be started or filled from it | For a Pyth-priced round the page offers no start or fill and says to use the filler script. The testnet deployment prices from the guard feed | (page) |
 | 11 minor | A nonce far in the future locks the wallet out of that stock | A nonce more than a day ahead is refused | "a nonce far ahead is refused" |
 | 3 (rest), 9 major | Nonce check and totals are not atomic under KV; every read lists every record | Intents moved from KV to one SQLite-backed Durable Object (`web/worker/store.ts`). It runs one request at a time and its SQL calls are synchronous, so the nonce check, both per-network limits and the write happen as one step. Totals are one indexed query over unexpired rows; an hourly alarm deletes expired intents and old counters (nonces stay, so an expired signature stays refused); the demand export comes in pages of 500 with `next`. Checked in workerd too (`wrangler dev`): a replay sent alongside its replacement gets 409 | "a replay sent at the same time as its replacement cannot win", "the per-network limit holds when the writes arrive at once", "the hourly sweep deletes expired intents but keeps their nonces", "the demand export comes in pages" |
+
+## Codex r3 (2026-11-11): what changed
+
+Codex r3 ([codex-r3.md](codex-r3.md)) found r2 #3, #10 and #11 fixed, #1, #8 and #9 partly fixed, and one
+new issue, verdict CHANGES.
+
+| # | Finding | Fix | Test |
+|---|---|---|---|
+| 1 major (r2 #8 rest) | A dust pledge holds a ticker for 30 days; replacing a round leaves the old one taking pledges it can never fill | An Open round a day old with under 10% of its target pledged may be replaced, and the factory cancels it in the same transaction (`SummonRound.cancel`, factory only): it becomes Expired, refunds, and refuses new pledges. A Funded round frees itself after three auctions nobody fills | `test_roundsCannotSquatATicker` (cancelled round refuses a pledge; a 1-unit pledge does not block; its owner refunds; 10% blocks) |
+| 2 major (r2 #1 rest) | Within the 5 s window the filler still picks the print; a fair fill may miss the window | A pull listing settles on the first Pyth print at or after `settleTime()` (the start of the previous 10 s window), through `parsePriceFeedUpdatesUnique`. Added to hl-price-guard as `PythRef.readFirstAfter` (v0.4.0), which its own docs already recommended for a price at a set time. Push feeds (the testnet guard) keep 60 s. `ts/e2e.ts` fetches that print from Hermes and times the transaction into its window. The Pyth on Base Sepolia answers `parsePriceFeedUpdatesUnique` | `test_pullFeedSettlesOnTheFirstPrintAfterASetTime` (a later, higher print and an earlier window's print are refused) |
+| 3 major (r2 #9 rest) | Live intents and nonces unbounded; totals aggregate every live row | Totals are one row per ticker. Each request deletes expired intents through the expiry index and takes them off the totals. Live intents are capped at 50,000. A nonce is the signing time in ms and an intent may last at most 31 days from it, so nonces are dropped after 31 days. The export's paging reads each page when fetched (documented) | "an intent may last at most 31 days from its nonce, and the nonce is dropped after that", "live intents are capped", "totals are kept as rows and an expired intent leaves them" |
+| 4 major (new) | Swaps ignore the issuer registry's pause | `beforeSwap` reverts while the registry says paused or its multiplier differs from the token's | `test_swapStopsWhileTheIssuerPauses` |
+| 6 | No page test for the Pyth start/fill suppression | Not added: the page has no test harness; checked by hand | - |
+| 7 minor | A near-limit nonce can lock out for up to a day | Accepted: the page signs `Date.now()`; a nonce more than a day ahead is refused | - |
+| 8 minor | The spec still says 60 s for every Pyth price | Spec r5: pull and push listings (5.1, 5.2 item 3), round replacement (2a), the hook's issuer check (5.5) | - |
+
+Removing each fix makes its test fail (checked one at a time). `forge test`: 52. Worker tests: 20, and the
+store was run again under `wrangler dev`.

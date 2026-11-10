@@ -59,7 +59,7 @@ contract Deploy is Script {
         o.swap = address(new SummonSwap(IPoolManager(POOL_MANAGER), ISummonPools(o.factory)));
         o.source = usePyth ? PYTH : o.guardFeed;
         // a guard posts one price at a time: 60 s; Pyth, where the filler supplies the update: 5 s
-        SummonFactory(o.factory).list(o.stock, o.source, o.priceId, o.source == o.guardFeed ? 60 : 5);
+        SummonFactory(o.factory).list(o.stock, o.source, o.priceId, o.source == o.guardFeed ? 60 : 10, o.source != o.guardFeed);
         vm.stopBroadcast();
 
         _write(o);

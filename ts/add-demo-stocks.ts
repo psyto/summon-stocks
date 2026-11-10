@@ -12,8 +12,8 @@ import { account, deployment, publicClient, wallet } from "./env.js";
 
 const ROLES = ["MINT_ROLE", "PAUSE_ROLE", "UNPAUSE_ROLE", "OPERATOR_ROLE"] as const;
 const listAbi = parseAbi([
-  "function list(address token, address source, bytes32 priceId, uint32 maxAge)",
-  "function feedOf(address token) view returns (address source, bytes32 priceId, uint32 maxAge)",
+  "function list(address token, address source, bytes32 priceId, uint32 maxAge, bool pull)",
+  "function feedOf(address token) view returns (address source, bytes32 priceId, uint32 maxAge, bool pull)",
 ]);
 const oracleAbi = parseAbi(["function set(address token, uint256 multiplier, bool paused)"]);
 
@@ -55,7 +55,7 @@ async function main() {
     await send("createB20", { address: B20_FACTORY, abi: factoryAbi, functionName: "createB20", args: [0, salt, params, initCalls], chain: op.chain, account: op.account! });
     await send("mint 1,000 to filler", { address: token, abi: b20Abi, functionName: "mint", args: [filler, 1_000n * 10n ** 8n], chain: op.chain, account: op.account! });
     await send("issuer registry", { address: d.oracleRegistry, abi: oracleAbi, functionName: "set", args: [token, 10n ** 18n, false], chain: op.chain, account: op.account! });
-    await send("list in factory", { address: d.factory, abi: listAbi, functionName: "list", args: [token, d.priceSource, feed, d.priceSource.toLowerCase() === d.guardFeed.toLowerCase() ? 60 : 5], chain: op.chain, account: op.account! });
+    await send("list in factory", { address: d.factory, abi: listAbi, functionName: "list", args: [token, d.priceSource, feed, ...((d.priceSource.toLowerCase() === d.guardFeed.toLowerCase() ? [60, false] : [10, true]) as [number, boolean])], chain: op.chain, account: op.account! });
     out.demoStocks.push({ ticker: t, symbol, address: token, priceId: feed });
     writeFileSync(path, JSON.stringify(out, null, 2) + "\n");
   }

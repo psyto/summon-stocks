@@ -75,7 +75,8 @@ contract SummonRound is IUnlockCallback {
         uint8 maxAuctions;
         uint32 lpLockSeconds;
         uint32 maxGuardAge;
-        uint32 maxPythAge;
+        uint32 maxPythAge; // push feeds: the oldest price accepted. Pull feeds: the settlement window
+        bool pull; // the caller supplies Pyth's update: settle on the first print after a set time (Codex r3 #2)
         uint16 maxConfBps;
         uint16 maxJumpBps;
         uint32 cooldownSeconds; // corporate-action window around a scheduled multiplier change
@@ -147,6 +148,7 @@ contract SummonRound is IUnlockCallback {
     event Filled(address indexed filler, uint256 spreadBps, uint256 ref, uint256 tokensIn, uint256 usdcOut, uint128 liquidity);
     event Claimed(address indexed backer, uint256 tokens, uint256 usdc);
     event Refunded(address indexed backer, uint256 amount);
+    event Cancelled();
     event LPUnwound(uint256 tokens, uint256 usdc);
     event LPClaimed(address indexed backer, uint256 tokens, uint256 usdc);
     event Realigned(uint256 fromMultiplier, uint256 toMultiplier, uint160 sqrtPriceX96, uint128 liquidity);
@@ -185,6 +187,14 @@ contract SummonRound is IUnlockCallback {
     function state() public view returns (State) {
         (State s,) = _timed();
         return s;
+    }
+
+    /// For a pull feed: the time whose first Pyth print prices a start or fill in this block. It is the start
+    /// of the previous window of maxPythAge seconds, so the print exists by the time the window ends, and a
+    /// transaction built for it lands any time in the window after.
+    function settleTime() public view returns (uint64) {
+        uint64 w = p.maxPythAge;
+        return uint64(block.timestamp / w * w - w);
     }
 
     /// The spread a fill would get now, in bps.
@@ -231,6 +241,16 @@ contract SummonRound is IUnlockCallback {
     }
 
     // ------------------------------------------------------------------ auction
+
+    /// The factory cancels an Open round it replaces, in the same transaction, so nobody can pledge into a
+    /// round that can no longer fill; every pledge becomes refundable (Codex r3 #1).
+    function cancel() external nonReentrant {
+        if (msg.sender != factory) revert NotFactory();
+        _sync();
+        if (_state != State.Open) revert WrongState(_state);
+        _state = State.Expired;
+        emit Cancelled();
+    }
 
     /// Anyone may start the auction once the round is funded and every fill condition holds now.
     function startAuction(bytes[] calldata pythUpdate) external payable nonReentrant {
@@ -457,7 +477,11 @@ contract SummonRound is IUnlockCallback {
         // 2. market state, fail closed
         MarketStateCheck.requireOpen(MarketStateRegistry(d.marketState), p.token, p.maxGuardAge);
         // 3. a fresh Pyth price with a narrow confidence interval (stops publishing outside the session)
-        HLPriceGuard.Ref memory r = PythRef.updateAndReadFresh(IPyth(p.priceSource), pythUpdate, p.priceId, p.maxPythAge, p.maxConfBps);
+        // a pull feed settles on the first print at or after a time set by the block, so the caller cannot pick
+        // a favorable print from several (Codex r3 #2); a push feed is the latest price its updater posted
+        HLPriceGuard.Ref memory r = p.pull
+            ? PythRef.readFirstAfter(IPyth(p.priceSource), pythUpdate, p.priceId, settleTime(), p.maxPythAge, p.maxConfBps)
+            : PythRef.updateAndReadFresh(IPyth(p.priceSource), pythUpdate, p.priceId, p.maxPythAge, p.maxConfBps);
         uint256 m = IB20AssetMin(p.token).multiplier();
         ref = SummonPrice.refPerToken(r.price, m);
         publishedAt = r.updatedAt;

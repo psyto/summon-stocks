@@ -7,7 +7,7 @@ import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
 import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "v4-core/src/types/BeforeSwapDelta.sol";
 import {LPFeeLibrary} from "v4-core/src/libraries/LPFeeLibrary.sol";
 import {MarketStateRegistry} from "market-state/MarketStateRegistry.sol";
-import {SummonRound, IB20AssetMin} from "./SummonRound.sol";
+import {SummonRound, IB20AssetMin, IOracleParams} from "./SummonRound.sol";
 import {SummonPool} from "./SummonPool.sol";
 
 interface ISummonRegistry {
@@ -33,6 +33,8 @@ contract SummonHook {
     error CorporateActionWindow(uint256 effectiveAt);
     error StaleMultiplier(uint256 pool, uint256 token);
     error MarketHalted(uint8 reason);
+    error IssuerPaused();
+    error MultiplierMismatch(uint256 registry, uint256 token);
 
     constructor(address poolManager_, address deployer_) {
         poolManager = poolManager_;
@@ -83,6 +85,13 @@ contract SummonHook {
         // 2. the pool was priced at another multiplier
         uint256 m = IB20AssetMin(p.token).multiplier();
         if (m != round.poolMultiplier()) revert StaleMultiplier(round.poolMultiplier(), m);
+        // 2a. the issuer's registry: paused, or disagreeing with the token, stops swaps as it stops fills (Codex r3 #4)
+        address reg = round.deps().oracleRegistry;
+        if (reg != address(0)) {
+            (uint256 rm, bool paused) = IOracleParams(reg).getOracleParams(p.token);
+            if (paused) revert IssuerPaused();
+            if (rm != m) revert MultiplierMismatch(rm, m);
+        }
         // 3. halted, or not yet resumed
         MarketStateRegistry ms = MarketStateRegistry(round.deps().marketState);
         MarketStateRegistry.State memory s = ms.stateOf(p.token);

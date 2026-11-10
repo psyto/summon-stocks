@@ -9,6 +9,7 @@ import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
 import {PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
 import {StateLibrary} from "v4-core/src/libraries/StateLibrary.sol";
 import {MockPyth} from "@pythnetwork/pyth-sdk-solidity/MockPyth.sol";
+import {PythStructs} from "@pythnetwork/pyth-sdk-solidity/PythStructs.sol";
 import {MarketStateRegistry} from "market-state/MarketStateRegistry.sol";
 import {MarketStateCheck} from "market-state/MarketStateCheck.sol";
 import {PythRef} from "hl-price-guard/PythRef.sol";
@@ -21,6 +22,34 @@ import {SummonSwap, ISummonPools} from "../src/SummonSwap.sol";
 import {PoolModifyLiquidityTest} from "v4-core/src/test/PoolModifyLiquidityTest.sol";
 import {MockERC20, MockB20, MockPolicyRegistry, MockOracleRegistry} from "./mocks/Mocks.sol";
 import {GuardPriceFeed} from "../src/testnet/GuardPriceFeed.sol";
+
+/// MockPyth with Pyth's parsePriceFeedUpdatesUnique. Each update is abi.encode(int64 price, uint64 conf,
+/// uint64 publishTime, uint64 prevPublishTime); it returns the first with prev < min <= publishTime <= max.
+contract UniqueMockPyth is MockPyth {
+    int32 internal immutable expo;
+
+    constructor(int32 expo_) MockPyth(60, 1) {
+        expo = expo_;
+    }
+
+    function parsePriceFeedUpdatesUnique(bytes[] calldata updateData, bytes32[] calldata ids, uint64 min, uint64 max)
+        external
+        payable
+        returns (PythStructs.PriceFeed[] memory f)
+    {
+        require(msg.value >= getUpdateFee(updateData), "fee");
+        f = new PythStructs.PriceFeed[](1);
+        for (uint256 i; i < updateData.length; i++) {
+            (int64 px, uint64 conf, uint64 t, uint64 prev) = abi.decode(updateData[i], (int64, uint64, uint64, uint64));
+            if (prev < min && min <= t && t <= max) {
+                f[0].id = ids[0];
+                f[0].price = PythStructs.Price(px, conf, expo, t);
+                return f;
+            }
+        }
+        revert("PriceFeedNotFoundWithinRange");
+    }
+}
 
 contract SummonRoundTest is Test {
     using PoolIdLibrary for PoolKey;
@@ -87,7 +116,7 @@ contract SummonRoundTest is Test {
             })
         );
         hook.setFactory(ISummonRegistry(address(factory)));
-        factory.list(address(token), address(pyth), GME, 60);
+        factory.list(address(token), address(pyth), GME, 60, false);
         round = factory.openRound(address(token), 10_000e6, uint64(block.timestamp + 7 days), 100, 7 days);
 
         for (uint256 i; i < 3; ++i) {
@@ -411,7 +440,7 @@ contract SummonRoundTest is Test {
     /// Codex r2 #8: nobody can hold a ticker's only round open for good.
     function test_roundsCannotSquatATicker() public {
         MockB20 t3 = new MockB20(policies);
-        factory.list(address(t3), address(pyth), GME, 60);
+        factory.list(address(t3), address(pyth), GME, 60, false);
         vm.expectRevert(SummonFactory.BadRoundTerms.selector);
         factory.openRound(address(t3), 10_000e6, uint64(block.timestamp + 31 days), 100, 7 days);
         vm.expectRevert(SummonFactory.BadRoundTerms.selector);
@@ -425,21 +454,46 @@ contract SummonRoundTest is Test {
         vm.warp(block.timestamp + 1 days);
         SummonRound fair = factory.openRound(address(t3), 10_000e6, uint64(block.timestamp + 7 days), 100, 7 days);
         assertEq(factory.latestRound(address(t3)), address(fair));
-        // a round someone pledged to is never replaced
+        // the replaced round is cancelled in the same transaction: no pledge can land in it any more
         vm.startPrank(alice);
+        usdc.approve(address(squat), type(uint256).max);
+        vm.expectRevert(abi.encodeWithSelector(SummonRound.WrongState.selector, SummonRound.State.Expired));
+        squat.pledge(1e6);
+        vm.stopPrank();
+
+        // Codex r3 #1: a dust pledge does not hold a ticker; whoever pledged it gets it back
+        vm.startPrank(carol);
         usdc.approve(address(fair), type(uint256).max);
-        fair.pledge(1e6);
+        fair.pledge(1);
+        vm.stopPrank();
+        vm.warp(block.timestamp + 1 days);
+        SummonRound next = factory.openRound(address(t3), 10_000e6, uint64(block.timestamp + 7 days), 100, 7 days);
+        assertEq(uint8(fair.state()), uint8(SummonRound.State.Expired));
+        vm.prank(carol);
+        fair.refund();
+
+        // a round with a tenth of its target pledged is not replaced
+        vm.startPrank(alice);
+        usdc.approve(address(next), type(uint256).max);
+        next.pledge(1_000e6);
         vm.stopPrank();
         vm.warp(block.timestamp + 2 days);
-        vm.expectRevert(abi.encodeWithSelector(SummonFactory.RoundActive.selector, address(fair)));
+        vm.expectRevert(abi.encodeWithSelector(SummonFactory.RoundActive.selector, address(next)));
         factory.openRound(address(t3), 10_000e6, uint64(block.timestamp + 7 days), 100, 7 days);
     }
 
-    /// Codex r2 #1: where the filler supplies the price, the listing accepts only a recent one.
-    function test_pullFeedFillNeedsARecentPrice() public {
+    function _print(int64 px, uint64 t, uint64 prev) internal pure returns (bytes[] memory u) {
+        u = new bytes[](1);
+        u[0] = abi.encode(px, CONF, t, prev);
+    }
+
+    /// Codex r2 #1, r3 #2: where the filler supplies Pyth's update, a start or fill settles on the first print
+    /// at or after settleTime(), which the block sets; a later, more favorable print is refused.
+    function test_pullFeedSettlesOnTheFirstPrintAfterASetTime() public {
+        UniqueMockPyth up = new UniqueMockPyth(EXPO);
         MockB20 t3 = new MockB20(policies);
         market.setState(address(t3), false, 0, 0);
-        factory.list(address(t3), address(pyth), GME, 5);
+        factory.list(address(t3), address(up), GME, 10, true);
         SummonRound r = factory.openRound(address(t3), 10_000e6, uint64(block.timestamp + 7 days), 100, 7 days);
         for (uint256 i; i < 3; ++i) {
             address b = [alice, bob, carol][i];
@@ -451,19 +505,39 @@ contract SummonRoundTest is Test {
         t3.mint(ap, 1_000e8);
         vm.prank(ap);
         t3.approve(address(r), type(uint256).max);
-        r.startAuction{value: 1}(_fresh());
-        // a print from after the start, but 10 s old, is outside the 5 s window
-        vm.warp(block.timestamp + 20);
+        vm.warp(block.timestamp + 3); // 1_800_000_003: settles on the first print at or after 1_799_999_990
+        uint64 t = r.settleTime();
+        assertEq(t, 1_799_999_990);
+        r.startAuction{value: 1}(_print(PX, t + 1, t - 1));
+
+        vm.warp(block.timestamp + 130);
         _heartbeat();
         market.heartbeat(_one(address(t3)));
-        bytes[] memory old = _update(PX, CONF, uint64(block.timestamp - 10));
+        t = r.settleTime();
+        // a print 4 s into the window, $1 higher, but not the first one in it: the filler is choosing
         vm.prank(ap);
-        vm.expectRevert(abi.encodeWithSelector(PythRef.PythStale.selector, GME, 10, 5));
-        r.fill{value: 1}(old);
-        bytes[] memory recent = _update(PX, CONF, uint64(block.timestamp - 2));
+        vm.expectRevert(bytes("PriceFeedNotFoundWithinRange"));
+        r.fill{value: 1}(_print(PX + 1e5, t + 4, t + 1));
+        // the first print of an earlier window
         vm.prank(ap);
-        r.fill{value: 1}(recent);
+        vm.expectRevert(bytes("PriceFeedNotFoundWithinRange"));
+        r.fill{value: 1}(_print(PX, t - 9, t - 11));
+        // the first print in the window fills, at its price
+        vm.prank(ap);
+        r.fill{value: 1}(_print(PX, t + 1, t - 1));
         assertEq(uint8(r.state()), uint8(SummonRound.State.Filled));
+        assertEq(r.fillRef(), SummonPrice.refPerToken(uint256(uint64(PX)) * 10 ** uint256(int256(18 + EXPO)), 1e18));
+    }
+
+    /// Codex r3 #4: an issuer pause stops swaps, as it stops fills.
+    function test_swapStopsWhileTheIssuerPauses() public {
+        (SummonSwap router, PoolKey memory key, bool usdcIs0) = _summoned();
+        oracle.set(1e18, true);
+        vm.prank(alice);
+        vm.expectRevert(); // the PoolManager wraps the hook's IssuerPaused
+        router.swapExactIn(key, usdcIs0, 100e6, 1, alice);
+        oracle.set(1e18, false);
+        assertGt(_buy(router, key, usdcIs0), 0);
     }
 
     function _one(address a) internal pure returns (address[] memory x) {
@@ -538,10 +612,10 @@ contract SummonRoundTest is Test {
         vm.expectRevert(abi.encodeWithSelector(SummonFactory.RoundActive.selector, address(round)));
         factory.openRound(address(token), 1e6, uint64(block.timestamp + 1 days), 100, 1 days);
         vm.expectRevert(abi.encodeWithSelector(SummonFactory.AlreadyListed.selector, address(token)));
-        factory.list(address(token), address(pyth), bytes32(uint256(1)), 60);
+        factory.list(address(token), address(pyth), bytes32(uint256(1)), 60, false);
         vm.prank(alice);
         vm.expectRevert(SummonFactory.NotOwner.selector);
-        factory.list(address(usdc), address(pyth), bytes32(uint256(1)), 60);
+        factory.list(address(usdc), address(pyth), bytes32(uint256(1)), 60, false);
         // spread above 1% is refused
         vm.warp(block.timestamp + 8 days);
         vm.expectRevert(SummonRound.BadParams.selector);
@@ -775,7 +849,7 @@ contract SummonRoundTest is Test {
         t2 = new MockB20(policies);
         market.setState(address(t2), false, 0, 0);
         oracle.set(1e18, false);
-        factory.list(address(t2), address(feed), GME, 60);
+        factory.list(address(t2), address(feed), GME, 60, false);
         r = factory.openRound(address(t2), 10_000e6, uint64(block.timestamp + 1 days), 100, 1 days);
         for (uint256 i; i < 3; ++i) {
             address b = [alice, bob, carol][i];

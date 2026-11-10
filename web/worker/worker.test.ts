@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { DatabaseSync } from "node:sqlite";
 import worker, { IntentStore } from "./index";
+import { MAX_LIVE } from "./store";
 
 /** The Durable Object namespace, with IntentStore over an in-memory node:sqlite database. */
 function memStore() {
@@ -166,11 +167,12 @@ const tests: [string, () => Promise<void>][] = [
     async () => {
       const e = env();
       const a = privateKeyToAccount(generatePrivateKey());
+      const n0 = Date.now(); // a nonce is the signing time in ms
       // keep the first signed request, as an observer could
-      const first = await intent(e, a, "RKT", 250, "203.0.113.7", undefined, { nonce: 1 });
+      const first = await intent(e, a, "RKT", 250, "203.0.113.7", undefined, { nonce: n0 });
       assert.equal(first.status, 200);
-      assert.equal((await intent(e, a, "RKT", 1, "203.0.113.7", undefined, { nonce: 2 })).status, 200);
-      assert.equal((await intent(e, a, "RKT", 250, "203.0.113.7", undefined, { nonce: 1 })).status, 409);
+      assert.equal((await intent(e, a, "RKT", 1, "203.0.113.7", undefined, { nonce: n0 + 1 })).status, 200);
+      assert.equal((await intent(e, a, "RKT", 250, "203.0.113.7", undefined, { nonce: n0 })).status, 409);
       assert.deepEqual(await (await worker.fetch(req("/api/intents"), e)).json(), { RKT: { backers: 1, usd: 1 } });
     },
   ],
@@ -179,11 +181,12 @@ const tests: [string, () => Promise<void>][] = [
     async () => {
       const e = env();
       const a = privateKeyToAccount(generatePrivateKey());
-      assert.equal((await intent(e, a, "RKT", 250, "203.0.113.7", undefined, { nonce: 1 })).status, 200);
+      const n0 = Date.now(); // a nonce is the signing time in ms
+      assert.equal((await intent(e, a, "RKT", 250, "203.0.113.7", undefined, { nonce: n0 })).status, 200);
       // the replacement and a replay of the first, in flight together (KV could keep either)
       const [next, replay] = await Promise.all([
-        intent(e, a, "RKT", 1, "203.0.113.7", undefined, { nonce: 2 }),
-        intent(e, a, "RKT", 250, "203.0.113.7", undefined, { nonce: 1 }),
+        intent(e, a, "RKT", 1, "203.0.113.7", undefined, { nonce: n0 + 1 }),
+        intent(e, a, "RKT", 250, "203.0.113.7", undefined, { nonce: n0 }),
       ]);
       assert.equal(next.status, 200);
       assert.equal(replay.status, 409);
@@ -205,7 +208,7 @@ const tests: [string, () => Promise<void>][] = [
       const e = env() as unknown as { INTENTS: ReturnType<typeof memStore> };
       const a = privateKeyToAccount(generatePrivateKey());
       const now = Date.now();
-      await intent(e as never, a, "RKT", 250, "203.0.113.7", undefined, { expiry: Math.floor(now / 1000) + 5, nonce: 7 });
+      await intent(e as never, a, "RKT", 250, "203.0.113.7", undefined, { expiry: Math.floor(now / 1000) + 5, nonce: now });
       await intent(e as never, privateKeyToAccount(generatePrivateKey()), "SOFI", 40);
       const realNow = Date.now;
       Date.now = () => now + 10_000;
@@ -213,7 +216,55 @@ const tests: [string, () => Promise<void>][] = [
         await e.INTENTS.obj.alarm();
         assert.deepEqual(e.INTENTS.db.prepare("SELECT ticker FROM intents").all().map((r) => r.ticker), ["SOFI"]);
         // the expired intent's signature still cannot come back
-        assert.equal((await intent(e as never, a, "RKT", 250, "203.0.113.7", undefined, { expiry: Math.floor(now / 1000) + 86_400, nonce: 7 })).status, 409);
+        assert.equal((await intent(e as never, a, "RKT", 250, "203.0.113.7", undefined, { expiry: Math.floor(now / 1000) + 86_400, nonce: now })).status, 409);
+      } finally {
+        Date.now = realNow;
+      }
+    },
+  ],
+  [
+    "an intent may last at most 31 days from its nonce, and the nonce is dropped after that (Codex r3 #3)",
+    async () => {
+      const e = env() as unknown as { INTENTS: ReturnType<typeof memStore> };
+      const a = privateKeyToAccount(generatePrivateKey());
+      const now = Date.now();
+      // signed (nonce) 10 days ago, lasting 25 days from now: 35 days from signing
+      const tooLong = await intent(e as never, a, "RKT", 10, "203.0.113.7", undefined, { nonce: now - 10 * 86_400_000, expiry: Math.floor(now / 1000) + 25 * 86_400 });
+      assert.equal(tooLong.status, 400);
+      assert.equal((await intent(e as never, a, "RKT", 10, "203.0.113.7", undefined, { nonce: now })).status, 200);
+      const realNow = Date.now;
+      Date.now = () => now + 32 * 86_400_000;
+      try {
+        await e.INTENTS.obj.alarm();
+      } finally {
+        Date.now = realNow;
+      }
+      assert.equal(e.INTENTS.db.prepare("SELECT COUNT(*) AS n FROM nonces").all()[0]!.n, 0);
+    },
+  ],
+  [
+    "live intents are capped (Codex r3 #3)",
+    async () => {
+      const e = env() as unknown as { INTENTS: ReturnType<typeof memStore> };
+      e.INTENTS.db.prepare("INSERT INTO totals VALUES ('XYZ', ?, 1)").run(MAX_LIVE);
+      const r = await intent(e as never, privateKeyToAccount(generatePrivateKey()), "RKT", 10);
+      assert.equal(r.status, 503);
+    },
+  ],
+  [
+    "totals are kept as rows and an expired intent leaves them (Codex r3 #3)",
+    async () => {
+      const e = env() as unknown as { INTENTS: ReturnType<typeof memStore> };
+      const now = Date.now();
+      const a = privateKeyToAccount(generatePrivateKey());
+      await intent(e as never, a, "RKT", 250, "203.0.113.7", undefined, { expiry: Math.floor(now / 1000) + 5 });
+      await intent(e as never, a, "RKT", 100); // the same wallet replaces its own
+      await intent(e as never, privateKeyToAccount(generatePrivateKey()), "RKT", 40, "203.0.113.7", undefined, { expiry: Math.floor(now / 1000) + 5 });
+      assert.deepEqual(e.INTENTS.db.prepare("SELECT backers, usd FROM totals").all().map((r) => [r.backers, r.usd]), [[2, 140]]);
+      const realNow = Date.now;
+      Date.now = () => now + 10_000;
+      try {
+        assert.deepEqual(await (await worker.fetch(req("/api/intents"), e as never)).json(), { RKT: { backers: 1, usd: 100 } });
       } finally {
         Date.now = realNow;
       }

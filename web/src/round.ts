@@ -181,8 +181,11 @@ async function readChecks(round: Addr, p: Params): Promise<Check[]> {
     const age = Math.abs(now() - Number(price.publishTime));
     checks.push({
       name: "The price is fresh",
-      ok: age <= p.maxPythAge && confBps <= p.maxConfBps,
-      value: `${demo.ticker} $${px.toFixed(2)}, posted ${ago(Number(price.publishTime))}, ±${confBps.toFixed(0)} bp. Limits: ${p.maxPythAge} s and ${p.maxConfBps} bp.`,
+      // a pull listing settles on a print the filler supplies, so the stored one only shows the feed is alive
+      ok: (p.pull || age <= p.maxPythAge) && confBps <= p.maxConfBps,
+      value: p.pull
+        ? `${demo.ticker} $${px.toFixed(2)} stored ${ago(Number(price.publishTime))}. A start or fill settles on the first Pyth print at or after the start of the previous ${p.maxPythAge} s window, which the filler supplies; its confidence must be within ${p.maxConfBps} bp.`
+        : `${demo.ticker} $${px.toFixed(2)}, posted ${ago(Number(price.publishTime))}, ±${confBps.toFixed(0)} bp. Limits: ${p.maxPythAge} s and ${p.maxConfBps} bp.`,
       source: priceSource,
     });
   }

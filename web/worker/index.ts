@@ -17,7 +17,7 @@
  * (Codex r1 #3). The demand export comes in pages of 500 (?after=<next> continues it).
  */
 import { verifyTypedData, getAddress, isAddress } from "viem";
-import { IntentStore } from "./store";
+import { IntentStore, MAX_EXPIRY_DAYS } from "./store";
 
 export { IntentStore };
 
@@ -58,7 +58,6 @@ const DEMO_WALLETS = new Set(
 );
 
 const MAX_USD = 1_000_000;
-const MAX_EXPIRY_DAYS = 31; // the page signs 30 days
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 
@@ -109,6 +108,9 @@ async function post(req: Request, env: Env): Promise<Response> {
 
   // the page signs Date.now(): a nonce far ahead would lock this wallet out of the stock (Codex r2 #11)
   if (nonce! > Date.now() + 86_400_000) return json({ error: "nonce is too far ahead. Check your device's clock and sign again." }, 400);
+  // the nonce is the signing time in ms, and an intent lasts at most MAX_EXPIRY_DAYS from it, so the store can
+  // forget a nonce once that long has passed (Codex r3 #3)
+  if (expiry! > nonce! / 1000 + MAX_EXPIRY_DAYS * 86_400) return json({ error: `An intent may last at most ${MAX_EXPIRY_DAYS} days from when it was signed (its nonce).` }, 400);
   const ip = req.headers.get("cf-connecting-ip") ?? "local";
   const r = await store(env)("/put", { ticker, token: getAddress(token), address: address.toLowerCase(), usd, expiry, nonce, signature, ip });
   return json(await r.json(), r.status);

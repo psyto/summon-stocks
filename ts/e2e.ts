@@ -11,7 +11,10 @@
 import { decodeEventLog, parseUnits, type Abi, type Hex } from "viem";
 import { STATES, b20Abi, erc20Abi, pythAbi, roundAbi, summonFactoryAbi } from "./abi.js";
 import { account, deployment, publicClient, wallet, type ROLES } from "./env.js";
-import { latestUpdate } from "./hermes.js";
+import { updateAt } from "./hermes.js";
+
+/** The settlement window of a pull listing; Deploy.s.sol lists Pyth with 10. */
+const PYTH_WINDOW_SECONDS = 10;
 
 const pc = publicClient();
 const d0 = deployment() as ReturnType<typeof deployment> & { demoStocks?: { ticker: string; symbol: string; address: Hex; priceId: Hex }[] };
@@ -40,16 +43,26 @@ async function send(role: keyof typeof ROLES, step: string, req: Call) {
   return r;
 }
 
-/** Hermes update data for real Pyth; nothing for GuardPriceFeed, which the guard keeps posting to. */
+/**
+ * Hermes update data for real Pyth; nothing for GuardPriceFeed, which the guard keeps posting to. A pull
+ * listing settles on the first print at or after the start of the previous window (SummonRound.settleTime),
+ * so this fetches that print and waits, if needed, until the next block falls in the window it was built for.
+ */
 async function pythArgs(): Promise<{ data: Hex[]; fee: bigint }> {
   if (d.priceSource.toLowerCase() === d.guardFeed.toLowerCase()) {
     console.log("  price: GuardPriceFeed (the guard must be running)");
     return { data: [], fee: 0n };
   }
-  const u = await latestUpdate(d.priceId);
+  const w = PYTH_WINDOW_SECONDS;
+  let next = Number((await pc.getBlock()).timestamp) + 2; // Base: a block every 2 s
+  if (next % w > w - 4) {
+    await new Promise((r) => setTimeout(r, (w - (next % w) + 1) * 1000));
+    next = Number((await pc.getBlock()).timestamp) + 2;
+  }
+  const at = Math.floor(next / w) * w - w;
+  const u = await updateAt(d.priceId, at);
   const fee = await pc.readContract({ address: d.pyth, abi: pythAbi, functionName: "getUpdateFee", args: [u.data] });
-  const age = Math.floor(Date.now() / 1000) - u.publishTime;
-  console.log(`  Pyth GME ${Number(u.price) * 10 ** u.expo} (${age} s old)`);
+  console.log(`  Pyth GME ${Number(u.price) * 10 ** u.expo}, the first print at or after ${at} (published ${u.publishTime})`);
   return { data: u.data, fee };
 }
 
