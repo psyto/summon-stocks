@@ -15,7 +15,7 @@ Read docs/specs/001-summon.md (r4) first, then:
 
 Facts already checked on Base Sepolia (do not re-derive): the demo stock is a real B20 Asset created with
 createB20; multiplier 1e18, effectiveAt 0, all three transfer policies are id 0 (always allow). Deployed
-addresses are in deployments/84532.json. `forge test` passes 47 tests; `cd web && npm run test:worker` passes 8 (checked 2026-11-10 on this branch).
+addresses are in deployments/84532.json. `forge test` passes 49 tests; `cd web && npm run test:worker` passes 12 (checked 2026-11-10 on this branch).
 
 Where Claude thinks it is weakest (start here):
 1. Price manipulation by the filler: the filler supplies the price update (Pyth) or the guard posts it

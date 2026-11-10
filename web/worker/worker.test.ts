@@ -47,8 +47,24 @@ const types = {
 
 const tokenOf = new Map((JSON.parse(snapshot) as { stocks: { ticker: string; address: `0x${string}` }[] }).stocks.map((s) => [s.ticker, s.address]));
 
-async function intent(e: never, acct: ReturnType<typeof privateKeyToAccount>, ticker: string, usd: number, ip = "203.0.113.7", token = tokenOf.get(ticker)!) {
-  const message = { ticker, token, usd: BigInt(usd), expiry: BigInt(Math.floor(Date.now() / 1000) + 86_400), nonce: BigInt(Date.now()) };
+let nextNonce = Date.now();
+
+async function intent(
+  e: never,
+  acct: ReturnType<typeof privateKeyToAccount>,
+  ticker: string,
+  usd: number,
+  ip = "203.0.113.7",
+  token = tokenOf.get(ticker)!,
+  o: { expiry?: number; nonce?: number } = {},
+) {
+  const message = {
+    ticker,
+    token,
+    usd: BigInt(usd),
+    expiry: BigInt(o.expiry ?? Math.floor(Date.now() / 1000) + 86_400),
+    nonce: BigInt(o.nonce ?? nextNonce++),
+  };
   const signature = await acct.signTypedData({ domain, types, primaryType: "Intent", message });
   const body = JSON.stringify({ ticker, token, usd, expiry: Number(message.expiry), nonce: Number(message.nonce), address: acct.address, signature });
   return worker.fetch(req("/api/intents", { method: "POST", body, headers: { "content-type": "application/json" } }, "JP", ip), e);
@@ -114,6 +130,49 @@ const tests: [string, () => Promise<void>][] = [
       const r = await intent(e, a, "SOFI", 50, "203.0.113.7", tokenOf.get("RKT"));
       assert.equal(r.status, 400);
       assert.match(((await r.json()) as { error: string }).error, /not the registered contract for SOFI/);
+    },
+  ],
+  [
+    "an expired intent stops counting at once (Codex r1 #2)",
+    async () => {
+      const e = env();
+      const now = Date.now();
+      assert.equal((await intent(e, privateKeyToAccount(generatePrivateKey()), "RKT", 250, "203.0.113.7", undefined, { expiry: Math.floor(now / 1000) + 5 })).status, 200);
+      assert.deepEqual(await (await worker.fetch(req("/api/intents"), e)).json(), { RKT: { backers: 1, usd: 250 } });
+      const realNow = Date.now;
+      Date.now = () => now + 10_000;
+      try {
+        assert.deepEqual(await (await worker.fetch(req("/api/intents"), e)).json(), {});
+      } finally {
+        Date.now = realNow;
+      }
+    },
+  ],
+  [
+    "an intent may last at most 31 days",
+    async () => {
+      const r = await intent(env(), privateKeyToAccount(generatePrivateKey()), "RKT", 10, "203.0.113.7", undefined, { expiry: Math.floor(Date.now() / 1000) + 40 * 86_400 });
+      assert.equal(r.status, 400);
+    },
+  ],
+  [
+    "an older signature cannot restore a replaced intent (Codex r1 #3)",
+    async () => {
+      const e = env();
+      const a = privateKeyToAccount(generatePrivateKey());
+      // keep the first signed request, as an observer could
+      const first = await intent(e, a, "RKT", 250, "203.0.113.7", undefined, { nonce: 1 });
+      assert.equal(first.status, 200);
+      assert.equal((await intent(e, a, "RKT", 1, "203.0.113.7", undefined, { nonce: 2 })).status, 200);
+      assert.equal((await intent(e, a, "RKT", 250, "203.0.113.7", undefined, { nonce: 1 })).status, 409);
+      assert.deepEqual(await (await worker.fetch(req("/api/intents"), e)).json(), { RKT: { backers: 1, usd: 1 } });
+    },
+  ],
+  [
+    "a request with no country is refused (Codex r1 #6)",
+    async () => {
+      const r = new Request("https://summon.test/api/intents", { headers: { "cf-connecting-ip": "203.0.113.7" } });
+      assert.equal((await worker.fetch(r as never, env())).status, 451);
     },
   ],
   [

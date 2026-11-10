@@ -261,7 +261,7 @@ function body(round: Addr, p: Params, s: S, checks: Check[], redraw: () => Promi
     "section",
     { class: "checks", "aria-labelledby": "checks-h" },
     h("h2", { class: "wide", id: "checks-h" }, "Fill conditions"),
-    h("p", { class: "checks__lede" }, `${passing} of ${checks.length} hold right now. The round can start its auction or be filled only when all of them hold. Read from Base Sepolia every 15 s.`),
+    h("p", { class: "checks__lede" }, `${passing} of ${checks.length} hold right now. These are the conditions this page can read; the round also checks the filler's own transfer policy, and that the fill's price was published after the auction started and has not jumped since. Read from Base Sepolia every 15 s.`),
     h(
       "ul",
       {},
@@ -468,6 +468,30 @@ function poolPriceUsd(sqrtPriceX96: bigint, tokenIs0: boolean): number {
   return tokenIs0 ? ratio * scale : scale / ratio;
 }
 
+/** What SummonHook does to a swap now (spec 5.5), read from the same sources: stopped and why, or the fee. */
+async function swapGate(round: Addr, p: Params): Promise<{ stopped?: string; realign?: boolean; feePct: number; closed: boolean }> {
+  const [st, m, eff, pm] = await Promise.all([
+    client.readContract({ address: D.marketState!, abi: marketAbi, functionName: "stateOf", args: [p.token] }),
+    client.readContract({ address: p.token, abi: b20Abi, functionName: "multiplier" }),
+    client.readContract({ address: p.token, abi: b20Abi, functionName: "effectiveAt" }),
+    client.readContract({ address: round, abi: roundAbi, functionName: "poolMultiplier" }),
+  ]);
+  const t = BigInt(now());
+  const cd = BigInt(p.cooldownSeconds);
+  if (eff !== 0n && t + cd >= eff && t <= eff + cd) {
+    return { stopped: `Trading is stopped around a corporate action: the multiplier changes at ${new Date(Number(eff) * 1000).toLocaleString()}.`, feePct: 0, closed: false };
+  }
+  if (m !== pm) {
+    return { stopped: "The token's multiplier changed since the pool was priced, so its price is out of date. Anyone can realign the pool to the new multiplier; trading resumes then.", realign: true, feePct: 0, closed: false };
+  }
+  const SESSION_CLOSED = 3;
+  if ((st.halted && st.reason !== SESSION_CLOSED) || t < st.resumeAfter) {
+    return { stopped: "Trading is stopped: the listing exchange has the stock halted.", feePct: 0, closed: false };
+  }
+  const closed = st.halted || st.updatedAt + BigInt(p.maxGuardAge) < t;
+  return { feePct: closed ? 1 : 0.3, closed };
+}
+
 /** After a fill: the summoned stock's pool, and a box to trade it. */
 function pool(round: Addr, p: Params): HTMLElement {
   const box = h(
@@ -483,7 +507,11 @@ function pool(round: Addr, p: Params): HTMLElement {
       const [sqrtP, , liq] = await client.readContract({ address: D.swap!, abi: swapAbi, functionName: "poolState", args: [key] });
       const tokenIs0 = key.currency0.toLowerCase() === p.token.toLowerCase();
       const px = poolPriceUsd(sqrtP, tokenIs0);
-      lede.textContent = `Pool price $${px.toFixed(2)} per ${demo.symbol}. In-range liquidity ${liq.toString()}. Pool fee 0.3%. Anyone can trade it; the backers are its LPs.`;
+      const gate = await swapGate(round, p);
+      const feeNote = gate.closed ? `Pool fee ${gate.feePct}% now: the US session is closed, so trades pay more (0.3% while it is open).` : `Pool fee ${gate.feePct}%.`;
+      lede.textContent = gate.stopped
+        ? `Pool price $${px.toFixed(2)} per ${demo.symbol}. ${gate.stopped}`
+        : `Pool price $${px.toFixed(2)} per ${demo.symbol}. In-range liquidity ${liq.toString()}. ${feeNote} Anyone can trade it; the backers are its LPs.`;
       box.append(
         h(
           "p",
@@ -493,6 +521,24 @@ function pool(round: Addr, p: Params): HTMLElement {
         ),
       );
       const me = current();
+      if (gate.stopped) {
+        if (gate.realign && me) {
+          const msg = h("p", { class: "act__msg", role: "status" });
+          const b = h("button", { class: "btn btn--seal", type: "button" }, "Realign the pool");
+          b.addEventListener("click", async () => {
+            try {
+              const hash = await walletClient().writeContract({ address: round, abi: roundAbi, functionName: "realign", account: me, chain: client.chain } as never);
+              msg.replaceChildren("Realign: waiting for Base Sepolia. ", h("a", { href: explorer("tx", hash), target: "_blank", rel: "noopener" }, "View transaction"));
+              await client.waitForTransactionReceipt({ hash });
+              msg.textContent = "Realigned. Reload to trade.";
+            } catch (e) {
+              msg.textContent = (e as Error).message.split("\n")[0] ?? "Realign failed.";
+            }
+          });
+          box.append(b, msg);
+        }
+        return;
+      }
       if (!me) {
         box.append(h("p", { class: "act__note" }, "Connect a wallet to trade."));
         return;
@@ -506,7 +552,8 @@ function pool(round: Addr, p: Params): HTMLElement {
       const go = h("button", { class: "btn btn--seal", type: "button" }, `Buy ${demo.symbol}`);
       const estimate = () => {
         const n = Number(amount.value) || 0;
-        const out = buying ? (n / px) * 0.997 : n * px * 0.997;
+        const keep = 1 - gate.feePct / 100;
+        const out = buying ? (n / px) * keep : n * px * keep;
         est.textContent = `About ${out.toFixed(buying ? 4 : 2)} ${buying ? demo.symbol : "tUSDC"} before price impact. The trade reverts if it would get less than 97% of that.`;
         return out;
       };

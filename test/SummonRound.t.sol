@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {PoolManager} from "v4-core/src/PoolManager.sol";
 import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
 import {PoolKey} from "v4-core/src/types/PoolKey.sol";
+import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
 import {PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
 import {StateLibrary} from "v4-core/src/libraries/StateLibrary.sol";
 import {MockPyth} from "@pythnetwork/pyth-sdk-solidity/MockPyth.sol";
@@ -16,7 +17,7 @@ import {SummonRound} from "../src/SummonRound.sol";
 import {SummonHook, ISummonRegistry} from "../src/SummonHook.sol";
 import {SummonPrice} from "../src/SummonPrice.sol";
 import {SummonPool} from "../src/SummonPool.sol";
-import {SummonSwap} from "../src/SummonSwap.sol";
+import {SummonSwap, ISummonPools} from "../src/SummonSwap.sol";
 import {PoolModifyLiquidityTest} from "v4-core/src/test/PoolModifyLiquidityTest.sol";
 import {MockERC20, MockB20, MockPolicyRegistry, MockOracleRegistry} from "./mocks/Mocks.sol";
 import {GuardPriceFeed} from "../src/testnet/GuardPriceFeed.sol";
@@ -145,6 +146,7 @@ contract SummonRoundTest is Test {
     }
 
     function _expectFillRevert(bytes memory err) internal {
+        vm.warp(block.timestamp + 1); // a fill's price must be published after the auction started
         bytes[] memory u = _fresh();
         vm.prank(ap);
         vm.expectRevert(err);
@@ -387,6 +389,26 @@ contract SummonRoundTest is Test {
 
     // ------------------------------------------------------------------ A6: expiry and refunds
 
+    /// Codex r1 #1: start on a favorable print up to maxPythAge old, then settle on that same print.
+    function test_fillNeedsAPriceFromAfterTheStart() public {
+        _fund();
+        vm.warp(block.timestamp + 100);
+        _heartbeat();
+        // a $103 spike published 55 s ago anchors the auction...
+        int64 spike = PX * 103 / 100;
+        round.startAuction{value: 1}(_update(spike, CONF, uint64(block.timestamp - 55)));
+        // ...and filling on that same print now is refused
+        vm.prank(ap);
+        vm.expectRevert(abi.encodeWithSelector(SummonRound.PriceNotAfterStart.selector, block.timestamp - 55, block.timestamp));
+        round.fill{value: 1}(new bytes[](0));
+        // a print published after the start fills, at that price
+        vm.warp(block.timestamp + 5);
+        bytes[] memory u = _update(PX, CONF, uint64(block.timestamp));
+        vm.prank(ap);
+        round.fill{value: 1}(u);
+        assertEq(round.fillRef(), SummonPrice.refPerToken(uint256(uint64(PX)) * 10 ** uint256(int256(18 + EXPO)), 1e18));
+    }
+
     function test_expiresAtDeadline() public {
         vm.prank(alice);
         round.pledge(3_000e6);
@@ -518,7 +540,7 @@ contract SummonRoundTest is Test {
     function test_swapOnSummonedPool() public {
         _start();
         _fillAfter(60);
-        SummonSwap router = new SummonSwap(IPoolManager(address(pm)));
+        SummonSwap router = new SummonSwap(IPoolManager(address(pm)), ISummonPools(address(factory)));
         PoolKey memory key = round.poolKey();
         bool usdcIs0 = address(usdc) < address(token);
         (uint160 p0,, uint128 l0) = router.poolState(key);
@@ -554,7 +576,7 @@ contract SummonRoundTest is Test {
     function _summoned() internal returns (SummonSwap router, PoolKey memory key, bool usdcIs0) {
         _start();
         _fillAfter(60);
-        router = new SummonSwap(IPoolManager(address(pm)));
+        router = new SummonSwap(IPoolManager(address(pm)), ISummonPools(address(factory)));
         key = round.poolKey();
         usdcIs0 = address(usdc) < address(token);
         vm.prank(alice);
@@ -666,6 +688,15 @@ contract SummonRoundTest is Test {
         token.approve(address(lp), type(uint256).max);
         vm.expectRevert(); // the PoolManager wraps the hook's NotTheRound
         lp.modifyLiquidity(key, IPoolManager.ModifyLiquidityParams(-887220, 887220, 1e9, 0), "");
+    }
+
+    /// Codex r1 #4: the router trades only pools a Summon round created.
+    function test_routerRefusesOtherPools() public {
+        (SummonSwap router, PoolKey memory key, bool usdcIs0) = _summoned();
+        PoolKey memory other = PoolKey(key.currency0, key.currency1, 3000, 60, IHooks(address(0)));
+        vm.prank(alice);
+        vm.expectRevert(SummonSwap.NotASummonPool.selector);
+        router.swapExactIn(other, usdcIs0, 100e6, 1, alice);
     }
 
     function test_hookRejectsDirectSwapCalls() public {

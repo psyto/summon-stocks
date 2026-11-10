@@ -9,6 +9,8 @@ import {SummonHook, ISummonRegistry} from "../src/SummonHook.sol";
 import {TestUSDC} from "../src/testnet/TestUSDC.sol";
 import {DemoOracleRegistry} from "../src/testnet/DemoOracleRegistry.sol";
 import {GuardPriceFeed} from "../src/testnet/GuardPriceFeed.sol";
+import {SummonSwap, ISummonPools} from "../src/SummonSwap.sol";
+import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
 
 /// Deploys Summon on Base Sepolia, except the B20 stock (created with the B20 factory precompile by
 /// ts/create-stock.ts, which forge cannot simulate). Then lists that stock against its price feed:
@@ -34,6 +36,7 @@ contract Deploy is Script {
         address guardFeed;
         address hook;
         address factory;
+        address swap;
         address source;
     }
 
@@ -53,6 +56,7 @@ contract Deploy is Script {
         o.hook = address(hook);
         o.factory = address(_deployFactory(o, me));
         hook.setFactory(ISummonRegistry(o.factory));
+        o.swap = address(new SummonSwap(IPoolManager(POOL_MANAGER), ISummonPools(o.factory)));
         o.source = usePyth ? PYTH : o.guardFeed;
         SummonFactory(o.factory).list(o.stock, o.source, o.priceId);
         vm.stopBroadcast();
@@ -113,6 +117,7 @@ contract Deploy is Script {
         vm.serializeAddress(k, "pyth", PYTH);
         vm.serializeAddress(k, "guardFeed", o.guardFeed);
         vm.serializeAddress(k, "priceSource", o.source);
+        vm.serializeAddress(k, "swap", o.swap);
         string memory json = vm.serializeAddress(k, "factory", o.factory);
         vm.writeJson(json, string.concat("deployments/", vm.toString(block.chainid), ".json"));
     }

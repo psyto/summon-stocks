@@ -47,14 +47,14 @@ track). **Testnet only (Base Sepolia).** Mainnet data is only read and shown.
 
 | Part | State |
 |---|---|
-| Spec ([docs/specs/001-summon.md](docs/specs/001-summon.md)) | r3, after one independent review ([docs/reviews](docs/reviews)). The Codex review of the spec and the code is written up ([docs/reviews/codex-r1-request.md](docs/reviews/codex-r1-request.md)) and runs from 2026-11-10 |
+| Spec ([docs/specs/001-summon.md](docs/specs/001-summon.md)) | r4 (the pool that knows the stock's market). Reviews in [docs/reviews](docs/reviews): one independent review of r1, then Codex r1 of the spec and code on 2026-11-10 ([findings](docs/reviews/codex-r1.md), [what changed](docs/reviews/codex-r1-response.md)): 3 major and 4 minor, all fixed. Codex r2 next |
 | Price math (`src/SummonPrice.sol`, spec 5.1) | done, with tests: split invariance, dividend multiplier, fuzzed rounding |
-| Round, factory, pool hook, swap (`src/SummonRound.sol`, `SummonFactory.sol`, `SummonHook.sol`, `SummonSwap.sol`) | done, 41 tests: each fill condition failing alone, pledge cap, withdraw rules, expiry and refunds, claims under transfer policies, LP unwind, pool initialization and liquidity restricted to the round, the guard price feed, trading the summoned pool, and the pool that knows the stock's market (below). Removing any of 8 fill checks, or any of the hook's 6 rules, makes a test fail |
+| Round, factory, pool hook, swap (`src/SummonRound.sol`, `SummonFactory.sol`, `SummonHook.sol`, `SummonSwap.sol`) | done, 43 tests: each fill condition failing alone, pledge cap, withdraw rules, expiry and refunds, claims under transfer policies, LP unwind, pool initialization and liquidity restricted to the round, a fill's price published after the auction started, the router trading only Summon pools, the guard price feed, trading the summoned pool, and the pool that knows the stock's market (below). Removing any of 8 fill checks, or any of the hook's 6 rules, makes a test fail |
 | Stock-aware pool (`SummonHook`, `SummonRound.realign`, spec 5.5 and 5.5a, r4) | built 2026-11-08, not yet deployed: no swaps in a corporate action window, while the multiplier differs from the one the pool was priced at, or while the listing exchange has the stock halted; a 1.00% fee instead of 0.30% while the session is closed or the guard is quiet; after a split or a dividend in shares, anyone can `realign` the backers' pool to the new multiplier, so the first trader cannot take the difference. No fills in the first 15 and last 25 minutes of the session, while US LULD bands are doubled (market-state `core-hours`). Holidays and 13:00 early closes from market-state `v0.2.0` |
-| Base Sepolia deployment | done 2026-11-07: factory, hook, swap router, registries and five real B20 demo stocks (see below). Open rounds: sGME [`0xa799…046D`](https://sepolia.basescan.org/address/0xa799fC499Af97a474D02878fC10fB8B733b1046D) and sSOFI [`0xAae4…DbEE`](https://sepolia.basescan.org/address/0xAae40400113c32D8D0345EBad6F781E56ECDDbEE) (both target 300 tUSDC) |
+| Base Sepolia deployment | **the contracts from `main` before the stock-aware pool**; this branch is not deployed yet (redeploy planned 2026-11-11). Done 2026-11-07: factory, hook, swap router, registries and five real B20 demo stocks (see below). Open rounds: sGME [`0xa799…046D`](https://sepolia.basescan.org/address/0xa799fC499Af97a474D02878fC10fB8B733b1046D) and sSOFI [`0xAae4…DbEE`](https://sepolia.basescan.org/address/0xAae40400113c32D8D0345EBad6F781E56ECDDbEE) (both target 300 tUSDC) |
 | Guard (`ts/guard.ts`) | done: Nasdaq Trader halts (once a minute) and, for guard pricing, the HIP-3 oracle price from Hyperliquid's chain. It writes nothing while the market is closed. `npm run guard -- --quote GME` prints the price it would post and writes nothing |
 | End-to-end fill on Base Sepolia (`ts/e2e.ts`) | scripted. It picks up the stock's open round wherever it stands, so pledges made from the web page count. First run when the market opens (weekdays 09:45–15:35 ET: the session without the LULD doubled-band edges) |
-| Web (`web/`) | built 2026-11-07: the register of all 298 stocks; live round pages; signed intents, with a round opening from the register once a demo stock's intents reach $250; trading a summoned pool; a demand export issuers can verify; the US block and per-network limits (8 Worker tests). Runs locally; goes public once the Codex review is addressed |
+| Web (`web/`) | built 2026-11-07: the register of all 298 stocks; live round pages; signed intents, with a round opening from the register once a demo stock's intents reach $250; trading a summoned pool; a demand export issuers can verify; the US block and per-network limits (12 Worker tests: totals count only unexpired intents, an intent lasts at most 31 days, an older signature cannot restore a replaced intent, and a request with no country is refused). Runs locally; goes public once the Codex review is addressed |
 | Demand from elsewhere | planned (from 2026-11-14): marks on the register for never-minted stocks that already trade elsewhere, by amount, not by listing. Hyperliquid HIP-3 open interest and volume; Robinhood Chain token supply. Display only: fills still price from Pyth. Counts are under "The numbers" |
 
 First use (2026-11-07, with v1 intents; v2 also signs the token address, so that intent is to be signed
@@ -65,7 +65,7 @@ button (get test USDC first, then pledge). Fills and trading follow on the first
 open.
 
 Docs:
-- [docs/specs/001-summon.md](docs/specs/001-summon.md): the spec (r3)
+- [docs/specs/001-summon.md](docs/specs/001-summon.md): the spec (r4)
 - [docs/reviews/](docs/reviews): reviews, and the request for the next one
 - [docs/design.md](docs/design.md): the web design
 
@@ -167,7 +167,8 @@ within 50 bp, and it has not jumped more than 3% since the auction started. A gu
 therefore stops fills.
 
 **Deployed on Base Sepolia** (2026-11-07, priced from the guard feed; addresses also in
-`deployments/84532.json`):
+`deployments/84532.json`). These are the contracts from before the stock-aware pool: their hook gates only
+pool initialization, and they have no `realign`. This branch replaces them when it is deployed:
 
 | Contract | Address |
 |---|---|

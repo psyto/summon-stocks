@@ -58,6 +58,8 @@ export const roundAbi = parseAbi([
   "function claim()",
   "function refund()",
   "function unwindLP()",
+  "function poolMultiplier() view returns (uint256)",
+  "function realign()",
   "function claimLP()",
   "function poolKey() view returns ((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks))",
 ]);

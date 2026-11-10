@@ -135,6 +135,7 @@ contract SummonRound is IUnlockCallback {
     error TokenPaused();
     error PolicyForbids(bytes32 scope, address account);
     error PriceJumped(uint256 observedBps, uint256 limitBps);
+    error PriceNotAfterStart(uint256 publishedAt, uint64 auctionStart);
     error LpLocked(uint64 until);
     error TransferFailed();
 
@@ -235,7 +236,7 @@ contract SummonRound is IUnlockCallback {
     function startAuction(bytes[] calldata pythUpdate) external payable nonReentrant {
         _sync();
         if (_state != State.Funded) revert WrongState(_state);
-        uint256 ref = _checkConditions(pythUpdate);
+        (uint256 ref,) = _checkConditions(pythUpdate);
         auctionStart = uint64(block.timestamp);
         auctionsRun += 1;
         multiplierAtStart = IB20AssetMin(p.token).multiplier();
@@ -249,7 +250,14 @@ contract SummonRound is IUnlockCallback {
     function fill(bytes[] calldata pythUpdate) external payable nonReentrant {
         _sync();
         if (_state != State.Auction) revert WrongState(_state);
-        uint256 ref = _checkConditions(pythUpdate);
+        uint256 ref;
+        {
+            uint256 publishedAt;
+            (ref, publishedAt) = _checkConditions(pythUpdate);
+            // the fill's price must be published after the auction started: otherwise the filler could start
+            // with a favorable print up to maxPythAge old and settle on that same print (Codex r1 #1)
+            if (publishedAt <= auctionStart) revert PriceNotAfterStart(publishedAt, auctionStart);
+        }
         uint256 nowMultiplier = IB20AssetMin(p.token).multiplier();
         if (nowMultiplier != multiplierAtStart) revert MultiplierChanged(multiplierAtStart, nowMultiplier);
         (HLPriceGuard.Breach breach, uint256 observed, uint256 limit) = latch.observe(ref, p.maxJumpBps);
@@ -444,13 +452,15 @@ contract SummonRound is IUnlockCallback {
 
     // ------------------------------------------------------------------ conditions (spec 5.2)
 
-    function _checkConditions(bytes[] calldata pythUpdate) internal returns (uint256 ref) {
+    /// Returns the reference price per token and the time the underlying price was published.
+    function _checkConditions(bytes[] calldata pythUpdate) internal returns (uint256 ref, uint256 publishedAt) {
         // 2. market state, fail closed
         MarketStateCheck.requireOpen(MarketStateRegistry(d.marketState), p.token, p.maxGuardAge);
         // 3. a fresh Pyth price with a narrow confidence interval (stops publishing outside the session)
         HLPriceGuard.Ref memory r = PythRef.updateAndReadFresh(IPyth(p.priceSource), pythUpdate, p.priceId, p.maxPythAge, p.maxConfBps);
         uint256 m = IB20AssetMin(p.token).multiplier();
         ref = SummonPrice.refPerToken(r.price, m);
+        publishedAt = r.updatedAt;
         // 4. issuer registry: not paused, and its multiplier agrees with the token's
         if (d.oracleRegistry != address(0)) {
             (uint256 rm, bool paused) = IOracleParams(d.oracleRegistry).getOracleParams(p.token);
