@@ -4,7 +4,7 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { generatePrivateKey, privateKeyToAccount, mnemonicToAccount, english, generateMnemonic } from "viem/accounts";
+import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import worker from "./index";
 
 class MemKV {
@@ -119,9 +119,18 @@ const tests: [string, () => Promise<void>][] = [
   [
     "the demo wallets are refused",
     async () => {
-      const m = /DEMO_MNEMONIC="([^"]+)"/.exec(readFileSync(new URL("../../.env", import.meta.url), "utf8"))?.[1] ?? generateMnemonic(english);
-      const demo = mnemonicToAccount(m, { addressIndex: 2 }) as unknown as ReturnType<typeof privateKeyToAccount>;
-      const r = await intent(env(), demo, "RKT", 100);
+      // demo backer 2. The Worker refuses demo wallets before it checks the signature, so this test needs no
+      // key and runs from a fresh clone (it used to read DEMO_MNEMONIC from .env)
+      const body = JSON.stringify({
+        ticker: "RKT",
+        token: tokenOf.get("RKT"),
+        usd: 100,
+        expiry: Math.floor(Date.now() / 1000) + 86_400,
+        nonce: 1,
+        address: "0x1525E0Ba473ECe824dCe7F88bAd932f77e16aB34",
+        signature: "0x" + "00".repeat(65),
+      });
+      const r = await worker.fetch(req("/api/intents", { method: "POST", body, headers: { "content-type": "application/json" } }), env());
       assert.equal(r.status, 403);
     },
   ],
