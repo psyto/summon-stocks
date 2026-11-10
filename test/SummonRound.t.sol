@@ -482,6 +482,33 @@ contract SummonRoundTest is Test {
         factory.openRound(address(t3), 10_000e6, uint64(block.timestamp + 7 days), 100, 7 days);
     }
 
+    /// Codex r4 #2: a round under 10% that is still gathering pledges cannot be cancelled by a replacement,
+    /// and dust pledges do not keep a stalled one alive.
+    function test_aRoundStillGatheringPledgesIsNotReplaced() public {
+        MockB20 t3 = new MockB20(policies);
+        factory.list(address(t3), address(pyth), GME, 60, false);
+        SummonRound r = factory.openRound(address(t3), 10_000e6, uint64(block.timestamp + 20 days), 100, 7 days);
+        vm.prank(alice);
+        usdc.approve(address(r), type(uint256).max);
+        vm.prank(bob);
+        usdc.approve(address(r), type(uint256).max);
+        // 9.9% pledged over three days, a backer arriving every day
+        for (uint256 i; i < 3; ++i) {
+            vm.warp(block.timestamp + 23 hours);
+            vm.prank(alice);
+            r.pledge(330e6);
+            vm.expectRevert(abi.encodeWithSelector(SummonFactory.RoundActive.selector, address(r)));
+            factory.openRound(address(t3), 1e30, uint64(block.timestamp + 30 days), 100, 30 days);
+        }
+        // then it stalls; pledges under 0.1% of the target do not count as activity
+        vm.warp(block.timestamp + 12 hours);
+        vm.prank(bob);
+        r.pledge(9e6);
+        vm.warp(block.timestamp + 12 hours);
+        factory.openRound(address(t3), 10_000e6, uint64(block.timestamp + 7 days), 100, 7 days);
+        assertEq(uint8(r.state()), uint8(SummonRound.State.Expired));
+    }
+
     function _print(int64 px, uint64 t, uint64 prev) internal pure returns (bytes[] memory u) {
         u = new bytes[](1);
         u[0] = abi.encode(px, CONF, t, prev);
@@ -522,9 +549,17 @@ contract SummonRoundTest is Test {
         vm.prank(ap);
         vm.expectRevert(bytes("PriceFeedNotFoundWithinRange"));
         r.fill{value: 1}(_print(PX, t - 9, t - 11));
-        // the first print in the window fills, at its price
+        // a quiet band (Codex r4 #1): Pyth printed nothing from t to t + 10, so this block has no price...
         vm.prank(ap);
-        r.fill{value: 1}(_print(PX, t + 1, t - 1));
+        vm.expectRevert(bytes("PriceFeedNotFoundWithinRange"));
+        r.fill{value: 1}(_print(PX, t + 12, t - 1));
+        // ...and the next band's first print (t + 12) fills once the block reaches that band
+        vm.warp(block.timestamp + 10);
+        _heartbeat();
+        market.heartbeat(_one(address(t3)));
+        assertEq(r.settleTime(), t + 10);
+        vm.prank(ap);
+        r.fill{value: 1}(_print(PX, t + 12, t - 1));
         assertEq(uint8(r.state()), uint8(SummonRound.State.Filled));
         assertEq(r.fillRef(), SummonPrice.refPerToken(uint256(uint64(PX)) * 10 ** uint256(int256(18 + EXPO)), 1e18));
     }

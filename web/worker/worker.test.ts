@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { DatabaseSync } from "node:sqlite";
 import worker, { IntentStore } from "./index";
-import { MAX_LIVE } from "./store";
+import { MAX_LIVE, MAX_NONCES } from "./store";
 
 /** The Durable Object namespace, with IntentStore over an in-memory node:sqlite database. */
 function memStore() {
@@ -246,7 +246,7 @@ const tests: [string, () => Promise<void>][] = [
     "live intents are capped (Codex r3 #3)",
     async () => {
       const e = env() as unknown as { INTENTS: ReturnType<typeof memStore> };
-      e.INTENTS.db.prepare("INSERT INTO totals VALUES ('XYZ', ?, 1)").run(MAX_LIVE);
+      e.INTENTS.db.prepare("INSERT INTO totals VALUES ('0xxyz', 'XYZ', ?, 1)").run(MAX_LIVE);
       const r = await intent(e as never, privateKeyToAccount(generatePrivateKey()), "RKT", 10);
       assert.equal(r.status, 503);
     },
@@ -265,6 +265,39 @@ const tests: [string, () => Promise<void>][] = [
       Date.now = () => now + 10_000;
       try {
         assert.deepEqual(await (await worker.fetch(req("/api/intents"), e as never)).json(), { RKT: { backers: 1, usd: 100 } });
+      } finally {
+        Date.now = realNow;
+      }
+    },
+  ],
+  [
+    "stored nonces are capped, and pruning frees room (Codex r4 #3)",
+    async () => {
+      const e = env() as unknown as { INTENTS: ReturnType<typeof memStore> };
+      const now = Date.now();
+      e.INTENTS.db.prepare("INSERT INTO nonces VALUES ('0xold', '0xa', ?)").run(now - 40 * 86_400_000);
+      e.INTENTS.db.prepare("INSERT INTO counts VALUES ('nonces', ?)").run(MAX_NONCES);
+      assert.equal((await intent(e as never, privateKeyToAccount(generatePrivateKey()), "RKT", 10)).status, 503);
+      await e.INTENTS.obj.alarm(); // the 40-day-old nonce goes, and with it one from the count
+      assert.equal((await intent(e as never, privateKeyToAccount(generatePrivateKey()), "RKT", 10)).status, 200);
+    },
+  ],
+  [
+    "totals follow the token, so a renamed ticker leaves nothing behind (Codex r4 #4)",
+    async () => {
+      const e = env() as unknown as { INTENTS: ReturnType<typeof memStore> };
+      const store = e.INTENTS.get();
+      const now = Date.now();
+      const put = (ticker: string, usd: number, expiry: number, nonce: number) =>
+        store.fetch("https://store/put", { method: "POST", body: JSON.stringify({ ticker, token: "0xAbC", address: "0xa", usd, expiry, nonce, signature: "0x", ip: "203.0.113.7" }) });
+      await put("RKT", 250, Math.floor(now / 1000) + 5, now);
+      // the snapshot renames the stock; the wallet replaces its intent under the new ticker
+      await put("NEW", 100, Math.floor(now / 1000) + 5, now + 1);
+      assert.deepEqual(await (await store.fetch("https://store/totals")).json(), { NEW: { backers: 1, usd: 100 } });
+      const realNow = Date.now;
+      Date.now = () => now + 10_000;
+      try {
+        assert.deepEqual(await (await store.fetch("https://store/totals")).json(), {});
       } finally {
         Date.now = realNow;
       }

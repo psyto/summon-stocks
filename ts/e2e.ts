@@ -119,8 +119,18 @@ async function main() {
     await new Promise((r) => setTimeout(r, wait * 1000));
   }
   await send("filler", `filler: approve ${demo.symbol}`, { address: d.stock, abi: b20Abi, functionName: "approve", args: [round, 2n ** 255n] });
-  p = await pythArgs();
-  await send("filler", "fill", { address: round, abi: roundAbi, functionName: "fill", args: [p.data], value: p.fee });
+  // a pull listing can meet a band in which Pyth printed nothing; the next band has a price, so try again
+  const pull = d.priceSource.toLowerCase() !== d.guardFeed.toLowerCase();
+  for (let tries = pull ? 3 : 1; ; tries--) {
+    p = await pythArgs();
+    try {
+      await send("filler", "fill", { address: round, abi: roundAbi, functionName: "fill", args: [p.data], value: p.fee });
+      break;
+    } catch (e) {
+      if (tries <= 1) throw e;
+      console.log(`  fill refused (${(e as Error).message.split("\n")[0]}); trying the next ${PYTH_WINDOW_SECONDS} s band`);
+    }
+  }
 
   const [spread, ref, owed, liq] = await Promise.all([
     pc.readContract({ address: round, abi: roundAbi, functionName: "currentSpreadBps" }),

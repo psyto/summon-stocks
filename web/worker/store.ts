@@ -5,11 +5,12 @@
  * the nonce, the per-network limits and stores the intent with nothing in between: two requests can no
  * longer both pass a check that only one should.
  *
- * Bounded (Codex r3 #3): totals are kept as one row per ticker, so the board reads at most one row per
- * stock. Every request first deletes the intents that have expired (through the expiry index, so it reads
+ * Bounded (Codex r3 #3, r4 #3): totals are kept as one row per stock, keyed by its token address (a
+ * ticker can change, Codex r4 #4), so the board reads at most one row per stock. Every request first deletes the intents that have expired (through the expiry index, so it reads
  * only those) and takes them off the totals, so an expired intent stops counting at once. Live intents are
  * capped at MAX_LIVE. A nonce is the signing time in ms and an intent may last at most MAX_EXPIRY_DAYS from
- * it, so a stored nonce is dropped MAX_EXPIRY_DAYS after it: any older signature has expired by then.
+ * it, so a stored nonce is dropped MAX_EXPIRY_DAYS after it: any older signature has expired by then. Stored
+ * nonces are also capped at MAX_NONCES; past it, a wallet new to a stock is refused until old ones expire.
  * The demand export reads each page when it is fetched: an intent stored during an export, before the
  * cursor, shows in the next export.
  *
@@ -41,6 +42,7 @@ export const NEW_WALLETS_PER_DAY = 5;
 const DEMAND_PAGE = 500;
 export const MAX_LIVE = 50_000;
 export const MAX_EXPIRY_DAYS = 31;
+export const MAX_NONCES = 200_000;
 const SWEEP_MS = 3_600_000;
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -61,7 +63,10 @@ export class IntentStore {
     // the highest nonce each wallet used for each stock, kept after its intent expires or is replaced
     this.sql.exec(`CREATE TABLE IF NOT EXISTS nonces (token TEXT NOT NULL, address TEXT NOT NULL, nonce INTEGER NOT NULL,
       PRIMARY KEY (token, address))`);
-    this.sql.exec(`CREATE TABLE IF NOT EXISTS totals (ticker TEXT PRIMARY KEY, backers INTEGER NOT NULL, usd INTEGER NOT NULL)`);
+    this.sql.exec(`CREATE INDEX IF NOT EXISTS nonces_nonce ON nonces (nonce)`);
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS totals (token TEXT PRIMARY KEY, ticker TEXT NOT NULL, backers INTEGER NOT NULL, usd INTEGER NOT NULL)`);
+    // counts kept alongside their tables, so a cap is one row read
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS counts (k TEXT PRIMARY KEY, n INTEGER NOT NULL)`);
     this.sql.exec(`CREATE TABLE IF NOT EXISTS writes (ip TEXT NOT NULL, hour INTEGER NOT NULL, n INTEGER NOT NULL, PRIMARY KEY (ip, hour))`);
     this.sql.exec(`CREATE TABLE IF NOT EXISTS wallets (ip TEXT NOT NULL, day INTEGER NOT NULL, address TEXT NOT NULL,
       PRIMARY KEY (ip, day, address))`);
@@ -95,6 +100,9 @@ export class IntentStore {
     if (writes >= WRITES_PER_HOUR) {
       return json({ error: `Too many intents from this network this hour. Try again after ${new Date((hour + 1) * 3_600_000).toISOString().slice(11, 16)} UTC.` }, 429);
     }
+    if (last === undefined && this.count("nonces") >= MAX_NONCES) {
+      return json({ error: "The board is remembering as many signatures as it can right now. Try again later." }, 503);
+    }
     const prev = this.sql.exec(`SELECT usd FROM intents WHERE token = ? AND address = ?`, token, p.address).toArray()[0]?.usd as number | undefined;
     const isNew = prev === undefined;
     if (isNew) {
@@ -112,6 +120,7 @@ export class IntentStore {
     this.sql.exec(`INSERT INTO writes (ip, hour, n) VALUES (?, ?, 1) ON CONFLICT (ip, hour) DO UPDATE SET n = n + 1`, p.ip, hour);
     if (!seen) this.sql.exec(`INSERT INTO wallets (ip, day, address) VALUES (?, ?, ?)`, p.ip, day, p.address);
     this.sql.exec(`INSERT INTO nonces (token, address, nonce) VALUES (?, ?, ?) ON CONFLICT (token, address) DO UPDATE SET nonce = excluded.nonce`, token, p.address, p.nonce);
+    if (last === undefined) this.addCount("nonces", 1);
     this.sql.exec(
       `INSERT INTO intents (token, address, ticker, token_cs, usd, expiry, nonce, signature, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT (token, address) DO UPDATE SET ticker = excluded.ticker, token_cs = excluded.token_cs, usd = excluded.usd,
@@ -119,19 +128,19 @@ export class IntentStore {
       token, p.address, p.ticker, p.token, p.usd, p.expiry, p.nonce, p.signature, now,
     );
     this.sql.exec(
-      `INSERT INTO totals (ticker, backers, usd) VALUES (?, ?, ?)
-       ON CONFLICT (ticker) DO UPDATE SET backers = backers + excluded.backers, usd = usd + excluded.usd`,
-      p.ticker, isNew ? 1 : 0, p.usd - (prev ?? 0),
+      `INSERT INTO totals (token, ticker, backers, usd) VALUES (?, ?, ?, ?)
+       ON CONFLICT (token) DO UPDATE SET ticker = excluded.ticker, backers = backers + excluded.backers, usd = usd + excluded.usd`,
+      token, p.ticker, isNew ? 1 : 0, p.usd - (prev ?? 0),
     );
-    const row = this.sql.exec(`SELECT backers, usd FROM totals WHERE ticker = ?`, p.ticker).toArray()[0]!;
+    const row = this.sql.exec(`SELECT backers, usd FROM totals WHERE token = ?`, token).toArray()[0]!;
     return json({ ok: true, ticker: p.ticker, backers: row.backers, usd: row.usd });
   }
 
   /** Deletes the intents that expired before `now` (ms) and takes them off the totals; reads only those. */
   private sweep(now: number) {
-    const gone = this.sql.exec(`SELECT ticker, COUNT(*) AS n, SUM(usd) AS usd FROM intents WHERE expiry < ? GROUP BY ticker`, now / 1000).toArray();
+    const gone = this.sql.exec(`SELECT token, COUNT(*) AS n, SUM(usd) AS usd FROM intents WHERE expiry < ? GROUP BY token`, now / 1000).toArray();
     if (gone.length === 0) return;
-    for (const g of gone) this.sql.exec(`UPDATE totals SET backers = backers - ?, usd = usd - ? WHERE ticker = ?`, g.n, g.usd, g.ticker);
+    for (const g of gone) this.sql.exec(`UPDATE totals SET backers = backers - ?, usd = usd - ? WHERE token = ?`, g.n, g.usd, g.token);
     this.sql.exec(`DELETE FROM intents WHERE expiry < ?`, now / 1000);
     this.sql.exec(`DELETE FROM totals WHERE backers <= 0`);
   }
@@ -140,7 +149,11 @@ export class IntentStore {
   private totals(): Record<string, { backers: number; usd: number }> {
     const t: Record<string, { backers: number; usd: number }> = {};
     const rows = this.sql.exec(`SELECT ticker, backers, usd FROM totals`).toArray();
-    for (const r of rows) t[r.ticker as string] = { backers: r.backers as number, usd: r.usd as number };
+    for (const r of rows) {
+      const row = (t[r.ticker as string] ??= { backers: 0, usd: 0 });
+      row.backers += r.backers as number;
+      row.usd += r.usd as number;
+    }
     return t;
   }
 
@@ -164,12 +177,25 @@ export class IntentStore {
     };
   }
 
+  private count(k: string): number {
+    return (this.sql.exec(`SELECT n FROM counts WHERE k = ?`, k).toArray()[0]?.n as number | undefined) ?? 0;
+  }
+
+  private addCount(k: string, d: number) {
+    this.sql.exec(`INSERT INTO counts (k, n) VALUES (?, ?) ON CONFLICT (k) DO UPDATE SET n = n + excluded.n`, k, d);
+  }
+
   /** Hourly: drop expired intents, old limit counters, and nonces old enough that every signature below them
    * has expired. */
   async alarm(): Promise<void> {
     const now = Date.now();
     this.sweep(now);
-    this.sql.exec(`DELETE FROM nonces WHERE nonce < ?`, now - MAX_EXPIRY_DAYS * 86_400_000);
+    const cutoff = now - MAX_EXPIRY_DAYS * 86_400_000;
+    const old = this.sql.exec(`SELECT COUNT(*) AS n FROM nonces WHERE nonce < ?`, cutoff).toArray()[0]!.n as number;
+    if (old > 0) {
+      this.sql.exec(`DELETE FROM nonces WHERE nonce < ?`, cutoff);
+      this.addCount("nonces", -old);
+    }
     this.sql.exec(`DELETE FROM writes WHERE hour < ?`, Math.floor(now / 3_600_000) - 1);
     this.sql.exec(`DELETE FROM wallets WHERE day < ?`, Math.floor(now / 86_400_000) - 1);
     const left = this.sql.exec(`SELECT COUNT(*) AS n FROM (SELECT 1 FROM nonces LIMIT 1)`).toArray()[0]!.n as number;

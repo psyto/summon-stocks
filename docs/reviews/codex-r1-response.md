@@ -46,3 +46,19 @@ new issue, verdict CHANGES.
 
 Removing each fix makes its test fail (checked one at a time). `forge test`: 52. Worker tests: 20, and the
 store was run again under `wrangler dev`.
+
+## Codex r4 (2026-11-11): what changed
+
+Codex r4 ([codex-r4.md](codex-r4.md)) found r3 #1 (stranded round), #4 and #8 fixed, #2 and #3 partly fixed,
+and two new issues, verdict CHANGES.
+
+| # | Finding | Fix | Test |
+|---|---|---|---|
+| 1 major (r3 #2 rest) | The filler can still choose which 10 s band to fill in; a band with no print has no price | **Kept by design, with reasons in spec 5.1.** Choosing the band is choosing when to fill: the price is still the market's at that time, the spread is capped and shown up front, and the jump latch bounds the move from the start. A settlement time fixed at the start would give the filler an hour-long option on an aging price, which is worse. A quiet band is followed by one with a price; the e2e filler tries the next band | `test_pullFeedSettlesOnTheFirstPrintAfterASetTime` now covers a quiet band and the next band filling |
+| 2 major (new) | Anyone can cancel a healthy round just under 10% by replacing it, daily | The round records its last pledge of at least 0.1% of target (`lastPledgeAt`). Replacement needs under 10% pledged **and** a day with no such pledge. A round still gathering pledges cannot be cancelled; dust pledges do not keep a stalled one | `test_aRoundStillGatheringPledgesIsNotReplaced` (fails without either part) |
+| 3 major (r3 #3 rest) | Nonce rows are bounded by time, not by count | Stored nonces are capped at 200,000 (count kept in a row; pruning subtracts). Past the cap, a wallet new to a stock gets 503 | "stored nonces are capped, and pruning frees room" |
+| 4 major (new) | A ticker rename leaves totals behind under the old ticker | Totals are keyed by token address and carry its current ticker | "totals follow the token, so a renamed ticker leaves nothing behind" |
+| 5 minor (new) | The page's `swapGate` ignores the issuer registry | `swapGate` reads it and shows why trading is stopped, as the hook does | (page) |
+
+On testnet tUSDC is free to mint, so no rule here costs a griefer money; on mainnet the minimum target and
+real USDC do. `forge test`: 53. Worker tests: 22.

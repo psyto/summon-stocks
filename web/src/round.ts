@@ -479,11 +479,14 @@ function poolPriceUsd(sqrtPriceX96: bigint, tokenIs0: boolean): number {
 
 /** What SummonHook does to a swap now (spec 5.5), read from the same sources: stopped and why, or the fee. */
 async function swapGate(round: Addr, p: Params): Promise<{ stopped?: string; realign?: boolean; feePct: number; closed: boolean }> {
-  const [st, m, eff, pm] = await Promise.all([
+  const [st, m, eff, pm, reg] = await Promise.all([
     client.readContract({ address: D.marketState!, abi: marketAbi, functionName: "stateOf", args: [p.token] }),
     client.readContract({ address: p.token, abi: b20Abi, functionName: "multiplier" }),
     client.readContract({ address: p.token, abi: b20Abi, functionName: "effectiveAt" }),
     client.readContract({ address: round, abi: roundAbi, functionName: "poolMultiplier" }),
+    D.oracleRegistry
+      ? client.readContract({ address: D.oracleRegistry, abi: oracleAbi, functionName: "getOracleParams", args: [p.token] })
+      : Promise.resolve(undefined),
   ]);
   const t = BigInt(now());
   const cd = BigInt(p.cooldownSeconds);
@@ -492,6 +495,10 @@ async function swapGate(round: Addr, p: Params): Promise<{ stopped?: string; rea
   }
   if (m !== pm) {
     return { stopped: "The token's multiplier changed since the pool was priced, so its price is out of date. Anyone can realign the pool to the new multiplier; trading resumes then.", realign: true, feePct: 0, closed: false };
+  }
+  // the issuer's registry, as the hook reads it (Codex r4 #5)
+  if (reg && (reg[1] || reg[0] !== m)) {
+    return { stopped: reg[1] ? "Trading is stopped: the issuer has paused the stock." : "Trading is stopped: the issuer's registry and the token disagree on the multiplier.", feePct: 0, closed: false };
   }
   const SESSION_CLOSED = 3;
   if ((st.halted && st.reason !== SESSION_CLOSED) || t < st.resumeAfter) {

@@ -57,8 +57,10 @@ Non-goals:
   Nasdaq.com's quote endpoint, whose terms forbid automated capture. It is demo data: a HIP-3 deployer
   sets it.
 - **Round terms are bounded, and a stalled round can be replaced** (r5, Codex r2 #8, r3 #1). A round lasts
-  at most 30 days and locks its LP at most 30 days. An Open round that is a day old and has less than 10%
-  of its target pledged may be replaced by a new `openRound`; the factory cancels the old round in the same
+  at most 30 days and locks its LP at most 30 days. An Open round with less than 10% of its target pledged,
+  and no pledge of at least 0.1% of its target for a day (or since it opened, Codex r4 #2), may be replaced
+  by a new `openRound`; a round still gathering pledges is never cancelled, and dust pledges do not keep a
+  stalled one; the factory cancels the old round in the same
   transaction (it becomes Expired, so every pledge in it is refundable and no new pledge can land in it).
   A dust pledge therefore cannot hold a ticker. A round at 10% or more is not replaced. A Funded round frees
   itself: anyone may start its auctions while the market is open, and after three that nobody fills it is
@@ -120,6 +122,13 @@ Open ──(pledged == target)──> Funded ──startAuction()──> Auction
     hl-price-guard's `PythRef.readFirstAfter`. The block sets the time, so a filler cannot pick a favorable
     print from several; it can only choose when to fill, as in any auction. A transaction built for one
     window lands any time in the next `w` seconds, and the print is at most `2w` old.
+  - Choosing the band is choosing when to fill (Codex r4 #1), and it stays allowed: every fill settles on
+    the market's price at that time, plus a spread capped at `maxSpreadBps` and shown before anyone pledges,
+    and the jump latch refuses a price more than `maxJumpBps` from the start. Fixing one settlement time at
+    the start instead would be worse: for the whole window (an hour) the filler would hold an option to
+    fill at a known, aging price after the market had moved. A band in which Pyth printed nothing has no
+    price; the next band does (equity feeds print several times a second in the session), and the filler
+    script tries the next band.
   - **Push** (the testnet `GuardPriceFeed`, written by a trusted guard): the latest stored price, at most
     `maxAge` = 60 s old.
   - A fill also needs a price published after `auctionStart`, so it never settles on the print that

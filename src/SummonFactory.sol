@@ -38,8 +38,10 @@ contract SummonFactory {
     uint32 public constant MAX_LP_LOCK_SECONDS = 30 days;
     /// A round nobody has pledged to may be replaced this long after it opened.
     uint64 public constant REPLACE_UNPLEDGED_AFTER = 1 days;
-    /// An Open round a day old with less than this share of its target pledged may be replaced; the old one is
-    /// cancelled and refunds. A dust pledge therefore cannot hold a ticker (Codex r3 #1).
+    /// An Open round with less than this share of its target pledged, and no pledge of at least 0.1% of its
+    /// target for a day (or since it opened), may be replaced; the old one is cancelled and refunds. A dust
+    /// pledge cannot hold a ticker (Codex r3 #1), and a round still gathering pledges is never cancelled
+    /// (Codex r4 #2).
     uint16 public constant REPLACE_BELOW_BPS = 1000;
 
     /// The smallest target a round may have, in USDC (6 decimals). 0 = no minimum (testnet). Set from what
@@ -112,7 +114,7 @@ contract SummonFactory {
             if (s == SummonRound.State.Filled) revert TokenLive(prev);
             bool stale = s == SummonRound.State.Open
                 && SummonRound(prev).pledged() * 1e4 < SummonRound(prev).params().target * REPLACE_BELOW_BPS
-                && block.timestamp >= openedAt[prev] + REPLACE_UNPLEDGED_AFTER;
+                && block.timestamp >= _max(openedAt[prev], SummonRound(prev).lastPledgeAt()) + REPLACE_UNPLEDGED_AFTER;
             if (s != SummonRound.State.Expired && !stale) revert RoundActive(prev);
             if (stale) SummonRound(prev).cancel();
         }
@@ -152,5 +154,9 @@ contract SummonFactory {
 
     function getDeps() external view returns (SummonRound.Deps memory) {
         return deps;
+    }
+
+    function _max(uint64 a, uint64 b) internal pure returns (uint64) {
+        return a > b ? a : b;
     }
 }
