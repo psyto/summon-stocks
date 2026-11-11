@@ -213,6 +213,17 @@ cd web && npm install
 npm run build && npx wrangler dev  # page and Worker on http://localhost:8787
 ```
 
+## Not a Tokenized Securities Venue
+
+The SEC's Innovation Exemption (Release 34-106402, 2026-09-17) lets a Tokenized Securities Venue (TSV) trade
+tokenized US stock in permissioned AMM pools without registering as an exchange. Its conditions include
+permissioned access, per-tier caps on symbols and volume, halts in step with the primary exchange, public
+trade data and, for tokens made by someone other than the company, written notice to the company at least
+30 days before trading with a chance to object. Summon is not a TSV. It runs on testnet and does not serve US
+persons. A US mainnet version would have to meet those conditions. Most of all, a funded round could not
+trade on day one: the company's 30-day notice would come first. Of the conditions, Summon's market-state
+check covers only the halts.
+
 ## Parts used
 
 - [hl-price-guard](https://github.com/fabrknt/hl-price-guard) (pinned at `v0.4.0`): `PythRef` for the
