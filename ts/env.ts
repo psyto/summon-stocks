@@ -45,6 +45,7 @@ export interface Deployment {
   guardFeed: Hex;
   priceSource: Hex;
   factory: Hex;
+  swap: Hex;
 }
 export function deployment(): Deployment {
   return JSON.parse(readFileSync("deployments/84532.json", "utf8"));
