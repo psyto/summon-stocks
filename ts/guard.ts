@@ -153,7 +153,24 @@ async function hyperliquidQuote(symbol: string): Promise<Quote> {
   return { last, halfSpread, source: `Hyperliquid HIP-3 ${dex}:${symbol} oracle` };
 }
 
+/**
+ * market-state treats a session name it does not know as no session check at all, so an install older than
+ * v0.3.0 reads "core-hours" as always open (it did on 2026-11-11, and swaps after the close paid 0.30%).
+ * Refuse to start unless the installed copy closes at a known weekend and inside the opening 15 minutes
+ * (fabrknt/market-state#1).
+ */
+function checkSession() {
+  const quiet = { halts: [], fetchedAt: 0 };
+  for (const iso of ["2026-11-14T15:00:00Z", "2026-11-12T14:40:00Z"]) {
+    const t = Date.parse(iso) / 1000;
+    if (!marketStateFor(policy, "GME", t, { ...quiet, fetchedAt: t }, GUARD_FEED_MAX_AGE_SECONDS).halted) {
+      throw new Error(`@fabrknt/market-state does not close "${policy.market.session}" at ${iso}: reinstall it (npm ci)`);
+    }
+  }
+}
+
 async function main() {
+  checkSession();
   for (;;) {
     try {
       await tick();
