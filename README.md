@@ -47,13 +47,14 @@ track). **Testnet only (Base Sepolia).** Mainnet data is only read and shown.
 
 | Part | State |
 |---|---|
-| Spec ([docs/specs/001-summon.md](docs/specs/001-summon.md)) | r3, after one independent review ([docs/reviews](docs/reviews)). The Codex review of the spec and the code is written up ([docs/reviews/codex-r1-request.md](docs/reviews/codex-r1-request.md)) and runs from 2026-11-10 |
+| Spec ([docs/specs/001-summon.md](docs/specs/001-summon.md)) | r5 (after Codex r3: a Pyth price taken at a set time, round replacement, the issuer pause in the hook). Reviews in [docs/reviews](docs/reviews): one independent review of r1, then Codex r1 of the spec and code on 2026-11-10 ([findings](docs/reviews/codex-r1.md), [what changed](docs/reviews/codex-r1-response.md)): 3 major and 4 minor, all fixed; then Codex r2 ([findings](docs/reviews/codex-r2.md)): 1 blocker and 3 major, all fixed (intents now live in a Durable Object); then Codex r3 ([findings](docs/reviews/codex-r3.md)): 4 major, fixed; then Codex r4 ([findings](docs/reviews/codex-r4.md)): 4 major and 1 minor, 4 fixed and 1 kept by design with reasons (Codex r5 accepted them); then Codex r5 ([findings](docs/reviews/codex-r5.md)): 1 blocker, 1 major, 1 minor, fixed; r6 and r7 (1 blocker and 1 major each: target bounds, an auction past its deadline, the factory's size, the pool seed), fixed; **Codex r8: APPROVE** ([findings](docs/reviews/codex-r8.md)), its one minor point fixed |
 | Price math (`src/SummonPrice.sol`, spec 5.1) | done, with tests: split invariance, dividend multiplier, fuzzed rounding |
-| Round, factory, pool hook, swap (`src/SummonRound.sol`, `SummonFactory.sol`, `SummonHook.sol`, `SummonSwap.sol`) | done, 35 tests: each fill condition failing alone, pledge cap, withdraw rules, expiry and refunds, claims under transfer policies, LP unwind, pool initialization restricted to the round, the guard price feed, trading the summoned pool. Removing any of 8 checks makes a test fail |
+| Round, factory, pool hook, swap (`src/SummonRound.sol`, `SummonFactory.sol`, `SummonHook.sol`, `SummonSwap.sol`) | done, 51 tests: each fill condition failing alone, pledge cap, target bounds (10 to 10^9 USDC), a pool seed of at least 10^4 token units, no auction past the deadline, withdraw rules, expiry and refunds, claims under transfer policies, LP unwind, pool initialization and liquidity restricted to the round, a fill's price published after the auction started, on a Pyth listing the first print after a time the block sets, round terms of at most 30 days with a round behind pace replaceable (and cancelled) after a day, swaps stopped while the issuer pauses, the router trading only Summon pools, the guard price feed, trading the summoned pool, and the pool that knows the stock's market (below). Removing any of 8 fill checks, or any of the hook's 6 rules, makes a test fail |
+| Stock-aware pool (`SummonHook`, `SummonRound.realign`, spec 5.5 and 5.5a, r4) | built 2026-11-08, not yet deployed: no swaps in a corporate action window, while the multiplier differs from the one the pool was priced at, or while the listing exchange has the stock halted; a 1.00% fee instead of 0.30% while the session is closed or the guard is quiet; after a split or a dividend in shares, anyone can `realign` the backers' pool to the new multiplier, so the first trader cannot take the difference. No fills in the first 15 and last 25 minutes of the session, while US LULD bands are doubled (market-state `core-hours`). Holidays and 13:00 early closes from market-state `v0.2.0` |
 | Base Sepolia deployment | done 2026-11-07: factory, hook, swap router, registries and five real B20 demo stocks (see below). Rounds: sGME [`0xa799…046D`](https://sepolia.basescan.org/address/0xa799fC499Af97a474D02878fC10fB8B733b1046D) (filled 2026-11-10) and sSOFI (open) [`0xAae4…DbEE`](https://sepolia.basescan.org/address/0xAae40400113c32D8D0345EBad6F781E56ECDDbEE) (both target 300 tUSDC) |
 | Guard (`ts/guard.ts`) | done: Nasdaq Trader halts (once a minute) and, for guard pricing, the HIP-3 oracle price from Hyperliquid's chain. It writes nothing while the market is closed. `npm run guard -- --quote GME` prints the price it would post and writes nothing |
 | End-to-end fill on Base Sepolia (`ts/e2e.ts`) | **first fill done 2026-11-10 (ET), sGME**: three demo backers pledged 300 tUSDC, the auction started, and the demo filler filled at a $25.115 reference (the HIP-3 oracle price the guard posted), 6 bp under it; the Uniswap v4 pool was seeded and every backer claimed. [pledge](https://sepolia.basescan.org/tx/0x3dbe7c7ad11fdd223ddeab48fbc05393fa85a334a9a2b7ed7054433b7cd7a60c) · [auction start](https://sepolia.basescan.org/tx/0x4b5831f2ca5fc62b8695315ca29670eb433421307826bad32aef927df572bb9a) · [fill](https://sepolia.basescan.org/tx/0xb71b8eb7f4cf16fd1bb060b11247b29741a0caf7151036d79965f09497ffb9eb) · [claim](https://sepolia.basescan.org/tx/0xda9dddb16b677e784f2d4bd6868c5e01fefbd6b699f63f7cc8d36d9e75b3b5dc). It picks up the stock's open round wherever it stands, so pledges made from the web page count. Weekdays 09:30–16:00 ET |
-| Web (`web/`) | built 2026-11-07: the register of all 298 stocks; live round pages; signed intents, with a round opening from the register once a demo stock's intents reach $250; trading a summoned pool; a demand export issuers can verify; the US block and per-network limits (8 Worker tests). Runs locally; goes public once the Codex review is addressed |
+| Web (`web/`) | built 2026-11-07: the register of all 298 stocks; live round pages; signed intents, with a round opening from the register once a demo stock's intents reach $250; trading a summoned pool; a demand export issuers can verify; the US block and per-network limits (22 Worker tests, intents in one Durable Object so nonce checks and limits are exact, with totals kept per token (named by the current snapshot) and live intents and nonces capped: totals count only unexpired intents, a replay sent with its replacement loses, expired intents are swept, the demand export is paged, an intent lasts at most 31 days, an older signature cannot restore a replaced intent, a nonce far ahead is refused, and a request with no country is refused). Runs locally; goes public once the Codex review is addressed |
 | Demand from elsewhere | planned (from 2026-11-14): marks on the register for never-minted stocks that already trade elsewhere, by amount, not by listing. Hyperliquid HIP-3 open interest and volume; Robinhood Chain token supply. Display only: fills still price from Pyth. Counts are under "The numbers" |
 
 First use (2026-11-07, with v1 intents; v2 also signs the token address, so that intent is to be signed
@@ -64,7 +65,7 @@ button (get test USDC first, then pledge). The first fill ran from the script on
 fill and a trade from the page are next.
 
 Docs:
-- [docs/specs/001-summon.md](docs/specs/001-summon.md): the spec (r3)
+- [docs/specs/001-summon.md](docs/specs/001-summon.md): the spec (r5)
 - [docs/reviews/](docs/reviews): reviews, and the request for the next one
 - [docs/design.md](docs/design.md): the web design
 
@@ -142,7 +143,7 @@ npm run create-stock                           # prints STOCK_TOKEN
 STOCK_TOKEN=0x… PRICE_ID=0x6f9cd89ef1b7fd39f667101a91ad578b6c6ace4579d5f7f285a4b06aa4504be6 \
   PRICE_SOURCE=guard forge script script/Deploy.s.sol --rpc-url base_sepolia --broadcast --mnemonics "$DEMO_MNEMONIC"
 npm run guard                                  # keep running: halts (and, for guard pricing, the quote)
-npm run e2e                                    # weekdays 09:30-16:00 ET
+npm run e2e                                    # trading days 09:45-15:35 ET (12:35 on early closes)
 ```
 
 **Price source.** Each listed token is bound to one feed, chosen by the factory owner:
@@ -166,7 +167,8 @@ within 50 bp, and it has not jumped more than 3% since the auction started. A gu
 therefore stops fills.
 
 **Deployed on Base Sepolia** (2026-11-07, priced from the guard feed; addresses also in
-`deployments/84532.json`):
+`deployments/84532.json`). These are the contracts from before the stock-aware pool: their hook gates only
+pool initialization, and they have no `realign`. This branch replaces them when it is deployed:
 
 | Contract | Address |
 |---|---|
@@ -212,13 +214,16 @@ npm run build && npx wrangler dev  # page and Worker on http://localhost:8787
 
 ## Parts used
 
-- [hl-price-guard](https://github.com/fabrknt/hl-price-guard) (pinned at `v0.3.2`): `PythRef` for the
+- [hl-price-guard](https://github.com/fabrknt/hl-price-guard) (pinned at `v0.4.0`): `PythRef` for the
   Pyth read and confidence bound, and `JumpLatch` for the jump guard. Summon needed a Pyth-only staleness
-  check, so it was added upstream first (`PythRef.readFresh`), not worked around here.
-- [market-state](https://github.com/fabrknt/market-state) (pinned at `v0.2.0`): `MarketStateCheck.requireOpen`
+  check, so it was added upstream first (`PythRef.readFresh`, `v0.3.2`), not worked around here. Codex r3
+  then showed a filler could still pick among fresh prints, so `PythRef.readFirstAfter` (the first print
+  after a set time) was added upstream in `v0.4.0` and Pyth listings settle through it.
+- [market-state](https://github.com/fabrknt/market-state) (pinned at `v0.3.0`): `MarketStateCheck.requireOpen`
   on every auction start and fill, and the Nasdaq Trader halts guard. Using it here showed the guard did
   not know exchange holidays (Thanksgiving read as open), so `v0.2.0` added NYSE's 2026-2028 holidays and
-  13:00 early closes upstream first. The registry fails closed when the
+  13:00 early closes upstream first, and `v0.3.0` the `core-hours` session (no fills while US LULD bands
+  are doubled). The registry fails closed when the
   updater goes quiet. It was extracted from another of our projects as a public part, so that Summon could
   depend on it through a tag. That project now depends on the same tag.
 - [Uniswap v4-core](https://github.com/Uniswap/v4-core) v4.0.0,

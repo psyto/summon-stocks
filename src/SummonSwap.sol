@@ -10,6 +10,10 @@ import {BalanceDelta} from "v4-core/src/types/BalanceDelta.sol";
 import {StateLibrary} from "v4-core/src/libraries/StateLibrary.sol";
 import {TickMath} from "v4-core/src/libraries/TickMath.sol";
 
+interface ISummonPools {
+    function roundForPool(bytes32 keyHash) external view returns (address);
+}
+
 interface IERC20Pull {
     function transferFrom(address from, address to, uint256 amount) external returns (bool);
 }
@@ -17,16 +21,19 @@ interface IERC20Pull {
 /// @title SummonSwap
 /// @notice Exact-input swaps on a summoned stock's Uniswap v4 pool, and a read of its price and liquidity
 ///         for the round page. Holds nothing between calls: input is pulled from the caller straight into
-///         the PoolManager, output goes straight to `to`.
+///         the PoolManager, output goes straight to `to`. Only pools a Summon round created (registered in
+///         the factory) can be traded through it.
 contract SummonSwap is IUnlockCallback {
     using PoolIdLibrary for PoolKey;
     using StateLibrary for IPoolManager;
 
     IPoolManager public immutable poolManager;
+    ISummonPools public immutable factory;
 
     error NotPoolManager();
     error TooLittleReceived(uint256 out, uint256 minOut);
     error ZeroAmount();
+    error NotASummonPool();
     error TransferFailed();
 
     event Swapped(PoolId indexed id, address indexed payer, bool zeroForOne, uint256 amountIn, uint256 amountOut);
@@ -40,8 +47,9 @@ contract SummonSwap is IUnlockCallback {
         address to;
     }
 
-    constructor(IPoolManager pm) {
+    constructor(IPoolManager pm, ISummonPools factory_) {
         poolManager = pm;
+        factory = factory_;
     }
 
     /// Sells exactly `amountIn` of one side for at least `minOut` of the other.
@@ -50,6 +58,7 @@ contract SummonSwap is IUnlockCallback {
         returns (uint256 amountOut)
     {
         if (amountIn == 0) revert ZeroAmount();
+        if (factory.roundForPool(keccak256(abi.encode(key))) == address(0)) revert NotASummonPool();
         amountOut = abi.decode(poolManager.unlock(abi.encode(Call(msg.sender, key, zeroForOne, amountIn, minOut, to))), (uint256));
         emit Swapped(key.toId(), msg.sender, zeroForOne, amountIn, amountOut);
     }

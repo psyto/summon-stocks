@@ -74,7 +74,7 @@ contract MockPolicyRegistry {
 
 /// The parts of a B20 Asset that Summon reads, with B20's transfer rules: TRANSFER pause, and the sender,
 /// receiver and executor policies checked on every transfer.
-contract MockB20 is MockERC20 {
+contract MockB20Of is MockERC20 {
     bytes32 public constant TRANSFER_SENDER_POLICY = keccak256("TRANSFER_SENDER_POLICY");
     bytes32 public constant TRANSFER_RECEIVER_POLICY = keccak256("TRANSFER_RECEIVER_POLICY");
     bytes32 public constant TRANSFER_EXECUTOR_POLICY = keccak256("TRANSFER_EXECUTOR_POLICY");
@@ -89,7 +89,7 @@ contract MockB20 is MockERC20 {
     error ContractPaused(uint8 feature);
     error PolicyForbids(bytes32 scope, address account);
 
-    constructor(MockPolicyRegistry r) MockERC20("Demo GME", "dGMEc", 8) {
+    constructor(MockPolicyRegistry r, uint8 d) MockERC20("Demo GME", "dGMEc", d) {
         registry = r;
     }
 
@@ -158,4 +158,9 @@ contract MockOracleRegistry {
     function getOracleParams(address) external view returns (uint256, bool) {
         return (m, paused);
     }
+}
+
+/// The demo stock with 8 decimals, as most tests use it.
+contract MockB20 is MockB20Of {
+    constructor(MockPolicyRegistry r) MockB20Of(r, 8) {}
 }

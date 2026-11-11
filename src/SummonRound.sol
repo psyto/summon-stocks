@@ -8,6 +8,8 @@ import {IUnlockCallback} from "v4-core/src/interfaces/callback/IUnlockCallback.s
 import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
 import {PoolKey} from "v4-core/src/types/PoolKey.sol";
 import {Currency} from "v4-core/src/types/Currency.sol";
+import {PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
+import {StateLibrary} from "v4-core/src/libraries/StateLibrary.sol";
 import {BalanceDelta} from "v4-core/src/types/BalanceDelta.sol";
 import {HLPriceGuard} from "hl-price-guard/HLPriceGuard.sol";
 import {PythRef, IPyth} from "hl-price-guard/PythRef.sol";
@@ -40,6 +42,8 @@ interface IOracleParams {
 ///         reference price; part of the round seeds a Uniswap v4 pool that the backers own pro rata.
 contract SummonRound is IUnlockCallback {
     using HLPriceGuard for HLPriceGuard.JumpLatch;
+    using PoolIdLibrary for PoolKey;
+    using StateLibrary for IPoolManager;
 
     enum State {
         Open,
@@ -65,20 +69,30 @@ contract SummonRound is IUnlockCallback {
         uint256 target; // USDC, 6 decimals
         uint64 deadline;
         uint16 maxSpreadBps; // <= 100
-        uint16 lpBps; // share of the round that seeds the pool, <= 5000
+        uint16 lpBps; // share of the round that seeds the pool, <= MAX_LP_BPS
         uint32 rampSeconds;
         uint32 windowSeconds;
         uint8 maxAuctions;
         uint32 lpLockSeconds;
         uint32 maxGuardAge;
-        uint32 maxPythAge;
+        uint32 maxPythAge; // push feeds: the oldest price accepted. Pull feeds: the settlement window
+        bool pull; // the caller supplies Pyth's update: settle on the first print after a set time (Codex r3 #2)
         uint16 maxConfBps;
         uint16 maxJumpBps;
         uint32 cooldownSeconds; // corporate-action window around a scheduled multiplier change
     }
 
     uint16 public constant MAX_SPREAD_CAP_BPS = 100;
-    uint16 public constant MAX_LP_BPS = 5000;
+    /// Below half, so the filler's share buys more tokens than the seed even at the 1% spread cap:
+    /// 5050 / 4950 / 1.01 > 1 (Codex r8 #3).
+    uint16 public constant MAX_LP_BPS = 4950;
+    /// The pool's seed must be at least this many raw token units, so rounding each amount up by one unit
+    /// moves the seed's price and the filler's delivery by at most 1 bp. A target too small for the token's
+    /// decimals and price cannot start, and its round expires and refunds (Codex r7 #2).
+    uint256 public constant MIN_SEED_UNITS = 1e4;
+    uint8 internal constant OP_UNWIND = 0;
+    uint8 internal constant OP_SEED = 1;
+    uint8 internal constant OP_REALIGN = 2;
 
     Deps internal d;
     Params internal p;
@@ -102,6 +116,9 @@ contract SummonRound is IUnlockCallback {
     uint256 public backerTokens; // raw token units owed to backers in total
     uint256 public backerUsdcDust; // seed USDC the pool did not take, owed to backers in total
     uint128 public liquidity;
+    uint256 public poolMultiplier; // the token multiplier the pool is priced at (§5.5a)
+    uint256 public idleTokens; // what realign could not put back, owed to backers at unwind
+    uint256 public idleUsdc;
     mapping(address => bool) public claimed;
 
     // LP unwind
@@ -125,6 +142,9 @@ contract SummonRound is IUnlockCallback {
     error TokenPaused();
     error PolicyForbids(bytes32 scope, address account);
     error PriceJumped(uint256 observedBps, uint256 limitBps);
+    error PriceNotAfterStart(uint256 publishedAt, uint64 auctionStart);
+    error TooLateToStart(uint64 deadline);
+    error SeedTooSmall(uint256 units);
     error LpLocked(uint64 until);
     error TransferFailed();
 
@@ -136,8 +156,10 @@ contract SummonRound is IUnlockCallback {
     event Filled(address indexed filler, uint256 spreadBps, uint256 ref, uint256 tokensIn, uint256 usdcOut, uint128 liquidity);
     event Claimed(address indexed backer, uint256 tokens, uint256 usdc);
     event Refunded(address indexed backer, uint256 amount);
+    event Cancelled();
     event LPUnwound(uint256 tokens, uint256 usdc);
     event LPClaimed(address indexed backer, uint256 tokens, uint256 usdc);
+    event Realigned(uint256 fromMultiplier, uint256 toMultiplier, uint160 sqrtPriceX96, uint128 liquidity);
 
     modifier nonReentrant() {
         if (_lock != 1) revert Reentrancy();
@@ -148,7 +170,7 @@ contract SummonRound is IUnlockCallback {
 
     constructor(Deps memory deps_, Params memory params_) {
         if (
-            params_.token == address(0) || params_.priceSource == address(0) || params_.target == 0 || params_.deadline <= block.timestamp
+            params_.token == address(0) || params_.priceSource == address(0) || params_.target == 0 || params_.deadline < block.timestamp + params_.windowSeconds
                 || params_.maxSpreadBps > MAX_SPREAD_CAP_BPS || params_.lpBps == 0 || params_.lpBps > MAX_LP_BPS
                 || params_.rampSeconds == 0 || params_.windowSeconds < params_.rampSeconds || params_.maxAuctions == 0
                 || params_.maxPythAge == 0 || params_.maxGuardAge == 0 || params_.maxJumpBps == 0
@@ -173,6 +195,14 @@ contract SummonRound is IUnlockCallback {
     function state() public view returns (State) {
         (State s,) = _timed();
         return s;
+    }
+
+    /// For a pull feed: the time whose first Pyth print prices a start or fill in this block. It is the start
+    /// of the previous window of maxPythAge seconds, so the print exists by the time the window ends, and a
+    /// transaction built for it lands any time in the window after.
+    function settleTime() public view returns (uint64) {
+        uint64 w = p.maxPythAge;
+        return uint64(block.timestamp / w * w - w);
     }
 
     /// The spread a fill would get now, in bps.
@@ -220,11 +250,24 @@ contract SummonRound is IUnlockCallback {
 
     // ------------------------------------------------------------------ auction
 
-    /// Anyone may start the auction once the round is funded and every fill condition holds now.
+    /// The factory cancels an Open round it replaces, in the same transaction, so nobody can pledge into a
+    /// round that can no longer fill; every pledge becomes refundable (Codex r3 #1).
+    function cancel() external nonReentrant {
+        if (msg.sender != factory) revert NotFactory();
+        _sync();
+        if (_state != State.Open) revert WrongState(_state);
+        _state = State.Expired;
+        emit Cancelled();
+    }
+
+    /// Anyone may start the auction once the round is funded and every fill condition holds now, and the whole
+    /// auction window ends by the deadline, so no auction outlives its round (Codex r6 #4).
     function startAuction(bytes[] calldata pythUpdate) external payable nonReentrant {
         _sync();
         if (_state != State.Funded) revert WrongState(_state);
-        uint256 ref = _checkConditions(pythUpdate);
+        if (block.timestamp + p.windowSeconds > p.deadline) revert TooLateToStart(p.deadline);
+        (uint256 ref,) = _checkConditions(pythUpdate);
+        _lpTokens(ref);
         auctionStart = uint64(block.timestamp);
         auctionsRun += 1;
         multiplierAtStart = IB20AssetMin(p.token).multiplier();
@@ -238,7 +281,14 @@ contract SummonRound is IUnlockCallback {
     function fill(bytes[] calldata pythUpdate) external payable nonReentrant {
         _sync();
         if (_state != State.Auction) revert WrongState(_state);
-        uint256 ref = _checkConditions(pythUpdate);
+        uint256 ref;
+        {
+            uint256 publishedAt;
+            (ref, publishedAt) = _checkConditions(pythUpdate);
+            // the fill's price must be published after the auction started: otherwise the filler could start
+            // with a favorable print up to maxPythAge old and settle on that same print (Codex r1 #1)
+            if (publishedAt <= auctionStart) revert PriceNotAfterStart(publishedAt, auctionStart);
+        }
         uint256 nowMultiplier = IB20AssetMin(p.token).multiplier();
         if (nowMultiplier != multiplierAtStart) revert MultiplierChanged(multiplierAtStart, nowMultiplier);
         (HLPriceGuard.Breach breach, uint256 observed, uint256 limit) = latch.observe(ref, p.maxJumpBps);
@@ -249,14 +299,15 @@ contract SummonRound is IUnlockCallback {
         uint256 usdcLp = pledged * p.lpBps / 1e4;
         uint256 usdcFiller = pledged - usdcLp;
         uint256 q = SummonPrice.tokensFor(usdcFiller, ref, s, tokenDecimals);
-        uint256 qLp = SummonPrice.tokensFor(usdcLp, ref, 0, tokenDecimals);
-        if (qLp >= q) revert BadParams(); // lpBps <= 5000 and spread <= 1% make this unreachable
+        uint256 qLp = _lpTokens(ref);
+        if (qLp >= q) revert BadParams(); // lpBps <= 4950 and spread <= 1% make this unreachable
 
         _state = State.Filled;
         filledAt = uint64(block.timestamp);
         filler = msg.sender;
         fillSpreadBps = s;
         fillRef = ref;
+        poolMultiplier = nowMultiplier;
 
         _pull(p.token, msg.sender, q);
         _push(d.usdc, msg.sender, usdcFiller);
@@ -311,11 +362,36 @@ contract SummonRound is IUnlockCallback {
         if (block.timestamp < until) revert LpLocked(until);
         unwound = true;
         (uint256 t, uint256 u) = abi.decode(
-            IPoolManager(d.poolManager).unlock(abi.encode(false, uint256(0), uint256(0))), (uint256, uint256)
+            IPoolManager(d.poolManager).unlock(abi.encode(OP_UNWIND, uint256(0), uint256(0))), (uint256, uint256)
         );
-        lpTokens = t;
-        lpUsdc = u;
+        lpTokens = t + idleTokens;
+        lpUsdc = u + idleUsdc;
         emit LPUnwound(t, u);
+    }
+
+    /// §5.5a: after a corporate action, re-prices the backers' pool by the multiplier's change, so the first
+    /// trader cannot take the difference. Anyone may call it once the action window has passed.
+    function realign() external nonReentrant {
+        _sync();
+        if (_state != State.Filled) revert WrongState(_state);
+        if (unwound) revert NothingToDo();
+        uint256 m = IB20AssetMin(p.token).multiplier();
+        uint256 from = poolMultiplier;
+        if (m == from) revert NothingToDo();
+        uint256 eff = IB20AssetMin(p.token).effectiveAt();
+        if (_inActionWindow(eff)) revert CorporateActionWindow(eff);
+        if (d.oracleRegistry != address(0)) {
+            (uint256 rm,) = IOracleParams(d.oracleRegistry).getOracleParams(p.token);
+            if (rm != m) revert MultiplierMismatch(rm, m);
+        }
+        (uint256 t, uint256 u, uint128 l, uint160 sqrtP) = abi.decode(
+            IPoolManager(d.poolManager).unlock(abi.encode(OP_REALIGN, m, from)), (uint256, uint256, uint128, uint160)
+        );
+        idleTokens += t;
+        idleUsdc += u;
+        liquidity = l;
+        poolMultiplier = m;
+        emit Realigned(from, m, sqrtP, l);
     }
 
     function claimLP() external nonReentrant {
@@ -333,39 +409,61 @@ contract SummonRound is IUnlockCallback {
 
     // ------------------------------------------------------------------ pool
 
+    /// `data` is (op, a, b): seed (a = token, b = USDC), unwind, or realign (a = new multiplier, b = old).
     function unlockCallback(bytes calldata data) external returns (bytes memory) {
         if (msg.sender != d.poolManager) revert NotPoolManager();
-        (bool seed, uint256 tokenAmt, uint256 usdcAmt) = abi.decode(data, (bool, uint256, uint256));
+        (uint8 op, uint256 a, uint256 b) = abi.decode(data, (uint8, uint256, uint256));
         IPoolManager pm = IPoolManager(d.poolManager);
         PoolKey memory key = poolKey();
         bool tokenIs0 = p.token < d.usdc;
-        if (seed) {
-            (uint256 a0, uint256 a1) = tokenIs0 ? (tokenAmt, usdcAmt) : (usdcAmt, tokenAmt);
-            uint160 sqrtP = SummonPool.sqrtPriceX96(a0, a1);
+        if (op == OP_SEED) {
+            uint160 sqrtP = tokenIs0 ? SummonPool.sqrtPriceX96(a, b) : SummonPool.sqrtPriceX96(b, a);
             pm.initialize(key, sqrtP);
-            uint128 l = SummonPool.fullRangeLiquidity(sqrtP, a0, a1);
-            (BalanceDelta delta,) = pm.modifyLiquidity(
-                key,
-                IPoolManager.ModifyLiquidityParams(SummonPool.tickLower(), SummonPool.tickUpper(), int256(uint256(l)), 0),
-                ""
-            );
-            uint256 paid0 = _settleOwed(pm, key.currency0, delta.amount0());
-            uint256 paid1 = _settleOwed(pm, key.currency1, delta.amount1());
-            (uint256 tokenUsed, uint256 usdcUsed) = tokenIs0 ? (paid0, paid1) : (paid1, paid0);
+            (uint256 tokenUsed, uint256 usdcUsed, uint128 l) = _addFullRange(pm, key, sqrtP, a, b);
             return abi.encode(tokenUsed, usdcUsed, l);
         }
-        (BalanceDelta delta2,) = pm.modifyLiquidity(
+        (uint256 t, uint256 u) = _removeAll(pm, key);
+        if (op == OP_UNWIND) return abi.encode(t, u);
+        // realign: the pool is empty now, so a swap moves its price and moves no tokens. The price is
+        // currency1 per currency0, so it scales by new/old multiplier when the token is currency0.
+        (uint160 sqrtNow,,,) = pm.getSlot0(key.toId());
+        uint160 target = tokenIs0 ? SummonPool.scaledSqrtPrice(sqrtNow, a, b) : SummonPool.scaledSqrtPrice(sqrtNow, b, a);
+        if (target != sqrtNow) {
+            pm.swap(key, IPoolManager.SwapParams({zeroForOne: target < sqrtNow, amountSpecified: -1, sqrtPriceLimitX96: target}), "");
+        }
+        (uint256 tUsed, uint256 uUsed, uint128 l2) = _addFullRange(pm, key, target, t, u);
+        return abi.encode(t - tUsed, u - uUsed, l2, target);
+    }
+
+    function _addFullRange(IPoolManager pm, PoolKey memory key, uint160 sqrtP, uint256 tokenAmt, uint256 usdcAmt)
+        internal
+        returns (uint256 tokenUsed, uint256 usdcUsed, uint128 l)
+    {
+        bool tokenIs0 = p.token < d.usdc;
+        (uint256 a0, uint256 a1) = tokenIs0 ? (tokenAmt, usdcAmt) : (usdcAmt, tokenAmt);
+        l = SummonPool.fullRangeLiquidity(sqrtP, a0, a1);
+        (BalanceDelta delta,) = pm.modifyLiquidity(
+            key, IPoolManager.ModifyLiquidityParams(SummonPool.tickLower(), SummonPool.tickUpper(), int256(uint256(l)), 0), ""
+        );
+        uint256 paid0 = _settleOwed(pm, key.currency0, delta.amount0());
+        uint256 paid1 = _settleOwed(pm, key.currency1, delta.amount1());
+        (tokenUsed, usdcUsed) = tokenIs0 ? (paid0, paid1) : (paid1, paid0);
+    }
+
+    /// Removes the whole position, fees included, into the round; returns (tokens, USDC).
+    function _removeAll(IPoolManager pm, PoolKey memory key) internal returns (uint256, uint256) {
+        (BalanceDelta delta,) = pm.modifyLiquidity(
             key,
             IPoolManager.ModifyLiquidityParams(SummonPool.tickLower(), SummonPool.tickUpper(), -int256(uint256(liquidity)), 0),
             ""
         );
-        uint256 got0 = _takeOwed(pm, key.currency0, delta2.amount0());
-        uint256 got1 = _takeOwed(pm, key.currency1, delta2.amount1());
-        return tokenIs0 ? abi.encode(got0, got1) : abi.encode(got1, got0);
+        uint256 got0 = _takeOwed(pm, key.currency0, delta.amount0());
+        uint256 got1 = _takeOwed(pm, key.currency1, delta.amount1());
+        return p.token < d.usdc ? (got0, got1) : (got1, got0);
     }
 
     function _seed(uint256 tokenAmt, uint256 usdcAmt) internal returns (uint256, uint256, uint128) {
-        bytes memory r = IPoolManager(d.poolManager).unlock(abi.encode(true, tokenAmt, usdcAmt));
+        bytes memory r = IPoolManager(d.poolManager).unlock(abi.encode(OP_SEED, tokenAmt, usdcAmt));
         return abi.decode(r, (uint256, uint256, uint128));
     }
 
@@ -385,13 +483,19 @@ contract SummonRound is IUnlockCallback {
 
     // ------------------------------------------------------------------ conditions (spec 5.2)
 
-    function _checkConditions(bytes[] calldata pythUpdate) internal returns (uint256 ref) {
+    /// Returns the reference price per token and the time the underlying price was published.
+    function _checkConditions(bytes[] calldata pythUpdate) internal returns (uint256 ref, uint256 publishedAt) {
         // 2. market state, fail closed
         MarketStateCheck.requireOpen(MarketStateRegistry(d.marketState), p.token, p.maxGuardAge);
         // 3. a fresh Pyth price with a narrow confidence interval (stops publishing outside the session)
-        HLPriceGuard.Ref memory r = PythRef.updateAndReadFresh(IPyth(p.priceSource), pythUpdate, p.priceId, p.maxPythAge, p.maxConfBps);
+        // a pull feed settles on the first print at or after a time set by the block, so the caller cannot pick
+        // a favorable print from several (Codex r3 #2); a push feed is the latest price its updater posted
+        HLPriceGuard.Ref memory r = p.pull
+            ? PythRef.readFirstAfter(IPyth(p.priceSource), pythUpdate, p.priceId, settleTime(), p.maxPythAge, p.maxConfBps)
+            : PythRef.updateAndReadFresh(IPyth(p.priceSource), pythUpdate, p.priceId, p.maxPythAge, p.maxConfBps);
         uint256 m = IB20AssetMin(p.token).multiplier();
         ref = SummonPrice.refPerToken(r.price, m);
+        publishedAt = r.updatedAt;
         // 4. issuer registry: not paused, and its multiplier agrees with the token's
         if (d.oracleRegistry != address(0)) {
             (uint256 rm, bool paused) = IOracleParams(d.oracleRegistry).getOracleParams(p.token);
@@ -400,9 +504,7 @@ contract SummonRound is IUnlockCallback {
         }
         // 5. no scheduled multiplier change near now
         uint256 eff = IB20AssetMin(p.token).effectiveAt();
-        if (eff != 0 && block.timestamp + p.cooldownSeconds >= eff && block.timestamp <= eff + p.cooldownSeconds) {
-            revert CorporateActionWindow(eff);
-        }
+        if (_inActionWindow(eff)) revert CorporateActionWindow(eff);
         // 6. transfers not paused; an unreadable answer counts as paused
         try IB20(p.token).isPaused(IB20.PausableFeature.TRANSFER) returns (bool isP) {
             if (isP) revert TokenPaused();
@@ -421,6 +523,10 @@ contract SummonRound is IUnlockCallback {
         _requireAuthorized(executor, d.poolManager);
     }
 
+    function _inActionWindow(uint256 eff) internal view returns (bool) {
+        return eff != 0 && block.timestamp + p.cooldownSeconds >= eff && block.timestamp <= eff + p.cooldownSeconds;
+    }
+
     function _requireCanReceive(address account) internal view {
         _requireAuthorized(IB20(p.token).TRANSFER_RECEIVER_POLICY(), account);
     }
@@ -429,6 +535,12 @@ contract SummonRound is IUnlockCallback {
         uint64 id = IB20(p.token).policyId(scope);
         IPolicyRegistry reg = IPolicyRegistry(d.policyRegistry);
         if (!reg.policyExists(id) || !reg.isAuthorized(id, account)) revert PolicyForbids(scope, account);
+    }
+
+    /// Raw token units the pool is seeded with at `ref`; reverts below MIN_SEED_UNITS.
+    function _lpTokens(uint256 ref) internal view returns (uint256 qLp) {
+        qLp = SummonPrice.tokensFor(pledged * p.lpBps / 1e4, ref, 0, tokenDecimals);
+        if (qLp < MIN_SEED_UNITS) revert SeedTooSmall(qLp);
     }
 
     // ------------------------------------------------------------------ time

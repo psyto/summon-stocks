@@ -5,28 +5,35 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
-import worker from "./index";
+import { DatabaseSync } from "node:sqlite";
+import worker, { IntentStore } from "./index";
+import { MAX_LIVE, MAX_NONCES } from "./store";
 
-class MemKV {
-  m = new Map<string, string>();
-  async get(k: string, type?: string) {
-    const v = this.m.get(k);
-    if (v === undefined) return null;
-    return type === "json" ? JSON.parse(v) : v;
-  }
-  async put(k: string, v: string) {
-    this.m.set(k, v);
-  }
-  async list(o: { prefix?: string }) {
-    return { keys: [...this.m.keys()].filter((k) => k.startsWith(o.prefix ?? "")).map((name) => ({ name })), list_complete: true, cursor: "" };
-  }
+/** The Durable Object namespace, with IntentStore over an in-memory node:sqlite database. */
+function memStore() {
+  const db = new DatabaseSync(":memory:");
+  let alarm: number | null = null;
+  const storage = {
+    sql: {
+      // run each statement at once, as ctx.storage.sql.exec does; rows only for SELECT
+      exec: (q: string, ...b: unknown[]) => {
+        const st = db.prepare(q);
+        const rows = /^\s*SELECT/i.test(q) ? (st.all(...(b as never[])) as Record<string, unknown>[]) : (st.run(...(b as never[])), []);
+        return { toArray: () => rows };
+      },
+    },
+    getAlarm: async () => alarm,
+    setAlarm: async (at: number) => void (alarm = at),
+  };
+  const obj = new IntentStore({ storage });
+  return { idFromName: () => "all", get: () => ({ fetch: (u: string, i?: RequestInit) => obj.fetch(new Request(u, i)) }), obj, db };
 }
 
 const snapshot = readFileSync(new URL("../public/b20.json", import.meta.url), "utf8");
 const ASSETS = { fetch: async () => new Response(snapshot, { headers: { "content-type": "application/json" } }) };
 
 function env(geo = "on") {
-  return { ASSETS, INTENTS: new MemKV(), GEO_BLOCK: geo } as never;
+  return { ASSETS, INTENTS: memStore(), GEO_BLOCK: geo } as never;
 }
 
 function req(path: string, init: RequestInit = {}, country = "JP", ip = "203.0.113.7") {
@@ -47,8 +54,24 @@ const types = {
 
 const tokenOf = new Map((JSON.parse(snapshot) as { stocks: { ticker: string; address: `0x${string}` }[] }).stocks.map((s) => [s.ticker, s.address]));
 
-async function intent(e: never, acct: ReturnType<typeof privateKeyToAccount>, ticker: string, usd: number, ip = "203.0.113.7", token = tokenOf.get(ticker)!) {
-  const message = { ticker, token, usd: BigInt(usd), expiry: BigInt(Math.floor(Date.now() / 1000) + 86_400), nonce: BigInt(Date.now()) };
+let nextNonce = Date.now();
+
+async function intent(
+  e: never,
+  acct: ReturnType<typeof privateKeyToAccount>,
+  ticker: string,
+  usd: number,
+  ip = "203.0.113.7",
+  token = tokenOf.get(ticker)!,
+  o: { expiry?: number; nonce?: number } = {},
+) {
+  const message = {
+    ticker,
+    token,
+    usd: BigInt(usd),
+    expiry: BigInt(o.expiry ?? Math.floor(Date.now() / 1000) + 86_400),
+    nonce: BigInt(o.nonce ?? nextNonce++),
+  };
   const signature = await acct.signTypedData({ domain, types, primaryType: "Intent", message });
   const body = JSON.stringify({ ticker, token, usd, expiry: Number(message.expiry), nonce: Number(message.nonce), address: acct.address, signature });
   return worker.fetch(req("/api/intents", { method: "POST", body, headers: { "content-type": "application/json" } }, "JP", ip), e);
@@ -114,6 +137,204 @@ const tests: [string, () => Promise<void>][] = [
       const r = await intent(e, a, "SOFI", 50, "203.0.113.7", tokenOf.get("RKT"));
       assert.equal(r.status, 400);
       assert.match(((await r.json()) as { error: string }).error, /not the registered contract for SOFI/);
+    },
+  ],
+  [
+    "an expired intent stops counting at once (Codex r1 #2)",
+    async () => {
+      const e = env();
+      const now = Date.now();
+      assert.equal((await intent(e, privateKeyToAccount(generatePrivateKey()), "RKT", 250, "203.0.113.7", undefined, { expiry: Math.floor(now / 1000) + 5 })).status, 200);
+      assert.deepEqual(await (await worker.fetch(req("/api/intents"), e)).json(), { RKT: { backers: 1, usd: 250 } });
+      const realNow = Date.now;
+      Date.now = () => now + 10_000;
+      try {
+        assert.deepEqual(await (await worker.fetch(req("/api/intents"), e)).json(), {});
+      } finally {
+        Date.now = realNow;
+      }
+    },
+  ],
+  [
+    "an intent may last at most 31 days",
+    async () => {
+      const r = await intent(env(), privateKeyToAccount(generatePrivateKey()), "RKT", 10, "203.0.113.7", undefined, { expiry: Math.floor(Date.now() / 1000) + 40 * 86_400 });
+      assert.equal(r.status, 400);
+    },
+  ],
+  [
+    "an older signature cannot restore a replaced intent (Codex r1 #3)",
+    async () => {
+      const e = env();
+      const a = privateKeyToAccount(generatePrivateKey());
+      const n0 = Date.now(); // a nonce is the signing time in ms
+      // keep the first signed request, as an observer could
+      const first = await intent(e, a, "RKT", 250, "203.0.113.7", undefined, { nonce: n0 });
+      assert.equal(first.status, 200);
+      assert.equal((await intent(e, a, "RKT", 1, "203.0.113.7", undefined, { nonce: n0 + 1 })).status, 200);
+      assert.equal((await intent(e, a, "RKT", 250, "203.0.113.7", undefined, { nonce: n0 })).status, 409);
+      assert.deepEqual(await (await worker.fetch(req("/api/intents"), e)).json(), { RKT: { backers: 1, usd: 1 } });
+    },
+  ],
+  [
+    "a replay sent at the same time as its replacement cannot win (Codex r2 #3)",
+    async () => {
+      const e = env();
+      const a = privateKeyToAccount(generatePrivateKey());
+      const n0 = Date.now(); // a nonce is the signing time in ms
+      assert.equal((await intent(e, a, "RKT", 250, "203.0.113.7", undefined, { nonce: n0 })).status, 200);
+      // the replacement and a replay of the first, in flight together (KV could keep either)
+      const [next, replay] = await Promise.all([
+        intent(e, a, "RKT", 1, "203.0.113.7", undefined, { nonce: n0 + 1 }),
+        intent(e, a, "RKT", 250, "203.0.113.7", undefined, { nonce: n0 }),
+      ]);
+      assert.equal(next.status, 200);
+      assert.equal(replay.status, 409);
+      assert.deepEqual(await (await worker.fetch(req("/api/intents"), e)).json(), { RKT: { backers: 1, usd: 1 } });
+    },
+  ],
+  [
+    "the per-network limit holds when the writes arrive at once (Codex r2 #3)",
+    async () => {
+      const e = env();
+      const rs = await Promise.all(Array.from({ length: 8 }, () => intent(e, privateKeyToAccount(generatePrivateKey()), "RKT", 10)));
+      assert.equal(rs.filter((r) => r.status === 200).length, 5);
+      assert.equal(rs.filter((r) => r.status === 429).length, 3);
+    },
+  ],
+  [
+    "the hourly sweep deletes expired intents but keeps their nonces (Codex r2 #9)",
+    async () => {
+      const e = env() as unknown as { INTENTS: ReturnType<typeof memStore> };
+      const a = privateKeyToAccount(generatePrivateKey());
+      const now = Date.now();
+      await intent(e as never, a, "RKT", 250, "203.0.113.7", undefined, { expiry: Math.floor(now / 1000) + 5, nonce: now });
+      await intent(e as never, privateKeyToAccount(generatePrivateKey()), "SOFI", 40);
+      const realNow = Date.now;
+      Date.now = () => now + 10_000;
+      try {
+        await e.INTENTS.obj.alarm();
+        assert.deepEqual(e.INTENTS.db.prepare("SELECT ticker FROM intents").all().map((r) => r.ticker), ["SOFI"]);
+        // the expired intent's signature still cannot come back
+        assert.equal((await intent(e as never, a, "RKT", 250, "203.0.113.7", undefined, { expiry: Math.floor(now / 1000) + 86_400, nonce: now })).status, 409);
+      } finally {
+        Date.now = realNow;
+      }
+    },
+  ],
+  [
+    "an intent may last at most 31 days from its nonce, and the nonce is dropped after that (Codex r3 #3)",
+    async () => {
+      const e = env() as unknown as { INTENTS: ReturnType<typeof memStore> };
+      const a = privateKeyToAccount(generatePrivateKey());
+      const now = Date.now();
+      // signed (nonce) 10 days ago, lasting 25 days from now: 35 days from signing
+      const tooLong = await intent(e as never, a, "RKT", 10, "203.0.113.7", undefined, { nonce: now - 10 * 86_400_000, expiry: Math.floor(now / 1000) + 25 * 86_400 });
+      assert.equal(tooLong.status, 400);
+      assert.equal((await intent(e as never, a, "RKT", 10, "203.0.113.7", undefined, { nonce: now })).status, 200);
+      const realNow = Date.now;
+      Date.now = () => now + 32 * 86_400_000;
+      try {
+        await e.INTENTS.obj.alarm();
+      } finally {
+        Date.now = realNow;
+      }
+      assert.equal(e.INTENTS.db.prepare("SELECT COUNT(*) AS n FROM nonces").all()[0]!.n, 0);
+    },
+  ],
+  [
+    "live intents are capped (Codex r3 #3)",
+    async () => {
+      const e = env() as unknown as { INTENTS: ReturnType<typeof memStore> };
+      e.INTENTS.db.prepare("INSERT INTO totals VALUES ('0xxyz', 'XYZ', ?, 1)").run(MAX_LIVE);
+      const r = await intent(e as never, privateKeyToAccount(generatePrivateKey()), "RKT", 10);
+      assert.equal(r.status, 503);
+    },
+  ],
+  [
+    "totals are kept as rows and an expired intent leaves them (Codex r3 #3)",
+    async () => {
+      const e = env() as unknown as { INTENTS: ReturnType<typeof memStore> };
+      const now = Date.now();
+      const a = privateKeyToAccount(generatePrivateKey());
+      await intent(e as never, a, "RKT", 250, "203.0.113.7", undefined, { expiry: Math.floor(now / 1000) + 5 });
+      await intent(e as never, a, "RKT", 100); // the same wallet replaces its own
+      await intent(e as never, privateKeyToAccount(generatePrivateKey()), "RKT", 40, "203.0.113.7", undefined, { expiry: Math.floor(now / 1000) + 5 });
+      assert.deepEqual(e.INTENTS.db.prepare("SELECT backers, usd FROM totals").all().map((r) => [r.backers, r.usd]), [[2, 140]]);
+      const realNow = Date.now;
+      Date.now = () => now + 10_000;
+      try {
+        assert.deepEqual(await (await worker.fetch(req("/api/intents"), e as never)).json(), { RKT: { backers: 1, usd: 100 } });
+      } finally {
+        Date.now = realNow;
+      }
+    },
+  ],
+  [
+    "stored nonces are capped, and pruning frees room (Codex r4 #3)",
+    async () => {
+      const e = env() as unknown as { INTENTS: ReturnType<typeof memStore> };
+      const now = Date.now();
+      e.INTENTS.db.prepare("INSERT INTO nonces VALUES ('0xold', '0xa', ?)").run(now - 40 * 86_400_000);
+      e.INTENTS.db.prepare("INSERT INTO counts VALUES ('nonces', ?)").run(MAX_NONCES);
+      assert.equal((await intent(e as never, privateKeyToAccount(generatePrivateKey()), "RKT", 10)).status, 503);
+      await e.INTENTS.obj.alarm(); // the 40-day-old nonce goes, and with it one from the count
+      assert.equal((await intent(e as never, privateKeyToAccount(generatePrivateKey()), "RKT", 10)).status, 200);
+    },
+  ],
+  [
+    "the board names totals by the current snapshot: a rename or a reassigned ticker shows at once (Codex r4 #4, r5 #2)",
+    async () => {
+      const e = env() as unknown as { ASSETS: unknown };
+      await intent(e as never, privateKeyToAccount(generatePrivateKey()), "RKT", 250);
+      assert.deepEqual(await (await worker.fetch(req("/api/intents"), e as never)).json(), { RKT: { backers: 1, usd: 250 } });
+      // the snapshot renames RKT's token to NEW, and gives the ticker RKT to SOFI's token
+      const snap = JSON.parse(snapshot) as { stocks: { ticker: string; address: string }[] };
+      const rkt = snap.stocks.find((x) => x.ticker === "RKT")!;
+      const sofi = snap.stocks.find((x) => x.ticker === "SOFI")!;
+      [rkt.ticker, sofi.ticker] = ["NEW", "RKT"];
+      e.ASSETS = { fetch: async () => new Response(JSON.stringify(snap)) };
+      assert.deepEqual(await (await worker.fetch(req("/api/intents"), e as never)).json(), { NEW: { backers: 1, usd: 250 } });
+      // and a token dropped from the snapshot drops from the board
+      snap.stocks = snap.stocks.filter((x) => x !== rkt);
+      assert.deepEqual(await (await worker.fetch(req("/api/intents"), e as never)).json(), {});
+    },
+  ],
+  [
+    "the demand export comes in pages, and next continues it (Codex r2 #9)",
+    async () => {
+      const e = env() as unknown as { INTENTS: ReturnType<typeof memStore> };
+      const at = Math.floor(Date.now() / 1000) + 86_400;
+      const ins = e.INTENTS.db.prepare("INSERT INTO intents VALUES (?, ?, 'RKT', 'X', 1, ?, 1, '0x', 0)");
+      for (let i = 0; i < 1203; i++) ins.run("0xrkt", `0x${String(i).padStart(40, "0")}`, at);
+      const seen = new Set<string>();
+      let after: string | null = "";
+      let pages = 0;
+      do {
+        const body = (await (await worker.fetch(req(`/api/demand${after ? `?after=${after}` : ""}`), e as never)).json()) as { intents: { address: string }[]; next: string | null };
+        assert.ok(body.intents.length <= 500);
+        for (const it of body.intents) seen.add(it.address);
+        after = body.next;
+        pages++;
+      } while (after);
+      assert.equal(seen.size, 1203);
+      assert.equal(pages, 3);
+    },
+  ],
+  [
+    "a nonce far ahead is refused, so it cannot lock the wallet out (Codex r2 #11)",
+    async () => {
+      const e = env();
+      const a = privateKeyToAccount(generatePrivateKey());
+      assert.equal((await intent(e, a, "RKT", 10, "203.0.113.7", undefined, { nonce: Date.now() + 365 * 86_400_000 })).status, 400);
+      assert.equal((await intent(e, a, "RKT", 10)).status, 200);
+    },
+  ],
+  [
+    "a request with no country is refused (Codex r1 #6)",
+    async () => {
+      const r = new Request("https://summon.test/api/intents", { headers: { "cf-connecting-ip": "203.0.113.7" } });
+      assert.equal((await worker.fetch(r as never, env())).status, 451);
     },
   ],
   [

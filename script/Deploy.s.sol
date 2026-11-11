@@ -9,6 +9,8 @@ import {SummonHook, ISummonRegistry} from "../src/SummonHook.sol";
 import {TestUSDC} from "../src/testnet/TestUSDC.sol";
 import {DemoOracleRegistry} from "../src/testnet/DemoOracleRegistry.sol";
 import {GuardPriceFeed} from "../src/testnet/GuardPriceFeed.sol";
+import {SummonSwap, ISummonPools} from "../src/SummonSwap.sol";
+import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
 
 /// Deploys Summon on Base Sepolia, except the B20 stock (created with the B20 factory precompile by
 /// ts/create-stock.ts, which forge cannot simulate). Then lists that stock against its price feed:
@@ -22,7 +24,8 @@ contract Deploy is Script {
     address constant PYTH = 0xA2aa501b19aff244D90cc15a4Cf739D2725B5729; // Pyth Core, Base Sepolia
     address constant POLICY_REGISTRY = 0x8453000000000000000000000000000000000002; // B20 precompile
     uint160 constant FLAG_MASK = (1 << 14) - 1;
-    uint160 constant BEFORE_INITIALIZE = 1 << 13;
+    // SummonHook's flags (§5.5): BEFORE_INITIALIZE | BEFORE_ADD_LIQUIDITY | BEFORE_SWAP
+    uint160 constant HOOK_FLAGS = (1 << 13) | (1 << 11) | (1 << 7);
 
     struct Out {
         address stock;
@@ -33,6 +36,7 @@ contract Deploy is Script {
         address guardFeed;
         address hook;
         address factory;
+        address swap;
         address source;
     }
 
@@ -52,8 +56,10 @@ contract Deploy is Script {
         o.hook = address(hook);
         o.factory = address(_deployFactory(o, me));
         hook.setFactory(ISummonRegistry(o.factory));
+        o.swap = address(new SummonSwap(IPoolManager(POOL_MANAGER), ISummonPools(o.factory)));
         o.source = usePyth ? PYTH : o.guardFeed;
-        SummonFactory(o.factory).list(o.stock, o.source, o.priceId);
+        // a guard posts one price at a time: 60 s; Pyth, where the filler supplies the update: 5 s
+        SummonFactory(o.factory).list(o.stock, o.source, o.priceId, o.source == o.guardFeed ? 60 : 10, o.source != o.guardFeed);
         vm.stopBroadcast();
 
         _write(o);
@@ -92,7 +98,6 @@ contract Deploy is Script {
                 windowSeconds: 3600,
                 maxAuctions: 3,
                 maxGuardAge: 300,
-                maxPythAge: 60,
                 maxConfBps: 50,
                 maxJumpBps: 300,
                 cooldownSeconds: 3600
@@ -112,16 +117,17 @@ contract Deploy is Script {
         vm.serializeAddress(k, "pyth", PYTH);
         vm.serializeAddress(k, "guardFeed", o.guardFeed);
         vm.serializeAddress(k, "priceSource", o.source);
+        vm.serializeAddress(k, "swap", o.swap);
         string memory json = vm.serializeAddress(k, "factory", o.factory);
         vm.writeJson(json, string.concat("deployments/", vm.toString(block.chainid), ".json"));
     }
 
-    /// A CREATE2 salt whose hook address has BEFORE_INITIALIZE as its only flag bit.
+    /// A CREATE2 salt whose hook address carries exactly SummonHook's flag bits.
     function mineHookSalt(bytes32 initHash) public pure returns (bytes32 salt, address addr) {
         for (uint256 i; i < 1_000_000; ++i) {
             salt = bytes32(i);
             addr = address(uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), CREATE2_DEPLOYER, salt, initHash)))));
-            if (uint160(addr) & FLAG_MASK == BEFORE_INITIALIZE) return (salt, addr);
+            if (uint160(addr) & FLAG_MASK == HOOK_FLAGS) return (salt, addr);
         }
         revert("no salt");
     }

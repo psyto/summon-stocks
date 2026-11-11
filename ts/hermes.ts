@@ -6,8 +6,20 @@ import { env } from "./env.js";
  * (Pyth Terminal, app.pyth.com). Keep it server-side: browsers must not embed it.
  */
 export async function latestUpdate(priceId: Hex): Promise<{ data: Hex[]; price: bigint; expo: number; publishTime: number }> {
+  return hermes(priceId, "latest");
+}
+
+/**
+ * The first update published at or after `at` (unix seconds): what a round on a pull listing settles on
+ * (SummonRound.settleTime, through Pyth's parsePriceFeedUpdatesUnique).
+ */
+export async function updateAt(priceId: Hex, at: number) {
+  return hermes(priceId, String(at));
+}
+
+async function hermes(priceId: Hex, when: string): Promise<{ data: Hex[]; price: bigint; expo: number; publishTime: number }> {
   const base = env("HERMES_URL", "https://hermes.pyth.network");
-  const url = `${base}/v2/updates/price/latest?ids%5B%5D=${priceId.slice(2)}&encoding=hex&parsed=true`;
+  const url = `${base}/v2/updates/price/${when}?ids%5B%5D=${priceId.slice(2)}&encoding=hex&parsed=true`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${env("PYTH_API_KEY")}` } });
   if (!res.ok) throw new Error(`Hermes ${res.status}: ${await res.text()}`);
   const body = (await res.json()) as {

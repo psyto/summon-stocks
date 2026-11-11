@@ -1,8 +1,8 @@
 /**
  * Spec 001 A1 on Base Sepolia: three demo backers pledge to target, start the auction, the demo filler
  * fills, backers claim. Prints every transaction. Picks up the stock's open round where it stands (other
- * people may already have pledged); opens a new round only if none is open. Needs the market open (09:30-16:00 ET
- * on weekdays) and the guard running; with PRICE_SOURCE=pyth deployments, also PYTH_API_KEY.
+ * people may already have pledged); opens a new round only if none is open. Needs the market open (09:45-15:35 ET on trading
+ * days) and the guard running; with PRICE_SOURCE=pyth deployments, also PYTH_API_KEY.
  *
  *   npm run e2e                 # GME; target 300 tUSDC, fill after 120 s
  *   TICKER=AMC npm run e2e       # another demo stock
@@ -11,7 +11,10 @@
 import { decodeEventLog, parseUnits, type Abi, type Hex } from "viem";
 import { STATES, b20Abi, erc20Abi, guardFeedAbi, pythAbi, roundAbi, summonFactoryAbi } from "./abi.js";
 import { account, deployment, publicClient, wallet, type ROLES } from "./env.js";
-import { latestUpdate } from "./hermes.js";
+import { updateAt } from "./hermes.js";
+
+/** The settlement window of a pull listing; Deploy.s.sol lists Pyth with 10. */
+const PYTH_WINDOW_SECONDS = 10;
 
 const pc = publicClient();
 const d0 = deployment() as ReturnType<typeof deployment> & { demoStocks?: { ticker: string; symbol: string; address: Hex; priceId: Hex }[] };
@@ -40,17 +43,55 @@ async function send(role: keyof typeof ROLES, step: string, req: Call) {
   return r;
 }
 
-/** Hermes update data for real Pyth; nothing for GuardPriceFeed, which the guard keeps posting to. */
-async function pythArgs(): Promise<{ data: Hex[]; fee: bigint }> {
+/** Pyth's revert when an update holds no print in the band asked for: PriceFeedNotFoundWithinRange(). */
+const NO_PRINT = /PriceFeedNotFoundWithinRange|0x45805f5d/;
+
+/**
+ * Hermes update data for real Pyth; nothing for GuardPriceFeed, which the guard keeps posting to. A pull
+ * listing settles on the first print at or after the start of the previous window (SummonRound.settleTime),
+ * so this fetches that print and waits, if needed, until the next block falls in the window it was built for.
+ * `after` skips bands up to and including that one.
+ */
+async function pythArgs(after = -1): Promise<{ data: Hex[]; fee: bigint; band: number }> {
   if (d.priceSource.toLowerCase() === d.guardFeed.toLowerCase()) {
     console.log("  price: GuardPriceFeed (the guard must be running)");
-    return { data: [], fee: 0n };
+    return { data: [], fee: 0n, band: -1 };
   }
-  const u = await latestUpdate(d.priceId);
+  const w = PYTH_WINDOW_SECONDS;
+  const sleep = (s: number) => new Promise((r) => setTimeout(r, s * 1000));
+  let next: number;
+  for (;;) {
+    next = Number((await pc.getBlock()).timestamp) + 2; // Base: a block every 2 s
+    if (Math.floor(next / w) * w - w <= after) await sleep(2); // that band was tried already
+    else if (next % w > w - 4) await sleep(w - (next % w) + 1); // too close to the band's end
+    else if (next % w < 2) await sleep(2); // gas is estimated on the latest block, which must share the band
+    else break;
+  }
+  const band = Math.floor(next / w) * w - w;
+  const u = await updateAt(d.priceId, band);
   const fee = await pc.readContract({ address: d.pyth, abi: pythAbi, functionName: "getUpdateFee", args: [u.data] });
-  const age = Math.floor(Date.now() / 1000) - u.publishTime;
-  console.log(`  Pyth GME ${Number(u.price) * 10 ** u.expo} (${age} s old)`);
-  return { data: u.data, fee };
+  console.log(`  Pyth ${demo.ticker} ${Number(u.price) * 10 ** u.expo}, the first print at or after ${band} (published ${u.publishTime})`);
+  return { data: u.data, fee, band };
+}
+
+/**
+ * startAuction or fill with the price they need. A pull listing can meet a 10 s band in which Pyth printed
+ * nothing while the next band has a price, so on that refusal alone it moves to a later band, up to three
+ * bands in all (Codex r5 #3, r6 #3); any other refusal (a halt, a policy, a stale guard) stops the run.
+ */
+async function priced(role: keyof typeof ROLES, fn: "startAuction" | "fill", round: Hex) {
+  const pull = d.priceSource.toLowerCase() !== d.guardFeed.toLowerCase();
+  let band = -1;
+  for (let tries = pull ? 3 : 1; ; tries--) {
+    const p = await pythArgs(band);
+    band = p.band;
+    try {
+      return await send(role, fn, { address: round, abi: roundAbi, functionName: fn, args: [p.data], value: p.fee });
+    } catch (e) {
+      if (tries <= 1 || !NO_PRINT.test(String((e as Error).message))) throw e;
+      console.log(`  ${fn}: Pyth printed nothing in the band from ${band}; trying a later one`);
+    }
+  }
 }
 
 /**
@@ -119,15 +160,13 @@ async function main() {
   }
 
   if (state === "Funded") await guardPrice();
-  let p = await pythArgs();
   if (state === "Funded") {
-    await send("operator", "startAuction", { address: round, abi: roundAbi, functionName: "startAuction", args: [p.data], value: p.fee });
+    await priced("operator", "startAuction", round);
     console.log(`waiting ${wait} s for the spread to rise`);
     await new Promise((r) => setTimeout(r, wait * 1000));
   }
   await send("filler", `filler: approve ${demo.symbol}`, { address: d.stock, abi: b20Abi, functionName: "approve", args: [round, 2n ** 255n] });
-  p = await pythArgs();
-  await send("filler", "fill", { address: round, abi: roundAbi, functionName: "fill", args: [p.data], value: p.fee });
+  await priced("filler", "fill", round);
 
   const [spread, ref, owed, liq] = await Promise.all([
     pc.readContract({ address: round, abi: roundAbi, functionName: "currentSpreadBps" }),

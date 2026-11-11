@@ -1,7 +1,10 @@
 # 001: Summon — backers bring a stock onto Base
 
-Status: draft r3 (Claude): r2 answering docs/reviews/001-spec-r1-claude.md, plus two decisions made while
-implementing it (section 2a). Prepared for Base "Stocksmaxxing",
+Status: draft r5 (Claude, 2026-11-11): r4 after Codex reviews r1-r3 (docs/reviews): a pull price taken
+at a set time (5.1), round terms and replacement (2a), and an issuer pause that stops swaps (5.5); target
+bounds and the auction-start cutoff after r6 (2a). r4
+(2026-11-08) was r3 plus a pool that knows the stock's market (5.5, 5.5a) and US session edges (5.2 item 9). r3 was r2 answering docs/reviews/001-spec-r1-claude.md, plus two decisions
+made while implementing it (section 2a). Prepared for Base "Stocksmaxxing",
 track Programmable Stock Markets, submission 2026-12-05. Testnet only.
 
 ## 1. Why
@@ -47,13 +50,31 @@ Non-goals:
 - **The owner binds each token to its Pyth feed, once** (`SummonFactory.list(token, priceId)`). In r2 the
   summoner chose the feed id, so anyone could open a GME round priced off another stock's feed, and a
   filler would then deliver GME at that other stock's price. Summoners open rounds only for listed tokens.
-- **The price source is per listing** (`list(token, source, priceId)`): Pyth Core, or the testnet-only
+- **The price source is per listing** (`list(token, source, priceId, maxAge, pull)`): Pyth Core (pull), or the testnet-only
   `GuardPriceFeed` (Pyth's read interface, written by the guard). Hermes needs an API key since
   2026-08-26, and the onchain GME price on Base Sepolia was last pushed in April 2025, so the testnet demo
   defaults to the guard feed. Both sources go through the same 5.1/5.2 checks. The guard's price is the
   HIP-3 oracle price on Hyperliquid (public chain state, no key) since 2026-11-09; before that it read
   Nasdaq.com's quote endpoint, whose terms forbid automated capture. It is demo data: a HIP-3 deployer
   sets it.
+- **Round terms are bounded, and a stalled round can be replaced** (r5, Codex r2 #8, r3 #1). A round lasts
+  at most 30 days and locks its LP at most 30 days. An Open round at least a day old that is **behind pace**
+  may be replaced by a new `openRound` (Codex r3 #1, r4 #2, r5 #1). Behind pace: less than half the pledges
+  that a steady climb to the target by the deadline would have by now. The factory cancels the old round in
+  the same transaction (it becomes Expired, so every pledge in it is refundable and no new pledge can land
+  in it). A round on pace is never cancelled, however small its pledges. To hold a ticker, a squatter must
+  keep a growing share of the target locked (half of it by the deadline), and at the target the round is
+  Funded, where anyone may start its auctions; after three that nobody fills it is Expired. A squatter's
+  reachable target can simply be filled by other backers. On testnet tUSDC is free to mint, so none of this
+  costs a griefer money there; on mainnet it is real USDC, and the minimum target applies.
+- **Every target lies between 10 and 10^9 USDC** (r5, Codex r6 #1), whatever the owner's minimum says. The
+  cap keeps the pace check from overflowing, which would make a round impossible to replace. The pool's seed
+  must also be at least 10^4 raw token units (Codex r7 #2), so rounding moves its price by at most 1 bp; a
+  target too small for the token's decimals and price cannot start its auction, and the round expires and
+  refunds.
+- **No auction outlives its round** (r5, Codex r6 #4). `startAuction` is refused unless the whole auction
+  window ends by the deadline, and a round's deadline must leave room for one window. A round funded in its
+  last hour expires and refunds.
 - **A minimum target, set later** (`SummonFactory.setMinTarget`, 0 on testnet). A tiny round cannot cover
   a filler's fixed cost per mint (at most 1% of a $300 round is $3). The number comes from issuers' real
   costs, asked after the hackathon; it is not guessed now. Before money is asked for, signed intents show
@@ -104,7 +125,24 @@ Open ──(pledged == target)──> Funded ──startAuction()──> Auction
 ### 5.1 Reference price and units
 - Source: the Pyth pull oracle on Base Sepolia (`0xA2aa501b19aff244D90cc15a4Cf739D2725B5729`, which has
   code). Feed `Equity.US.<TICKER>/USD`, with the id fixed at round open. The filler passes `updateData` into
-  `fill()` (paying the Pyth fee). The round reads `getPriceNoOlderThan(id, maxAge)` with `maxAge` = 60 s.
+  `fill()` (paying the Pyth fee). Each listing says how its price is read (r5, Codex r1 #1, r2 #1, r3 #2):
+  - **Pull** (Pyth, where the caller supplies the update): a start or fill settles on **the first print
+    published at or after `settleTime`**, the start of the previous window of `w` seconds (`w` = 10;
+    `settleTime = floor(now / w) × w − w`), through Pyth's `parsePriceFeedUpdatesUnique` and
+    hl-price-guard's `PythRef.readFirstAfter`. The block sets the time, so a filler cannot pick a favorable
+    print from several; it can only choose when to fill, as in any auction. A transaction built for one
+    window lands any time in the next `w` seconds, and the print is at most `2w` old.
+  - Choosing the band is choosing when to fill (Codex r4 #1), and it stays allowed: every fill settles on
+    the market's price at that time, plus a spread capped at `maxSpreadBps` and shown before anyone pledges,
+    and the jump latch refuses a price more than `maxJumpBps` from the start. Fixing one settlement time at
+    the start instead would be worse: for the whole window (an hour) the filler would hold an option to
+    fill at a known, aging price after the market had moved. A band in which Pyth printed nothing has no
+    price; the next band does (equity feeds print several times a second in the session), and the filler
+    script tries the next band.
+  - **Push** (the testnet `GuardPriceFeed`, written by a trusted guard): the latest stored price, at most
+    `maxAge` = 60 s old.
+  - A fill also needs a price published after `auctionStart`, so it never settles on the print that
+    started the auction.
 - Pyth gives the **underlying share price** (`price × 10^expo`). The B20 token is worth underlying ×
   multiplier per whole token (Base docs: "Token Price = Underlying Equity Market Price × Multiplier").
   So, on this path, Summon **must** apply the multiplier, using `multiplier()` (WAD). This is the opposite
@@ -125,7 +163,8 @@ Open ──(pledged == target)──> Funded ──startAuction()──> Auction
 1. Lifecycle state, per section 4.
 2. Market state: `MarketStateRegistry.stateOf(token)` reports not halted, `updatedAt` is within
    `maxGuardAge`, and `now >= resumeAfter`. Fail closed.
-3. Price is fresh (60 s) and the confidence bound holds (5.1). Pyth equity feeds stop publishing outside
+3. Price is the listing's (5.1: the first print after `settleTime` for pull, at most 60 s old for push)
+   and the confidence bound holds. Pyth equity feeds stop publishing outside
    the session, so this check also enforces session hours.
 4. Issuer registry, mainnet shape `getOracleParams(address) → (uint256 multiplier, bool paused)`
    (selector `0xd4197e82`; ABI inferred from the selector name and decoded output, so treat it as
@@ -145,6 +184,10 @@ Open ──(pledged == target)──> Funded ──startAuction()──> Auction
    recorded at `startAuction`. Otherwise `fill` reverts, and the round can only return to Funded when the
    window ends. This uses hl-price-guard's `JumpLatch` with the anchor set by `startAuction`. Re-arming
    happens only through a new `startAuction`.
+9. US equity session edges (r4): the guard reports the session closed in the first 15 minutes after the
+   open and the last 25 minutes before the close (09:30-09:45 and 15:35-16:00 ET; 12:35-13:00 on early
+   closes). Those are the periods when US Limit Up-Limit Down bands are doubled, and quotes and Pyth's
+   confidence are widest. Exchange holidays and early closes come from market-state `v0.2.0`.
 
 ### 5.3 What a fill moves
 Let `P = target`, `U_lp = P × lpBps / 1e4` (default `lpBps` = 2000), and `U_f = P − U_lp`.
@@ -160,11 +203,42 @@ Let `P = target`, `U_lp = P × lpBps / 1e4` (default `lpBps` = 2000), and `U_f =
 - `claim()` transfers the backer's tokens. If a policy rejects the backer, it reverts with `NotAuthorized`.
   The tokens stay claimable, and the round never redirects them.
 
-### 5.5 Pool
-- PoolKey = (token, USDC, fee 3000, tickSpacing 60, hooks = `SummonHook`). `SummonHook.beforeInitialize`
-  requires `sender` to be a round registered in the factory for that token. Nobody else can initialize the
-  key, so there is no "join an existing pool" branch.
-- Seed full range at `ref` (no spread), so the pool does not open overpriced.
+### 5.5 Pool: a pool that knows the stock's market (r4, 2026-11-08)
+- PoolKey = (token, USDC, dynamic fee, tickSpacing 60, hooks = `SummonHook`). The hook's address carries
+  three flags: BEFORE_INITIALIZE, BEFORE_ADD_LIQUIDITY and BEFORE_SWAP.
+- `beforeInitialize` and `beforeAddLiquidity`: only the round registered for the key may initialize it or
+  add liquidity. Nobody can create the pool first at a bad price, and the position in the pool is the
+  backers' alone, which `realign` (5.5a) relies on. Removing liquidity is not gated (only the round has any).
+- Seed full range at `ref` (no spread), so the pool does not open overpriced. The round records the
+  token's multiplier at the fill as `poolMultiplier`.
+- `beforeSwap` reads the same sources as the fill conditions (5.2), and applies these rules in order:
+  1. **Corporate action window: no swaps.** The token's `effectiveAt()` is non-zero and within
+     `[now − cooldown, now + cooldown]`. The same window as 5.2 item 5.
+  2. **Stale multiplier: no swaps.** `multiplier()` differs from `poolMultiplier`. One token is now worth
+     a different number of shares, so the pool's price is wrong by that ratio, and the first trader would
+     take the difference from the backers. Swaps resume after `realign` (5.5a). The round's own swap
+     inside `realign` is the one exception.
+  3. **Halted: no swaps.** The market state says halted for any reason other than "session closed"
+     (primary halt, bad print, corporate action, manual, issuer paused), or `now < resumeAfter`. When the
+     listing exchange stops trading, nobody knows the price. Also the issuer registry (5.2 item 4):
+     `paused`, or a multiplier that differs from the token's, stops swaps as it stops fills (r5, Codex r3 #4).
+  4. **Closed: a higher fee.** The state says "session closed", or the guard has not confirmed it within
+     `maxGuardAge`. Swaps pay `CLOSED_FEE` (1.00%) instead of `OPEN_FEE` (0.30%). Trading on Base does not
+     stop at night, but the price cannot be checked against the listing exchange, so the backers, who are
+     the LPs, are paid more for that risk.
+  5. Otherwise, `OPEN_FEE` (0.30%).
+
+### 5.5a Realign after a corporate action
+- `realign()` on the round: anyone may call it once the corporate action window has passed and
+  `multiplier()` differs from `poolMultiplier`. In one unlock it removes the whole position, moves the
+  now-empty pool's price by `multiplier / poolMultiplier` (a swap with no liquidity moves the price and
+  nothing else), and adds the liquidity back at the new price. Then `poolMultiplier` takes the new value.
+- No price source is read. The new price is the pool's own price scaled by the issuer's multiplier, so a
+  caller cannot choose it.
+- What does not fit at the new ratio stays in the round and is added to what backers receive at
+  `unwindLP` (5.6).
+- Before the LP lock ends this is the only way to resume trading after an action. After the lock,
+  backers may also unwind instead.
 
 ### 5.6 LP unwind
 - One position, held by the round. After `lpLock` (default 7 days in the demo), anyone can call
@@ -209,7 +283,7 @@ Let `P = target`, `U_lp = P × lpBps / 1e4` (default `lpBps` = 2000), and `U_f =
   updates for a real ticker, mapped to the demo token.
 
 ## 8. Own parts used (dogfooding)
-- market-state (`fabrknt/market-state` v0.2.0, public; v0.3.0 on the `stock-aware-pool` branch): `MarketStateRegistry`, `MarketStateCheck.requireOpen`
+- market-state (`fabrknt/market-state` v0.3.0, public): `MarketStateRegistry`, `MarketStateCheck.requireOpen`
   (5.2-2), and the TypeScript guard for Nasdaq halts. Extracted from an earlier private project on
   2026-11-07, so that a judge's fresh clone builds. Copying the code into Summon was not an option.
 - hl-price-guard (`fabrknt/hl-price-guard` v0.3.2, public): `PythRef.readFresh` (added for Summon), `JumpLatch` with an anchor (5.2-8), and the
@@ -243,8 +317,9 @@ Let `P = target`, `U_lp = P × lpBps / 1e4` (default `lpBps` = 2000), and `U_f =
 - 12-04: video, X post (@buildonbase), submission form; 12-05 is spare.
 
 ## 11. Open questions / weakest points
-1. The Pyth `updateData` is chosen by the filler. Can a filler pick a favorable price inside the 60 s
-   window, and is the confidence bound enough? Should the window be 15 s?
+1. ~~The Pyth `updateData` is chosen by the filler.~~ Answered in r5: a pull listing settles on the first
+   print after a time the block sets (5.1). Open: is a 10 s window right for Base's 2 s blocks and Hermes
+   latency?
 2. Halts: does Pyth keep publishing during an LULD halt? If it does, the guard is the only defense. How long
    does the guard take to see a halt in the Nasdaq RSS?
 3. Policies can change between `fill` and `claim`, which leaves tokens stuck in the round. Is that

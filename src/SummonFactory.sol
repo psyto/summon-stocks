@@ -13,7 +13,6 @@ contract SummonFactory {
         uint32 windowSeconds;
         uint8 maxAuctions;
         uint32 maxGuardAge;
-        uint32 maxPythAge;
         uint16 maxConfBps;
         uint16 maxJumpBps;
         uint32 cooldownSeconds;
@@ -26,14 +25,38 @@ contract SummonFactory {
     struct Feed {
         address source; // Pyth, or a feed with Pyth's read interface
         bytes32 priceId;
+        // Push feed (a trusted guard posts one price at a time): the oldest price a round accepts. Pull feed
+        // (Pyth, where the caller supplies the update): the settlement window; a round settles on the first
+        // print at or after the start of the previous window, which no caller chooses (Codex r2 #1, r3 #2).
+        uint32 maxAge;
+        bool pull;
     }
 
-    /// The smallest target a round may have, in USDC (6 decimals). 0 = no minimum (testnet). Set from what
+    /// A round lasts at most this long, and locks its LP position at most this long, so nobody can hold a
+    /// ticker's only round open for good (Codex r2 #8).
+    uint64 public constant MAX_ROUND_SECONDS = 30 days;
+    uint32 public constant MAX_LP_LOCK_SECONDS = 30 days;
+    /// A round nobody has pledged to may be replaced this long after it opened.
+    uint64 public constant REPLACE_UNPLEDGED_AFTER = 1 days;
+    /// An Open round at least a day old that is behind pace may be replaced; the factory cancels it in the
+    /// same transaction and every pledge in it refunds. Behind pace: less than half the pledges a steady
+    /// climb to the target by the deadline would have by now (Codex r3 #1, r4 #2, r5 #1). To hold a ticker,
+    /// a squatter must keep a growing share of the target locked, and at the target the round is Funded,
+    /// where anyone may run its auctions. A round on pace is never cancelled, whatever its pledges' sizes.
+    uint16 public constant PACE_BPS = 5000;
+    /// Every round's target lies between these, in USDC (6 decimals), whatever minTarget says. The floor keeps
+    /// a funded round's LP share large enough to seed its pool; the cap keeps the pace check from overflowing,
+    /// which would make a round impossible to replace (Codex r6 #1).
+    uint256 public constant MIN_TARGET = 10e6;
+    uint256 public constant MAX_TARGET = 1e15;
+
+    /// The smallest target a round may have, in USDC (6 decimals), above MIN_TARGET. 0 = only MIN_TARGET (testnet). Set from what
     /// a fill costs the filler (an issuer's fixed cost per mint), not guessed; the owner can change it.
     uint256 public minTarget;
 
     mapping(address token => Feed) public feedOf;
     mapping(address token => address) public latestRound;
+    mapping(address round => uint64) public openedAt;
     mapping(bytes32 keyHash => address) public roundForPool;
     address[] public rounds;
 
@@ -43,8 +66,9 @@ contract SummonFactory {
     error TokenLive(address round);
     error AlreadyListed(address token);
     error TargetTooSmall(uint256 target, uint256 minTarget);
+    error BadRoundTerms();
 
-    event Listed(address indexed token, address source, bytes32 priceId);
+    event Listed(address indexed token, address source, bytes32 priceId, uint32 maxAge, bool pull);
     event RoundOpened(address indexed token, address round, uint256 target, uint64 deadline, uint16 maxSpreadBps);
     event OwnerTransferred(address indexed newOwner);
     event MinTargetSet(uint256 minTarget);
@@ -70,29 +94,37 @@ contract SummonFactory {
         emit MinTargetSet(m);
     }
 
-    /// Binds a token to its price feed (source contract and feed id). Once, so a live round's feed can
-    /// never change under it.
-    function list(address token, address source, bytes32 priceId) external onlyOwner {
+    /// Binds a token to its price feed (source contract, feed id, oldest accepted price). Once, so a live
+    /// round's feed can never change under it.
+    function list(address token, address source, bytes32 priceId, uint32 maxAge, bool pull) external onlyOwner {
         if (feedOf[token].source != address(0)) revert AlreadyListed(token);
-        if (source == address(0) || priceId == bytes32(0)) revert NotListed(token);
-        feedOf[token] = Feed(source, priceId);
-        emit Listed(token, source, priceId);
+        if (source == address(0) || priceId == bytes32(0) || maxAge == 0) revert NotListed(token);
+        feedOf[token] = Feed(source, priceId, maxAge, pull);
+        emit Listed(token, source, priceId, maxAge, pull);
     }
 
     /// Anyone may open a round for a listed token, unless one is still running or one already filled
-    /// (the token then has its Summon pool, and the pool key can only be initialized once).
+    /// (the token then has its Summon pool, and the pool key can only be initialized once). A running
+    /// round that nobody has pledged to may be replaced a day after it opened.
     function openRound(address token, uint256 target, uint64 deadline, uint16 maxSpreadBps, uint32 lpLockSeconds)
         external
         returns (SummonRound round)
     {
         Feed memory feed = feedOf[token];
         if (feed.source == address(0)) revert NotListed(token);
-        if (target < minTarget) revert TargetTooSmall(target, minTarget);
+        if (target < minTarget || target < MIN_TARGET) {
+            revert TargetTooSmall(target, minTarget > MIN_TARGET ? minTarget : MIN_TARGET);
+        }
+        if (target > MAX_TARGET) revert BadRoundTerms();
+        if (deadline > block.timestamp + MAX_ROUND_SECONDS || lpLockSeconds > MAX_LP_LOCK_SECONDS) revert BadRoundTerms();
         address prev = latestRound[token];
         if (prev != address(0)) {
             SummonRound.State s = SummonRound(prev).state();
             if (s == SummonRound.State.Filled) revert TokenLive(prev);
-            if (s != SummonRound.State.Expired) revert RoundActive(prev);
+            bool stale = s == SummonRound.State.Open && block.timestamp >= openedAt[prev] + REPLACE_UNPLEDGED_AFTER
+                && _behindPace(SummonRound(prev), openedAt[prev]);
+            if (s != SummonRound.State.Expired && !stale) revert RoundActive(prev);
+            if (stale) SummonRound(prev).cancel();
         }
         Defaults memory df = defaults;
         round = new SummonRound(
@@ -110,13 +142,15 @@ contract SummonFactory {
                 maxAuctions: df.maxAuctions,
                 lpLockSeconds: lpLockSeconds,
                 maxGuardAge: df.maxGuardAge,
-                maxPythAge: df.maxPythAge,
+                maxPythAge: feed.maxAge,
+                pull: feed.pull,
                 maxConfBps: df.maxConfBps,
                 maxJumpBps: df.maxJumpBps,
                 cooldownSeconds: df.cooldownSeconds
             })
         );
         latestRound[token] = address(round);
+        openedAt[address(round)] = uint64(block.timestamp);
         roundForPool[keccak256(abi.encode(round.poolKey()))] = address(round);
         rounds.push(address(round));
         emit RoundOpened(token, address(round), target, deadline, maxSpreadBps);
@@ -128,5 +162,11 @@ contract SummonFactory {
 
     function getDeps() external view returns (SummonRound.Deps memory) {
         return deps;
+    }
+
+    /// pledged < PACE_BPS of target × (time since opening) / (deadline − opening).
+    function _behindPace(SummonRound r, uint64 opened) internal view returns (bool) {
+        SummonRound.Params memory rp = r.params();
+        return r.pledged() * 1e4 * (rp.deadline - opened) < rp.target * PACE_BPS * (block.timestamp - opened);
     }
 }

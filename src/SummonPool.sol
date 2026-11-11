@@ -4,13 +4,17 @@ pragma solidity 0.8.26;
 import {FullMath} from "v4-core/src/libraries/FullMath.sol";
 import {FixedPoint96} from "v4-core/src/libraries/FixedPoint96.sol";
 import {TickMath} from "v4-core/src/libraries/TickMath.sol";
+import {LPFeeLibrary} from "v4-core/src/libraries/LPFeeLibrary.sol";
 
 /// @title SummonPool
 /// @notice Spec 001 §5.5: the full-range seed. The starting price is the ratio of the two seed amounts,
-///         which were both computed at the reference price, so the pool opens at that price.
+///         which were both computed at the reference price, so the pool opens at that price. The fee is
+///         dynamic: SummonHook sets it on every swap from the stock's market state.
 library SummonPool {
     int24 internal constant TICK_SPACING = 60;
-    uint24 internal constant FEE = 3000;
+    uint24 internal constant FEE = LPFeeLibrary.DYNAMIC_FEE_FLAG;
+    uint24 internal constant OPEN_FEE = 3000; // 0.30%, while the listing exchange is open
+    uint24 internal constant CLOSED_FEE = 10_000; // 1.00%, while it is closed or the guard is quiet
 
     error RatioOutOfRange();
 
@@ -27,7 +31,7 @@ library SummonPool {
         if (amount0 == 0 || amount1 == 0) revert RatioOutOfRange();
         // ratio in Q192; reverts (FullMath) when amount1 / amount0 >= 2^64
         uint256 ratioX192 = FullMath.mulDiv(amount1, 1 << 192, amount0);
-        uint256 r = _sqrt(ratioX192);
+        uint256 r = sqrt(ratioX192);
         if (r < TickMath.MIN_SQRT_PRICE || r >= TickMath.MAX_SQRT_PRICE) revert RatioOutOfRange();
         return uint160(r);
     }
@@ -44,7 +48,15 @@ library SummonPool {
         return uint128(l);
     }
 
-    function _sqrt(uint256 x) private pure returns (uint256 z) {
+    /// `sqrtP` with the price scaled by `num / den` (§5.5a). The price is (sqrtP / 2^96)^2, so sqrtP scales
+    /// by sqrt(num / den); both are 1e18-scaled multipliers, taken to 1e36 first for precision.
+    function scaledSqrtPrice(uint160 sqrtP, uint256 num, uint256 den) internal pure returns (uint160) {
+        uint256 r = FullMath.mulDiv(sqrtP, sqrt(num * 1e18), sqrt(den * 1e18));
+        if (r < TickMath.MIN_SQRT_PRICE || r >= TickMath.MAX_SQRT_PRICE) revert RatioOutOfRange();
+        return uint160(r);
+    }
+
+    function sqrt(uint256 x) internal pure returns (uint256 z) {
         if (x == 0) return 0;
         z = x;
         uint256 y = (x >> 1) + 1;

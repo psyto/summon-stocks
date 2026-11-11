@@ -26,7 +26,7 @@ const INTERVAL_SECONDS = Number(process.env.GUARD_INTERVAL ?? "30"); // rounds a
 const HEARTBEAT_SECONDS = 240; // under the rounds' maxGuardAge of 300 s
 const HALTS_EVERY_SECONDS = 60; // the Trade Halt RSS page: "do not query the data more than once a minute"
 const HL_INFO = "https://api.hyperliquid.xyz/info";
-const policy: GuardPolicy = { market: { haltSync: true, issuerSync: false, badPrintBandBps: 0, session: "regular-hours", maxStateAgeSeconds: 300 } };
+const policy: GuardPolicy = { market: { haltSync: true, issuerSync: false, badPrintBandBps: 0, session: "core-hours", maxStateAgeSeconds: 300 } };
 const factoryAbi = parseAbi(["function latestRound(address) view returns (address)"]);
 const roundAbi = parseAbi(["function state() view returns (uint8)"]);
 

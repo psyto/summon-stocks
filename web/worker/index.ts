@@ -9,23 +9,27 @@
  * Each intent is an EIP-712 signature checked here. It names the stock by ticker and by its B20 contract
  * address, and the address must match the snapshot (Base's docs: identify stocks by address, since a
  * symbol can change). One intent per wallet per stock (a new one replaces the old). The demo wallets are refused, so the board never counts our own signatures.
+ *
+ * The intents live in one Durable Object (store.ts), which checks the nonce and the per-network limits
+ * and stores the intent in one step, keeps totals over unexpired intents only, and deletes expired ones
+ * (Codex r2 #3, #9). An intent may last at most MAX_EXPIRY_DAYS. A replacement must carry a higher nonce
+ * than any this wallet used for this stock, so an older signature cannot be posted again to restore it
+ * (Codex r1 #3). The demand export comes in pages of 500 (?after=<next> continues it).
  */
 import { verifyTypedData, getAddress, isAddress } from "viem";
+import { IntentStore, MAX_EXPIRY_DAYS } from "./store";
+
+export { IntentStore };
 
 interface Env {
   ASSETS: Fetcher;
-  INTENTS: KVNamespace;
+  INTENTS: DurableObjectNamespace;
   GEO_BLOCK?: string;
 }
 
 /** Projects that enable trading for US users are out of scope (Stocks Maxxing FAQ), and Coinbase
  * tokenized stocks are not offered to US persons. The whole site is closed to US visitors. */
 const BLOCKED_COUNTRIES = new Set(["US", "PR", "VI", "GU", "AS", "MP", "UM"]);
-
-/** Per IP: intent writes per hour, and new wallets per day (a cheap brake on one person signing from
- * many wallets; the board still says it counts wallets, not people). */
-const WRITES_PER_HOUR = 20;
-const NEW_WALLETS_PER_DAY = 5;
 
 const BLOCKED_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Summon</title>
 <style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#ecf0ec;color:#14211c;font:17px/1.5 system-ui,sans-serif;padding:24px}main{max-width:34em}h1{color:#0e4a3b;font-size:28px;margin:0 0 12px}</style></head>
@@ -57,10 +61,11 @@ const MAX_USD = 1_000_000;
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 
-type Summary = Record<string, { backers: number; usd: number }>;
-
-async function summary(env: Env): Promise<Summary> {
-  return ((await env.INTENTS.get("summary", "json")) as Summary | null) ?? {};
+/** The one IntentStore; every intent goes through it, one request at a time. */
+function store(env: Env) {
+  const s = env.INTENTS.get(env.INTENTS.idFromName("all"));
+  return (path: string, body?: unknown) =>
+    s.fetch(`https://store${path}`, body === undefined ? undefined : { method: "POST", body: JSON.stringify(body), headers: { "content-type": "application/json" } });
 }
 
 async function tickers(env: Env, req: Request): Promise<Map<string, { address: string; status: string; pyth: boolean }>> {
@@ -69,24 +74,20 @@ async function tickers(env: Env, req: Request): Promise<Map<string, { address: s
   return new Map(snap.stocks.map((s) => [s.ticker, { address: s.address, status: s.status, pyth: !!s.pythFeed }]));
 }
 
-async function underLimit(env: Env, req: Request, address: string, isNew: boolean): Promise<string | null> {
-  const ip = req.headers.get("cf-connecting-ip") ?? "local";
-  const hour = Math.floor(Date.now() / 3_600_000);
-  const day = Math.floor(Date.now() / 86_400_000);
-  const wKey = `rl:w:${ip}:${hour}`;
-  const writes = Number((await env.INTENTS.get(wKey)) ?? 0);
-  if (writes >= WRITES_PER_HOUR) return `Too many intents from this network this hour. Try again after ${new Date((hour + 1) * 3_600_000).toISOString().slice(11, 16)} UTC.`;
-  const aKey = `rl:a:${ip}:${day}`;
-  const wallets = new Set(((await env.INTENTS.get(aKey, "json")) as string[] | null) ?? []);
-  if (isNew && !wallets.has(address) && wallets.size >= NEW_WALLETS_PER_DAY) {
-    return `This network has signed from ${NEW_WALLETS_PER_DAY} wallets today. Intents count wallets, so the limit keeps one person from looking like many.`;
+/** { [ticker]: { backers, usd } }: the store's totals by token, named by the current snapshot. A token no
+ * longer in the snapshot is dropped (Codex r5 #2). */
+async function board(env: Env, req: Request): Promise<Record<string, { backers: number; usd: number }>> {
+  const [byToken, snap] = await Promise.all([
+    store(env)("/totals").then((r) => r.json() as Promise<Record<string, { backers: number; usd: number }>>),
+    tickers(env, req),
+  ]);
+  const tickerOf = new Map([...snap].map(([ticker, s]) => [s.address.toLowerCase(), ticker]));
+  const out: Record<string, { backers: number; usd: number }> = {};
+  for (const [token, row] of Object.entries(byToken)) {
+    const ticker = tickerOf.get(token);
+    if (ticker) out[ticker] = row;
   }
-  await env.INTENTS.put(wKey, String(writes + 1), { expirationTtl: 7200 });
-  if (!wallets.has(address)) {
-    wallets.add(address);
-    await env.INTENTS.put(aKey, JSON.stringify([...wallets]), { expirationTtl: 172_800 });
-  }
-  return null;
+  return out;
 }
 
 async function post(req: Request, env: Env): Promise<Response> {
@@ -104,6 +105,7 @@ async function post(req: Request, env: Env): Promise<Response> {
   if (!isAddress(token)) return json({ error: "token is not a contract address." }, 400);
   if (usd! < 1 || usd! > MAX_USD) return json({ error: `usd must be between 1 and ${MAX_USD}.` }, 400);
   if (expiry! < Date.now() / 1000) return json({ error: "This intent has expired. Sign a new one." }, 400);
+  if (expiry! > Date.now() / 1000 + MAX_EXPIRY_DAYS * 86_400) return json({ error: `An intent may last at most ${MAX_EXPIRY_DAYS} days.` }, 400);
   const known = (await tickers(env, req)).get(ticker);
   if (!known) return json({ error: `${ticker} is not a registered tokenized stock.` }, 400);
   if (getAddress(token) !== getAddress(known.address)) return json({ error: `token is not the registered contract for ${ticker} (${known.address}).` }, 400);
@@ -120,48 +122,40 @@ async function post(req: Request, env: Env): Promise<Response> {
   }).catch(() => false);
   if (!ok) return json({ error: "The signature does not match this address and intent." }, 401);
 
-  const key = `i:${token.toLowerCase()}:${address.toLowerCase()}`;
-  const prev = (await env.INTENTS.get(key, "json")) as { usd: number } | null;
-  const limited = await underLimit(env, req, address.toLowerCase(), !prev);
-  if (limited) return json({ error: limited }, 429);
-  await env.INTENTS.put(key, JSON.stringify({ ticker, token: getAddress(token), usd, expiry, nonce, signature, at: Date.now() }));
-  const s = await summary(env);
-  const row = s[ticker] ?? { backers: 0, usd: 0 };
-  s[ticker] = { backers: row.backers + (prev ? 0 : 1), usd: row.usd - (prev?.usd ?? 0) + usd! };
-  await env.INTENTS.put("summary", JSON.stringify(s));
-  return json({ ok: true, ticker, ...s[ticker] });
+  // the page signs Date.now(): a nonce far ahead would lock this wallet out of the stock (Codex r2 #11)
+  if (nonce! > Date.now() + 86_400_000) return json({ error: "nonce is too far ahead. Check your device's clock and sign again." }, 400);
+  // the nonce is the signing time in ms, and an intent lasts at most MAX_EXPIRY_DAYS from it, so the store can
+  // forget a nonce once that long has passed (Codex r3 #3)
+  if (expiry! > nonce! / 1000 + MAX_EXPIRY_DAYS * 86_400) return json({ error: `An intent may last at most ${MAX_EXPIRY_DAYS} days from when it was signed (its nonce).` }, 400);
+  const ip = req.headers.get("cf-connecting-ip") ?? "local";
+  const r = await store(env)("/put", { ticker, token: getAddress(token), address: address.toLowerCase(), usd, expiry, nonce, signature, ip });
+  return json(await r.json(), r.status);
 }
 
 async function demand(req: Request, env: Env): Promise<Response> {
-  const ticker = new URL(req.url).searchParams.get("ticker");
+  const q = new URL(req.url).searchParams;
+  const ticker = q.get("ticker");
   const only = ticker ? (await tickers(env, req)).get(ticker)?.address.toLowerCase() : undefined;
   if (ticker && !only) return json({ error: `${ticker} is not a registered tokenized stock.` }, 400);
-  const rows: Record<string, unknown>[] = [];
-  let cursor: string | undefined;
-  do {
-    const page = await env.INTENTS.list({ prefix: only ? `i:${only}:` : "i:", cursor });
-    for (const k of page.keys) {
-      const address = k.name.split(":")[2];
-      const v = (await env.INTENTS.get(k.name, "json")) as { ticker: string; token: string; usd: number; expiry: number; nonce: number; signature: string } | null;
-      if (!v || v.expiry < Date.now() / 1000) continue;
-      rows.push({ ticker: v.ticker, token: v.token, address, usd: v.usd, expiry: v.expiry, nonce: v.nonce, signature: v.signature });
-    }
-    cursor = page.list_complete ? undefined : page.cursor;
-  } while (cursor);
-  return json({ domain: DOMAIN, types: TYPES, primaryType: "Intent", intents: rows });
+  const p = new URLSearchParams();
+  if (only) p.set("token", only);
+  if (q.get("after")) p.set("after", q.get("after")!);
+  const page = (await (await store(env)(`/demand?${p}`)).json()) as { intents: unknown[]; next: string | null };
+  return json({ domain: DOMAIN, types: TYPES, primaryType: "Intent", ...page });
 }
 
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const country = (req as Request & { cf?: { country?: string } }).cf?.country;
-    if (env.GEO_BLOCK !== "off" && country && BLOCKED_COUNTRIES.has(country)) {
+    // an unknown country is refused too (Codex r1 #6); local development sets GEO_BLOCK=off
+    if (env.GEO_BLOCK !== "off" && (!country || BLOCKED_COUNTRIES.has(country))) {
       if (new URL(req.url).pathname.startsWith("/api/")) return json({ error: "Summon is not available in the United States." }, 451);
       return new Response(BLOCKED_PAGE, { status: 451, headers: { "content-type": "text/html; charset=utf-8" } });
     }
     const url = new URL(req.url);
     if (url.pathname === "/api/demand" && req.method === "GET") return demand(req, env);
     if (url.pathname === "/api/intents") {
-      if (req.method === "GET") return json(await summary(env));
+      if (req.method === "GET") return json(await board(env, req));
       if (req.method === "POST") return post(req, env);
       return json({ error: "Use GET or POST." }, 405);
     }
