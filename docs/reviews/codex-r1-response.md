@@ -88,3 +88,15 @@ CHANGES on the rest.
 | 4 minor | An auction started in the last hour runs past the deadline | `startAuction` is refused unless the window ends by the deadline (`TooLateToStart`); a round's deadline must leave room for one window; the page disables the button and says why | `test_noAuctionPastTheDeadline`. Without the check it fails |
 
 `forge test`: 55.
+
+## Codex r7 (2026-11-11): what changed
+
+Codex r7 ([codex-r7.md](codex-r7.md)) found r6 #4 fixed, r6 #3 fixed in code (no test: it is the e2e script,
+checked on the next live run) and verdict CHANGES on two points.
+
+| # | Finding | Fix | Test |
+|---|---|---|---|
+| 1 blocker | `SummonFactory` is 27,975 bytes, over EIP-170, so it cannot deploy | `via_ir = true` in foundry.toml (the deploy script builds with it): 23,071 bytes. Under IR a test's `block.timestamp` can keep its value from before `vm.warp`, so the tests read time with `vm.getBlockTimestamp()` | `test_seedLargeEnoughToPrice` asserts the factory's deployed size is under 24,576 |
+| 2 major | The 10 USDC floor does not make every seed priceable: a 6-decimal token at $9m gives a 1-unit seed (fill reverts) or one priced far off the reference | `MIN_SEED_UNITS` 10^4: `startAuction` and `fill` refuse a seed below it (`SeedTooSmall`), so rounding moves the seed's price and the filler's delivery by at most 1 bp; such a round expires and refunds | `test_seedLargeEnoughToPrice` (6-decimal token: refused at $9m, starts at $23.45, refunds after expiry). Without the check at start it fails. `test_noAuctionPastTheDeadline` also checks the constructor boundary |
+
+`forge test`: 56.

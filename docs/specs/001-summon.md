@@ -68,8 +68,10 @@ Non-goals:
   reachable target can simply be filled by other backers. On testnet tUSDC is free to mint, so none of this
   costs a griefer money there; on mainnet it is real USDC, and the minimum target applies.
 - **Every target lies between 10 and 10^9 USDC** (r5, Codex r6 #1), whatever the owner's minimum says. The
-  cap keeps the pace check from overflowing, which would make a round impossible to replace; the floor
-  keeps a funded round's LP share large enough to seed its pool.
+  cap keeps the pace check from overflowing, which would make a round impossible to replace. The pool's seed
+  must also be at least 10^4 raw token units (Codex r7 #2), so rounding moves its price by at most 1 bp; a
+  target too small for the token's decimals and price cannot start its auction, and the round expires and
+  refunds.
 - **No auction outlives its round** (r5, Codex r6 #4). `startAuction` is refused unless the whole auction
   window ends by the deadline, and a round's deadline must leave room for one window. A round funded in its
   last hour expires and refunds.

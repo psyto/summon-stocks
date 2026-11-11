@@ -20,7 +20,7 @@ import {SummonPrice} from "../src/SummonPrice.sol";
 import {SummonPool} from "../src/SummonPool.sol";
 import {SummonSwap, ISummonPools} from "../src/SummonSwap.sol";
 import {PoolModifyLiquidityTest} from "v4-core/src/test/PoolModifyLiquidityTest.sol";
-import {MockERC20, MockB20, MockPolicyRegistry, MockOracleRegistry} from "./mocks/Mocks.sol";
+import {MockERC20, MockB20, MockB20Of, MockPolicyRegistry, MockOracleRegistry} from "./mocks/Mocks.sol";
 import {GuardPriceFeed} from "../src/testnet/GuardPriceFeed.sol";
 
 /// MockPyth with Pyth's parsePriceFeedUpdatesUnique. Each update is abi.encode(int64 price, uint64 conf,
@@ -54,6 +54,8 @@ contract UniqueMockPyth is MockPyth {
 contract SummonRoundTest is Test {
     using PoolIdLibrary for PoolKey;
     using StateLibrary for IPoolManager;
+    // Time is read with vm.getBlockTimestamp(): under via_ir (foundry.toml) block.timestamp can keep its
+    // value from before a vm.warp in the same test.
 
     uint256 constant MAX_TARGET = 1e15; // SummonFactory.MAX_TARGET
 
@@ -119,7 +121,7 @@ contract SummonRoundTest is Test {
         );
         hook.setFactory(ISummonRegistry(address(factory)));
         factory.list(address(token), address(pyth), GME, 60, false);
-        round = factory.openRound(address(token), 10_000e6, uint64(block.timestamp + 7 days), 100, 7 days);
+        round = factory.openRound(address(token), 10_000e6, uint64(vm.getBlockTimestamp() + 7 days), 100, 7 days);
 
         for (uint256 i; i < 3; ++i) {
             address b = [alice, bob, carol][i];
@@ -142,7 +144,7 @@ contract SummonRoundTest is Test {
     }
 
     function _fresh() internal view returns (bytes[] memory) {
-        return _update(PX, CONF, uint64(block.timestamp));
+        return _update(PX, CONF, uint64(vm.getBlockTimestamp()));
     }
 
     function _fund() internal {
@@ -168,7 +170,7 @@ contract SummonRoundTest is Test {
     }
 
     function _fillAfter(uint256 secs) internal {
-        vm.warp(block.timestamp + secs);
+        vm.warp(vm.getBlockTimestamp() + secs);
         _heartbeat();
         bytes[] memory u = _fresh();
         vm.prank(ap);
@@ -176,7 +178,7 @@ contract SummonRoundTest is Test {
     }
 
     function _expectFillRevert(bytes memory err) internal {
-        vm.warp(block.timestamp + 1); // a fill's price must be published after the auction started
+        vm.warp(vm.getBlockTimestamp() + 1); // a fill's price must be published after the auction started
         bytes[] memory u = _fresh();
         vm.prank(ap);
         vm.expectRevert(err);
@@ -233,7 +235,7 @@ contract SummonRoundTest is Test {
         // LP: locked for 7 days, then unwound once and claimed pro rata
         vm.expectRevert();
         round.unwindLP();
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(vm.getBlockTimestamp() + 7 days);
         round.unwindLP();
         assertGt(round.lpTokens(), 0);
         assertGt(round.lpUsdc(), 0);
@@ -248,11 +250,11 @@ contract SummonRoundTest is Test {
     function test_spreadRamp() public {
         _start();
         assertEq(round.currentSpreadBps(), 0);
-        vm.warp(block.timestamp + 450);
+        vm.warp(vm.getBlockTimestamp() + 450);
         assertEq(round.currentSpreadBps(), 25);
-        vm.warp(block.timestamp + 1350);
+        vm.warp(vm.getBlockTimestamp() + 1350);
         assertEq(round.currentSpreadBps(), 100);
-        vm.warp(block.timestamp + 1000);
+        vm.warp(vm.getBlockTimestamp() + 1000);
         assertEq(round.currentSpreadBps(), 100); // capped after the ramp
     }
 
@@ -304,13 +306,13 @@ contract SummonRoundTest is Test {
 
     function test_quietGuard() public {
         _start();
-        vm.warp(block.timestamp + 301);
-        _expectFillRevert(abi.encodeWithSelector(MarketStateCheck.MarketStateStale.selector, uint64(block.timestamp - 301)));
+        vm.warp(vm.getBlockTimestamp() + 301);
+        _expectFillRevert(abi.encodeWithSelector(MarketStateCheck.MarketStateStale.selector, uint64(vm.getBlockTimestamp() - 301)));
     }
 
     function test_beforeResume() public {
         _start();
-        uint64 resume = uint64(block.timestamp + 600);
+        uint64 resume = uint64(vm.getBlockTimestamp() + 600);
         market.setState(address(token), false, 0, resume);
         _expectFillRevert(abi.encodeWithSelector(MarketStateCheck.NotYetResumed.selector, resume));
     }
@@ -318,7 +320,7 @@ contract SummonRoundTest is Test {
     /// Pyth keeps the newest price, so an older update cannot make it stale; time passing does.
     function test_stalePythPrice() public {
         _start();
-        vm.warp(block.timestamp + 61);
+        vm.warp(vm.getBlockTimestamp() + 61);
         _heartbeat();
         bytes[] memory none = new bytes[](0);
         vm.prank(ap);
@@ -328,8 +330,8 @@ contract SummonRoundTest is Test {
 
     function test_wideConfidence() public {
         _start();
-        vm.warp(block.timestamp + 1);
-        bytes[] memory wide = _update(PX, 23_450, uint64(block.timestamp)); // 100 bp
+        vm.warp(vm.getBlockTimestamp() + 1);
+        bytes[] memory wide = _update(PX, 23_450, uint64(vm.getBlockTimestamp())); // 100 bp
         vm.prank(ap);
         vm.expectRevert(abi.encodeWithSelector(PythRef.PythConfTooWide.selector, GME, 100, 50));
         round.fill{value: 1}(wide);
@@ -349,11 +351,11 @@ contract SummonRoundTest is Test {
 
     function test_corporateActionWindow() public {
         _start();
-        uint256 eff = block.timestamp + 1800;
+        uint256 eff = vm.getBlockTimestamp() + 1800;
         token.setEffectiveAt(eff);
         _expectFillRevert(abi.encodeWithSelector(SummonRound.CorporateActionWindow.selector, eff));
         // far enough away, the same scheduled change does not block
-        token.setEffectiveAt(block.timestamp + 2 days);
+        token.setEffectiveAt(vm.getBlockTimestamp() + 2 days);
         _fillAfter(0);
     }
 
@@ -409,9 +411,9 @@ contract SummonRoundTest is Test {
 
     function test_priceJumpSinceStart() public {
         _start();
-        vm.warp(block.timestamp + 60);
+        vm.warp(vm.getBlockTimestamp() + 60);
         _heartbeat();
-        bytes[] memory jumped = _update(PX * 104 / 100, CONF, uint64(block.timestamp)); // +4% > 3%
+        bytes[] memory jumped = _update(PX * 104 / 100, CONF, uint64(vm.getBlockTimestamp())); // +4% > 3%
         vm.prank(ap);
         vm.expectRevert(abi.encodeWithSelector(SummonRound.PriceJumped.selector, 400, 300));
         round.fill{value: 1}(jumped);
@@ -422,18 +424,18 @@ contract SummonRoundTest is Test {
     /// Codex r1 #1: start on a favorable print up to maxPythAge old, then settle on that same print.
     function test_fillNeedsAPriceFromAfterTheStart() public {
         _fund();
-        vm.warp(block.timestamp + 100);
+        vm.warp(vm.getBlockTimestamp() + 100);
         _heartbeat();
         // a $103 spike published 55 s ago anchors the auction...
         int64 spike = PX * 103 / 100;
-        round.startAuction{value: 1}(_update(spike, CONF, uint64(block.timestamp - 55)));
+        round.startAuction{value: 1}(_update(spike, CONF, uint64(vm.getBlockTimestamp() - 55)));
         // ...and filling on that same print now is refused
         vm.prank(ap);
-        vm.expectRevert(abi.encodeWithSelector(SummonRound.PriceNotAfterStart.selector, block.timestamp - 55, block.timestamp));
+        vm.expectRevert(abi.encodeWithSelector(SummonRound.PriceNotAfterStart.selector, vm.getBlockTimestamp() - 55, vm.getBlockTimestamp()));
         round.fill{value: 1}(new bytes[](0));
         // a print published after the start fills, at that price
-        vm.warp(block.timestamp + 5);
-        bytes[] memory u = _update(PX, CONF, uint64(block.timestamp));
+        vm.warp(vm.getBlockTimestamp() + 5);
+        bytes[] memory u = _update(PX, CONF, uint64(vm.getBlockTimestamp()));
         vm.prank(ap);
         round.fill{value: 1}(u);
         assertEq(round.fillRef(), SummonPrice.refPerToken(uint256(uint64(PX)) * 10 ** uint256(int256(18 + EXPO)), 1e18));
@@ -444,17 +446,17 @@ contract SummonRoundTest is Test {
         MockB20 t3 = new MockB20(policies);
         factory.list(address(t3), address(pyth), GME, 60, false);
         vm.expectRevert(SummonFactory.BadRoundTerms.selector);
-        factory.openRound(address(t3), 10_000e6, uint64(block.timestamp + 31 days), 100, 7 days);
+        factory.openRound(address(t3), 10_000e6, uint64(vm.getBlockTimestamp() + 31 days), 100, 7 days);
         vm.expectRevert(SummonFactory.BadRoundTerms.selector);
-        factory.openRound(address(t3), 10_000e6, uint64(block.timestamp + 7 days), 100, 31 days);
+        factory.openRound(address(t3), 10_000e6, uint64(vm.getBlockTimestamp() + 7 days), 100, 31 days);
         // a squatter's round with a target nobody will meet...
         vm.prank(carol);
-        SummonRound squat = factory.openRound(address(t3), MAX_TARGET, uint64(block.timestamp + 30 days), 100, 30 days);
+        SummonRound squat = factory.openRound(address(t3), MAX_TARGET, uint64(vm.getBlockTimestamp() + 30 days), 100, 30 days);
         // ...blocks a new one for a day, then anyone may replace it while nobody has pledged
         vm.expectRevert(abi.encodeWithSelector(SummonFactory.RoundActive.selector, address(squat)));
-        factory.openRound(address(t3), 10_000e6, uint64(block.timestamp + 7 days), 100, 7 days);
-        vm.warp(block.timestamp + 1 days);
-        SummonRound fair = factory.openRound(address(t3), 10_000e6, uint64(block.timestamp + 7 days), 100, 7 days);
+        factory.openRound(address(t3), 10_000e6, uint64(vm.getBlockTimestamp() + 7 days), 100, 7 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
+        SummonRound fair = factory.openRound(address(t3), 10_000e6, uint64(vm.getBlockTimestamp() + 7 days), 100, 7 days);
         assertEq(factory.latestRound(address(t3)), address(fair));
         // the replaced round is cancelled in the same transaction: no pledge can land in it any more
         vm.startPrank(alice);
@@ -468,8 +470,8 @@ contract SummonRoundTest is Test {
         usdc.approve(address(fair), type(uint256).max);
         fair.pledge(1);
         vm.stopPrank();
-        vm.warp(block.timestamp + 1 days);
-        SummonRound next = factory.openRound(address(t3), 10_000e6, uint64(block.timestamp + 7 days), 100, 7 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
+        SummonRound next = factory.openRound(address(t3), 10_000e6, uint64(vm.getBlockTimestamp() + 7 days), 100, 7 days);
         assertEq(uint8(fair.state()), uint8(SummonRound.State.Expired));
         vm.prank(carol);
         fair.refund();
@@ -479,9 +481,9 @@ contract SummonRoundTest is Test {
         usdc.approve(address(next), type(uint256).max);
         next.pledge(1_000e6);
         vm.stopPrank();
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
         vm.expectRevert(abi.encodeWithSelector(SummonFactory.RoundActive.selector, address(next)));
-        factory.openRound(address(t3), 10_000e6, uint64(block.timestamp + 7 days), 100, 7 days);
+        factory.openRound(address(t3), 10_000e6, uint64(vm.getBlockTimestamp() + 7 days), 100, 7 days);
     }
 
     /// Codex r4 #2, r5 #1: a round keeping pace is never cancelled, however small its pledges; a squatter
@@ -490,7 +492,7 @@ contract SummonRoundTest is Test {
         MockB20 t3 = new MockB20(policies);
         factory.list(address(t3), address(pyth), GME, 60, false);
         // a healthy 7-day round, with many small pledges adding up to 750 tUSDC a day (pace needs 714)
-        SummonRound r = factory.openRound(address(t3), 10_000e6, uint64(block.timestamp + 7 days), 100, 7 days);
+        SummonRound r = factory.openRound(address(t3), 10_000e6, uint64(vm.getBlockTimestamp() + 7 days), 100, 7 days);
         vm.prank(alice);
         usdc.approve(address(r), type(uint256).max);
         for (uint256 day; day < 3; ++day) {
@@ -498,23 +500,23 @@ contract SummonRoundTest is Test {
                 vm.prank(alice);
                 r.pledge(10e6);
             }
-            vm.warp(block.timestamp + 1 days);
+            vm.warp(vm.getBlockTimestamp() + 1 days);
             vm.expectRevert(abi.encodeWithSelector(SummonFactory.RoundActive.selector, address(r)));
-            factory.openRound(address(t3), MAX_TARGET, uint64(block.timestamp + 30 days), 100, 30 days);
+            factory.openRound(address(t3), MAX_TARGET, uint64(vm.getBlockTimestamp() + 30 days), 100, 30 days);
         }
         // it stalls: by day 5 pace needs 3,571 and it has 2,250
-        vm.warp(block.timestamp + 2 days);
-        SummonRound squat = factory.openRound(address(t3), 10_000e6, uint64(block.timestamp + 30 days), 100, 30 days);
+        vm.warp(vm.getBlockTimestamp() + 2 days);
+        SummonRound squat = factory.openRound(address(t3), 10_000e6, uint64(vm.getBlockTimestamp() + 30 days), 100, 30 days);
         assertEq(uint8(r.state()), uint8(SummonRound.State.Expired));
 
         // the squatter tops up 0.1% (10 tUSDC) a day; a day in, pace needs 166
         vm.startPrank(carol);
         usdc.approve(address(squat), type(uint256).max);
         squat.pledge(10e6);
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
         squat.pledge(10e6);
         vm.stopPrank();
-        SummonRound fair = factory.openRound(address(t3), 10_000e6, uint64(block.timestamp + 7 days), 100, 7 days);
+        SummonRound fair = factory.openRound(address(t3), 10_000e6, uint64(vm.getBlockTimestamp() + 7 days), 100, 7 days);
         assertEq(uint8(squat.state()), uint8(SummonRound.State.Expired));
         assertEq(factory.latestRound(address(t3)), address(fair));
         vm.prank(carol);
@@ -533,7 +535,7 @@ contract SummonRoundTest is Test {
         MockB20 t3 = new MockB20(policies);
         market.setState(address(t3), false, 0, 0);
         factory.list(address(t3), address(up), GME, 10, true);
-        SummonRound r = factory.openRound(address(t3), 10_000e6, uint64(block.timestamp + 7 days), 100, 7 days);
+        SummonRound r = factory.openRound(address(t3), 10_000e6, uint64(vm.getBlockTimestamp() + 7 days), 100, 7 days);
         for (uint256 i; i < 3; ++i) {
             address b = [alice, bob, carol][i];
             vm.startPrank(b);
@@ -544,12 +546,12 @@ contract SummonRoundTest is Test {
         t3.mint(ap, 1_000e8);
         vm.prank(ap);
         t3.approve(address(r), type(uint256).max);
-        vm.warp(block.timestamp + 3); // 1_800_000_003: settles on the first print at or after 1_799_999_990
+        vm.warp(vm.getBlockTimestamp() + 3); // 1_800_000_003: settles on the first print at or after 1_799_999_990
         uint64 t = r.settleTime();
         assertEq(t, 1_799_999_990);
         r.startAuction{value: 1}(_print(PX, t + 1, t - 1));
 
-        vm.warp(block.timestamp + 130);
+        vm.warp(vm.getBlockTimestamp() + 130);
         _heartbeat();
         market.heartbeat(_one(address(t3)));
         t = r.settleTime();
@@ -566,7 +568,7 @@ contract SummonRoundTest is Test {
         vm.expectRevert(bytes("PriceFeedNotFoundWithinRange"));
         r.fill{value: 1}(_print(PX, t + 12, t - 1));
         // ...and the next band's first print (t + 12) fills once the block reaches that band
-        vm.warp(block.timestamp + 10);
+        vm.warp(vm.getBlockTimestamp() + 10);
         _heartbeat();
         market.heartbeat(_one(address(t3)));
         assertEq(r.settleTime(), t + 10);
@@ -597,7 +599,7 @@ contract SummonRoundTest is Test {
         round.pledge(3_000e6);
         vm.prank(bob);
         round.pledge(2_000e6);
-        vm.warp(block.timestamp + 7 days + 1);
+        vm.warp(vm.getBlockTimestamp() + 7 days + 1);
         assertEq(uint8(round.state()), uint8(SummonRound.State.Expired));
         vm.prank(alice);
         round.refund();
@@ -616,7 +618,7 @@ contract SummonRoundTest is Test {
         for (uint256 i; i < 3; ++i) {
             _heartbeat();
             round.startAuction{value: 1}(_fresh());
-            vm.warp(block.timestamp + 3601);
+            vm.warp(vm.getBlockTimestamp() + 3601);
             round.endAuction();
             if (i < 2) assertEq(uint8(round.state()), uint8(SummonRound.State.Funded));
         }
@@ -634,7 +636,7 @@ contract SummonRoundTest is Test {
 
     function test_noFillAfterWindow() public {
         _start();
-        vm.warp(block.timestamp + 3601);
+        vm.warp(vm.getBlockTimestamp() + 3601);
         _heartbeat();
         _expectFillRevert(abi.encodeWithSelector(SummonRound.WrongState.selector, SummonRound.State.Funded));
     }
@@ -655,20 +657,20 @@ contract SummonRoundTest is Test {
 
     function test_factoryRules() public {
         vm.expectRevert(abi.encodeWithSelector(SummonFactory.NotListed.selector, address(usdc)));
-        factory.openRound(address(usdc), 10e6, uint64(block.timestamp + 1 days), 100, 1 days);
+        factory.openRound(address(usdc), 10e6, uint64(vm.getBlockTimestamp() + 1 days), 100, 1 days);
         vm.expectRevert(abi.encodeWithSelector(SummonFactory.RoundActive.selector, address(round)));
-        factory.openRound(address(token), 10e6, uint64(block.timestamp + 1 days), 100, 1 days);
+        factory.openRound(address(token), 10e6, uint64(vm.getBlockTimestamp() + 1 days), 100, 1 days);
         vm.expectRevert(abi.encodeWithSelector(SummonFactory.AlreadyListed.selector, address(token)));
         factory.list(address(token), address(pyth), bytes32(uint256(1)), 60, false);
         vm.prank(alice);
         vm.expectRevert(SummonFactory.NotOwner.selector);
         factory.list(address(usdc), address(pyth), bytes32(uint256(1)), 60, false);
         // spread above 1% is refused
-        vm.warp(block.timestamp + 8 days);
+        vm.warp(vm.getBlockTimestamp() + 8 days);
         vm.expectRevert(SummonRound.BadParams.selector);
-        factory.openRound(address(token), 10e6, uint64(block.timestamp + 1 days), 101, 1 days);
+        factory.openRound(address(token), 10e6, uint64(vm.getBlockTimestamp() + 1 days), 101, 1 days);
         // after expiry a new round may open; after a fill it may not
-        SummonRound r2 = factory.openRound(address(token), 10e6, uint64(block.timestamp + 1 days), 100, 1 days);
+        SummonRound r2 = factory.openRound(address(token), 10e6, uint64(vm.getBlockTimestamp() + 1 days), 100, 1 days);
         assertTrue(address(r2) != address(round));
     }
 
@@ -678,10 +680,10 @@ contract SummonRoundTest is Test {
         vm.expectRevert(SummonFactory.NotOwner.selector);
         factory.setMinTarget(1_000e6);
         factory.setMinTarget(20_000e6);
-        vm.warp(block.timestamp + 8 days); // the setUp round has expired, so a new one may open
+        vm.warp(vm.getBlockTimestamp() + 8 days); // the setUp round has expired, so a new one may open
         vm.expectRevert(abi.encodeWithSelector(SummonFactory.TargetTooSmall.selector, 10_000e6, 20_000e6));
-        factory.openRound(address(token), 10_000e6, uint64(block.timestamp + 1 days), 100, 1 days);
-        factory.openRound(address(token), 20_000e6, uint64(block.timestamp + 1 days), 100, 1 days);
+        factory.openRound(address(token), 10_000e6, uint64(vm.getBlockTimestamp() + 1 days), 100, 1 days);
+        factory.openRound(address(token), 20_000e6, uint64(vm.getBlockTimestamp() + 1 days), 100, 1 days);
     }
 
     /// Codex r6 #1: a target too large for the pace check, or too small to seed a pool, is refused; a round at
@@ -692,23 +694,23 @@ contract SummonRoundTest is Test {
         uint256 cap = factory.MAX_TARGET();
         assertEq(cap, MAX_TARGET);
         vm.expectRevert(SummonFactory.BadRoundTerms.selector);
-        factory.openRound(address(t3), cap + 1, uint64(block.timestamp + 30 days), 100, 30 days);
+        factory.openRound(address(t3), cap + 1, uint64(vm.getBlockTimestamp() + 30 days), 100, 30 days);
         vm.expectRevert(abi.encodeWithSelector(SummonFactory.TargetTooSmall.selector, 10e6 - 1, 10e6));
-        factory.openRound(address(t3), 10e6 - 1, uint64(block.timestamp + 30 days), 100, 30 days);
-        SummonRound big = factory.openRound(address(t3), cap, uint64(block.timestamp + 30 days), 100, 30 days);
-        vm.warp(block.timestamp + 29 days);
-        factory.openRound(address(t3), 10e6, uint64(block.timestamp + 7 days), 100, 7 days);
+        factory.openRound(address(t3), 10e6 - 1, uint64(vm.getBlockTimestamp() + 30 days), 100, 30 days);
+        SummonRound big = factory.openRound(address(t3), cap, uint64(vm.getBlockTimestamp() + 30 days), 100, 30 days);
+        vm.warp(vm.getBlockTimestamp() + 29 days);
+        factory.openRound(address(t3), 10e6, uint64(vm.getBlockTimestamp() + 7 days), 100, 7 days);
         assertEq(uint8(big.state()), uint8(SummonRound.State.Expired));
 
         // the setUp round has expired by now; a floor-sized one fills and seeds its pool
-        SummonRound small = factory.openRound(address(token), 10e6, uint64(block.timestamp + 7 days), 100, 7 days);
+        SummonRound small = factory.openRound(address(token), 10e6, uint64(vm.getBlockTimestamp() + 7 days), 100, 7 days);
         vm.prank(alice);
         usdc.approve(address(small), type(uint256).max);
         vm.prank(alice);
         small.pledge(10e6);
         _heartbeat();
         small.startAuction{value: 1}(_fresh());
-        vm.warp(block.timestamp + 60);
+        vm.warp(vm.getBlockTimestamp() + 60);
         _heartbeat();
         bytes[] memory u = _fresh();
         vm.startPrank(ap);
@@ -719,8 +721,41 @@ contract SummonRoundTest is Test {
         assertGt(IPoolManager(address(pm)).getLiquidity(PoolIdLibrary.toId(small.poolKey())), 0);
     }
 
+    /// Codex r7 #2: a round too small for its token's decimals and price cannot start, so it never fills with a
+    /// seed rounded far off the reference; it expires and refunds. The factory's size stays deployable (r7 #1).
+    function test_seedLargeEnoughToPrice() public {
+        assertLt(address(factory).code.length, 24_576);
+        MockB20Of t6 = new MockB20Of(policies, 6);
+        market.setState(address(t6), false, 0, 0);
+        factory.list(address(t6), address(pyth), GME, 60, false);
+        SummonRound r = factory.openRound(address(t6), 10e6, uint64(vm.getBlockTimestamp() + 7 days), 100, 7 days);
+        vm.startPrank(alice);
+        usdc.approve(address(r), type(uint256).max);
+        r.pledge(10e6);
+        vm.stopPrank();
+        address[] memory ts = new address[](1);
+        ts[0] = address(t6);
+        market.heartbeat(ts);
+        // at $9m a share, the $2 LP share is 0.22 raw units of a 6-decimal token
+        bytes[] memory u = _update(900_000_000_000, 10_000_000, uint64(vm.getBlockTimestamp()));
+        vm.expectRevert(abi.encodeWithSelector(SummonRound.SeedTooSmall.selector, 1));
+        r.startAuction{value: 1}(u);
+        // at $23.45 it is 85,288 units, and the auction starts
+        r.startAuction{value: 1}(_fresh());
+        assertEq(uint8(r.state()), uint8(SummonRound.State.Auction));
+        // and expiry still refunds a round that cannot start
+        vm.warp(r.params().deadline + 1);
+        vm.prank(alice);
+        r.refund();
+    }
+
     /// Codex r6 #4: an auction may not start unless its whole window ends by the round's deadline.
     function test_noAuctionPastTheDeadline() public {
+        // a round must leave room for one auction window
+        vm.warp(vm.getBlockTimestamp() + 8 days);
+        vm.expectRevert(SummonRound.BadParams.selector);
+        factory.openRound(address(token), 10e6, uint64(vm.getBlockTimestamp() + 3600 - 1), 100, 1 days);
+        vm.warp(vm.getBlockTimestamp() - 8 days);
         _fund();
         uint64 deadline = round.params().deadline;
         vm.warp(deadline - 3600 + 1);
@@ -739,7 +774,7 @@ contract SummonRoundTest is Test {
         _start();
         _fillAfter(60);
         vm.expectRevert(abi.encodeWithSelector(SummonFactory.TokenLive.selector, address(round)));
-        factory.openRound(address(token), 10e6, uint64(block.timestamp + 1 days), 100, 1 days);
+        factory.openRound(address(token), 10e6, uint64(vm.getBlockTimestamp() + 1 days), 100, 1 days);
     }
 
     // ------------------------------------------------------------------ claims and policy
@@ -835,7 +870,7 @@ contract SummonRoundTest is Test {
         assertApproxEqRel(closed * 1e18 / open, uint256(990_000e18) / 997_000, 1e15);
         vm.revertToState(snap);
         // a guard that has gone quiet counts as closed too
-        vm.warp(block.timestamp + 301);
+        vm.warp(vm.getBlockTimestamp() + 301);
         assertEq(_buy(router, key, usdcIs0), closed);
     }
 
@@ -846,18 +881,18 @@ contract SummonRoundTest is Test {
         vm.expectRevert(); // the PoolManager wraps the hook's MarketHalted
         router.swapExactIn(key, usdcIs0, 100e6, 1, alice);
         // resumed, but not before resumeAfter
-        market.setState(address(token), false, 0, uint64(block.timestamp + 120));
+        market.setState(address(token), false, 0, uint64(vm.getBlockTimestamp() + 120));
         vm.prank(alice);
         vm.expectRevert();
         router.swapExactIn(key, usdcIs0, 100e6, 1, alice);
-        vm.warp(block.timestamp + 120);
+        vm.warp(vm.getBlockTimestamp() + 120);
         _heartbeat();
         assertGt(_buy(router, key, usdcIs0), 0);
     }
 
     function test_swapStopsInCorporateActionWindow() public {
         (SummonSwap router, PoolKey memory key, bool usdcIs0) = _summoned();
-        token.setEffectiveAt(block.timestamp + 1800); // inside the 3600 s cooldown
+        token.setEffectiveAt(vm.getBlockTimestamp() + 1800); // inside the 3600 s cooldown
         vm.prank(alice);
         vm.expectRevert();
         router.swapExactIn(key, usdcIs0, 100e6, 1, alice);
@@ -876,8 +911,8 @@ contract SummonRoundTest is Test {
         router.swapExactIn(key, usdcIs0, 100e6, 1, alice);
 
         // not while the action window is open, and not while the issuer's registry disagrees
-        token.setEffectiveAt(block.timestamp + 600);
-        vm.expectRevert(abi.encodeWithSelector(SummonRound.CorporateActionWindow.selector, block.timestamp + 600));
+        token.setEffectiveAt(vm.getBlockTimestamp() + 600);
+        vm.expectRevert(abi.encodeWithSelector(SummonRound.CorporateActionWindow.selector, vm.getBlockTimestamp() + 600));
         round.realign();
         token.setEffectiveAt(0);
         oracle.set(1e18, false);
@@ -907,7 +942,7 @@ contract SummonRoundTest is Test {
         // what realign could not put back reaches the backers at unwind
         uint256 idleT = round.idleTokens();
         uint256 idleU = round.idleUsdc();
-        vm.warp(block.timestamp + 7 days + 1);
+        vm.warp(vm.getBlockTimestamp() + 7 days + 1);
         round.unwindLP();
         assertGe(round.lpTokens(), idleT);
         assertGe(round.lpUsdc(), idleU);
@@ -948,7 +983,7 @@ contract SummonRoundTest is Test {
         market.setState(address(t2), false, 0, 0);
         oracle.set(1e18, false);
         factory.list(address(t2), address(feed), GME, 60, false);
-        r = factory.openRound(address(t2), 10_000e6, uint64(block.timestamp + 1 days), 100, 1 days);
+        r = factory.openRound(address(t2), 10_000e6, uint64(vm.getBlockTimestamp() + 1 days), 100, 1 days);
         for (uint256 i; i < 3; ++i) {
             address b = [alice, bob, carol][i];
             vm.startPrank(b);
@@ -964,13 +999,13 @@ contract SummonRoundTest is Test {
     function test_guardFeedRound() public {
         (SummonRound r, MockB20 t2, GuardPriceFeed feed) = _guardRound();
         bytes[] memory none = new bytes[](0);
-        feed.post(GME, PX, CONF, EXPO, block.timestamp);
+        feed.post(GME, PX, CONF, EXPO, vm.getBlockTimestamp());
         r.startAuction(none);
-        vm.warp(block.timestamp + 900);
+        vm.warp(vm.getBlockTimestamp() + 900);
         address[] memory ts = new address[](1);
         ts[0] = address(t2);
         market.heartbeat(ts);
-        feed.post(GME, PX, CONF, EXPO, block.timestamp);
+        feed.post(GME, PX, CONF, EXPO, vm.getBlockTimestamp());
         vm.prank(ap);
         r.fill(none);
         assertEq(uint8(r.state()), uint8(SummonRound.State.Filled));
@@ -981,9 +1016,9 @@ contract SummonRoundTest is Test {
     function test_guardFeedGoesStaleWhenGuardStops() public {
         (SummonRound r,, GuardPriceFeed feed) = _guardRound();
         bytes[] memory none = new bytes[](0);
-        feed.post(GME, PX, CONF, EXPO, block.timestamp);
+        feed.post(GME, PX, CONF, EXPO, vm.getBlockTimestamp());
         r.startAuction(none);
-        vm.warp(block.timestamp + 61); // the guard posted nothing since
+        vm.warp(vm.getBlockTimestamp() + 61); // the guard posted nothing since
         vm.prank(ap);
         vm.expectRevert(abi.encodeWithSelector(PythRef.PythStale.selector, GME, 61, 60));
         r.fill(none);
@@ -992,17 +1027,17 @@ contract SummonRoundTest is Test {
     function test_guardFeedRules() public {
         GuardPriceFeed feed = new GuardPriceFeed(address(this));
         vm.expectRevert(GuardPriceFeed.NotUpdater.selector);
-        feed.post(GME, PX, CONF, EXPO, block.timestamp);
+        feed.post(GME, PX, CONF, EXPO, vm.getBlockTimestamp());
         feed.setUpdater(address(this), true);
         vm.expectRevert(GuardPriceFeed.PriceFeedNotFound.selector);
         feed.getPriceUnsafe(GME);
-        feed.post(GME, PX, CONF, EXPO, block.timestamp);
-        vm.expectRevert(abi.encodeWithSelector(GuardPriceFeed.NotNewer.selector, block.timestamp, block.timestamp));
-        feed.post(GME, PX, CONF, EXPO, block.timestamp);
+        feed.post(GME, PX, CONF, EXPO, vm.getBlockTimestamp());
+        vm.expectRevert(abi.encodeWithSelector(GuardPriceFeed.NotNewer.selector, vm.getBlockTimestamp(), vm.getBlockTimestamp()));
+        feed.post(GME, PX, CONF, EXPO, vm.getBlockTimestamp());
         vm.expectRevert(GuardPriceFeed.BadPrice.selector);
-        feed.post(GME, PX, CONF, EXPO, block.timestamp + 31);
+        feed.post(GME, PX, CONF, EXPO, vm.getBlockTimestamp() + 31);
         vm.expectRevert(GuardPriceFeed.BadPrice.selector);
-        feed.post(GME, 0, CONF, EXPO, block.timestamp + 1);
+        feed.post(GME, 0, CONF, EXPO, vm.getBlockTimestamp() + 1);
         bytes[] memory one = new bytes[](1);
         vm.expectRevert(GuardPriceFeed.NoUpdateData.selector);
         feed.updatePriceFeeds(one);

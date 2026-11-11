@@ -84,6 +84,10 @@ contract SummonRound is IUnlockCallback {
 
     uint16 public constant MAX_SPREAD_CAP_BPS = 100;
     uint16 public constant MAX_LP_BPS = 5000;
+    /// The pool's seed must be at least this many raw token units, so rounding each amount up by one unit
+    /// moves the seed's price and the filler's delivery by at most 1 bp. A target too small for the token's
+    /// decimals and price cannot start, and its round expires and refunds (Codex r7 #2).
+    uint256 public constant MIN_SEED_UNITS = 1e4;
     uint8 internal constant OP_UNWIND = 0;
     uint8 internal constant OP_SEED = 1;
     uint8 internal constant OP_REALIGN = 2;
@@ -138,6 +142,7 @@ contract SummonRound is IUnlockCallback {
     error PriceJumped(uint256 observedBps, uint256 limitBps);
     error PriceNotAfterStart(uint256 publishedAt, uint64 auctionStart);
     error TooLateToStart(uint64 deadline);
+    error SeedTooSmall(uint256 units);
     error LpLocked(uint64 until);
     error TransferFailed();
 
@@ -260,6 +265,7 @@ contract SummonRound is IUnlockCallback {
         if (_state != State.Funded) revert WrongState(_state);
         if (block.timestamp + p.windowSeconds > p.deadline) revert TooLateToStart(p.deadline);
         (uint256 ref,) = _checkConditions(pythUpdate);
+        _lpTokens(ref);
         auctionStart = uint64(block.timestamp);
         auctionsRun += 1;
         multiplierAtStart = IB20AssetMin(p.token).multiplier();
@@ -291,7 +297,7 @@ contract SummonRound is IUnlockCallback {
         uint256 usdcLp = pledged * p.lpBps / 1e4;
         uint256 usdcFiller = pledged - usdcLp;
         uint256 q = SummonPrice.tokensFor(usdcFiller, ref, s, tokenDecimals);
-        uint256 qLp = SummonPrice.tokensFor(usdcLp, ref, 0, tokenDecimals);
+        uint256 qLp = _lpTokens(ref);
         if (qLp >= q) revert BadParams(); // lpBps <= 5000 and spread <= 1% make this unreachable
 
         _state = State.Filled;
@@ -527,6 +533,12 @@ contract SummonRound is IUnlockCallback {
         uint64 id = IB20(p.token).policyId(scope);
         IPolicyRegistry reg = IPolicyRegistry(d.policyRegistry);
         if (!reg.policyExists(id) || !reg.isAuthorized(id, account)) revert PolicyForbids(scope, account);
+    }
+
+    /// Raw token units the pool is seeded with at `ref`; reverts below MIN_SEED_UNITS.
+    function _lpTokens(uint256 ref) internal view returns (uint256 qLp) {
+        qLp = SummonPrice.tokensFor(pledged * p.lpBps / 1e4, ref, 0, tokenDecimals);
+        if (qLp < MIN_SEED_UNITS) revert SeedTooSmall(qLp);
     }
 
     // ------------------------------------------------------------------ time
