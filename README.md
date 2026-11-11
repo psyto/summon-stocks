@@ -241,11 +241,13 @@ check covers only the halts.
   check, so it was added upstream first (`PythRef.readFresh`, `v0.3.2`), not worked around here. Codex r3
   then showed a filler could still pick among fresh prints, so `PythRef.readFirstAfter` (the first print
   after a set time) was added upstream in `v0.4.0` and Pyth listings settle through it.
-- [market-state](https://github.com/fabrknt/market-state) (pinned at `v0.3.0`): `MarketStateCheck.requireOpen`
+- [market-state](https://github.com/fabrknt/market-state) (pinned at `v0.4.0`): `MarketStateCheck.requireOpen`
   on every auction start and fill, and the Nasdaq Trader halts guard. Using it here showed the guard did
   not know exchange holidays (Thanksgiving read as open), so `v0.2.0` added NYSE's 2026-2028 holidays and
   13:00 early closes upstream first, and `v0.3.0` the `core-hours` session (no fills while US LULD bands
-  are doubled). The registry fails closed when the
+  are doubled). After a stale `node_modules` read `core-hours` as always open (the hook charged the
+  open-session fee after the close), `v0.4.0` made an unknown session name read closed
+  ([#1](https://github.com/fabrknt/market-state/issues/1)). The registry fails closed when the
   updater goes quiet. It was extracted from another of our projects as a public part, so that Summon could
   depend on it through a tag. That project now depends on the same tag.
 - [Uniswap v4-core](https://github.com/Uniswap/v4-core) v4.0.0,

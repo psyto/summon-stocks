@@ -11,7 +11,7 @@
     "swap": "tsx ts/swap.ts"
   },
   "dependencies": {
-    "@fabrknt/market-state": "github:fabrknt/market-state#v0.3.0",
+    "@fabrknt/market-state": "github:fabrknt/market-state#v0.4.0",
     "viem": "2.55.11"
   },
   "devDependencies": {
