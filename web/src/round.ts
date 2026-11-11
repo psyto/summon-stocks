@@ -440,9 +440,19 @@ function actions(round: Addr, p: Params, s: S, conditionsHold: boolean, redraw: 
       h("p", { class: "act__note" }, "This round prices from Pyth. Starting the auction and filling need a signed Pyth update, which this page cannot fetch. Run them with the filler script: npm run e2e."),
     );
   } else if (s.state === "Funded") {
+    // an auction must end by the round's deadline (Codex r6 #4)
+    const tooLate = now() + p.windowSeconds > Number(p.deadline);
     box.append(
-      btn("Start the auction", () => void run("Start the auction", [{ address: round, abi: roundAbi as Abi, functionName: "startAuction", args: [[]] }]), true, !conditionsHold),
-      h("p", { class: "act__note" }, conditionsHold ? "Anyone can start it. The spread begins at 0." : "Waits until every fill condition holds, which needs the US market open."),
+      btn("Start the auction", () => void run("Start the auction", [{ address: round, abi: roundAbi as Abi, functionName: "startAuction", args: [[]] }]), true, !conditionsHold || tooLate),
+      h(
+        "p",
+        { class: "act__note" },
+        tooLate
+          ? `Too late to start: an auction runs ${p.windowSeconds / 60} minutes and must end by the deadline. The round will expire and every pledge can be refunded.`
+          : conditionsHold
+            ? "Anyone can start it. The spread begins at 0."
+            : "Waits until every fill condition holds, which needs the US market open.",
+      ),
     );
   } else if (s.state === "Auction") {
     box.append(

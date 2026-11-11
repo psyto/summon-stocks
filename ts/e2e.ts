@@ -43,42 +43,53 @@ async function send(role: keyof typeof ROLES, step: string, req: Call) {
   return r;
 }
 
+/** Pyth's revert when an update holds no print in the band asked for: PriceFeedNotFoundWithinRange(). */
+const NO_PRINT = /PriceFeedNotFoundWithinRange|0x45805f5d/;
+
 /**
  * Hermes update data for real Pyth; nothing for GuardPriceFeed, which the guard keeps posting to. A pull
  * listing settles on the first print at or after the start of the previous window (SummonRound.settleTime),
  * so this fetches that print and waits, if needed, until the next block falls in the window it was built for.
+ * `after` skips bands up to and including that one.
  */
-async function pythArgs(): Promise<{ data: Hex[]; fee: bigint }> {
+async function pythArgs(after = -1): Promise<{ data: Hex[]; fee: bigint; band: number }> {
   if (d.priceSource.toLowerCase() === d.guardFeed.toLowerCase()) {
     console.log("  price: GuardPriceFeed (the guard must be running)");
-    return { data: [], fee: 0n };
+    return { data: [], fee: 0n, band: -1 };
   }
   const w = PYTH_WINDOW_SECONDS;
-  let next = Number((await pc.getBlock()).timestamp) + 2; // Base: a block every 2 s
-  if (next % w > w - 4) {
-    await new Promise((r) => setTimeout(r, (w - (next % w) + 1) * 1000));
-    next = Number((await pc.getBlock()).timestamp) + 2;
+  const sleep = (s: number) => new Promise((r) => setTimeout(r, s * 1000));
+  let next: number;
+  for (;;) {
+    next = Number((await pc.getBlock()).timestamp) + 2; // Base: a block every 2 s
+    if (Math.floor(next / w) * w - w <= after) await sleep(2); // that band was tried already
+    else if (next % w > w - 4) await sleep(w - (next % w) + 1); // too close to the band's end
+    else if (next % w < 2) await sleep(2); // gas is estimated on the latest block, which must share the band
+    else break;
   }
-  const at = Math.floor(next / w) * w - w;
-  const u = await updateAt(d.priceId, at);
+  const band = Math.floor(next / w) * w - w;
+  const u = await updateAt(d.priceId, band);
   const fee = await pc.readContract({ address: d.pyth, abi: pythAbi, functionName: "getUpdateFee", args: [u.data] });
-  console.log(`  Pyth GME ${Number(u.price) * 10 ** u.expo}, the first print at or after ${at} (published ${u.publishTime})`);
-  return { data: u.data, fee };
+  console.log(`  Pyth ${demo.ticker} ${Number(u.price) * 10 ** u.expo}, the first print at or after ${band} (published ${u.publishTime})`);
+  return { data: u.data, fee, band };
 }
 
 /**
  * startAuction or fill with the price they need. A pull listing can meet a 10 s band in which Pyth printed
- * nothing, and the next band has a price, so it tries up to three bands (Codex r5 #3); a guard feed, once.
+ * nothing while the next band has a price, so on that refusal alone it moves to a later band, up to three
+ * bands in all (Codex r5 #3, r6 #3); any other refusal (a halt, a policy, a stale guard) stops the run.
  */
 async function priced(role: keyof typeof ROLES, fn: "startAuction" | "fill", round: Hex) {
   const pull = d.priceSource.toLowerCase() !== d.guardFeed.toLowerCase();
+  let band = -1;
   for (let tries = pull ? 3 : 1; ; tries--) {
-    const p = await pythArgs();
+    const p = await pythArgs(band);
+    band = p.band;
     try {
       return await send(role, fn, { address: round, abi: roundAbi, functionName: fn, args: [p.data], value: p.fee });
     } catch (e) {
-      if (tries <= 1) throw e;
-      console.log(`  ${fn} refused (${(e as Error).message.split("\n")[0]}); trying the next ${PYTH_WINDOW_SECONDS} s band`);
+      if (tries <= 1 || !NO_PRINT.test(String((e as Error).message))) throw e;
+      console.log(`  ${fn}: Pyth printed nothing in the band from ${band}; trying a later one`);
     }
   }
 }

@@ -75,3 +75,16 @@ fixed, and verdict CHANGES on three points.
 | 3 minor | The e2e retry covers fill, not startAuction | One wrapper (`priced`) retries both, up to three bands, for pull listings | - |
 
 `forge test`: 53 (pace rule: making it always true or "unpledged only" fails 2 tests each). Worker tests: 22.
+
+## Codex r6 (2026-11-11): what changed
+
+Codex r6 ([codex-r6.md](codex-r6.md)) found r5 #2 fixed and the pace rule itself sound, and verdict
+CHANGES on the rest.
+
+| # | Finding | Fix | Test |
+|---|---|---|---|
+| 1 blocker | A target above `uint256.max / 5000` overflows the pace check, so the round can never be replaced; a 1-unit target funds but cannot seed a pool | `MIN_TARGET` 10 USDC and `MAX_TARGET` 10^9 USDC in the factory, applied whatever `minTarget` says | `test_targetBounds` (both bounds refused one past; a round at the cap is replaced; one at the floor fills and seeds its pool). Without the cap or the floor it fails |
+| 3 major | The e2e retry can resend into the same quiet band, and retries every revert | `priced` retries only on Pyth's `PriceFeedNotFoundWithinRange`, and waits until the next block settles a later band; it also waits while the latest block (where gas is estimated) is in the previous band | - (e2e script) |
+| 4 minor | An auction started in the last hour runs past the deadline | `startAuction` is refused unless the window ends by the deadline (`TooLateToStart`); a round's deadline must leave room for one window; the page disables the button and says why | `test_noAuctionPastTheDeadline`. Without the check it fails |
+
+`forge test`: 55.

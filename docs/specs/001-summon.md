@@ -1,7 +1,8 @@
 # 001: Summon — backers bring a stock onto Base
 
 Status: draft r5 (Claude, 2026-11-11): r4 after Codex reviews r1-r3 (docs/reviews): a pull price taken
-at a set time (5.1), round terms and replacement (2a), and an issuer pause that stops swaps (5.5). r4
+at a set time (5.1), round terms and replacement (2a), and an issuer pause that stops swaps (5.5); target
+bounds and the auction-start cutoff after r6 (2a). r4
 (2026-11-08) was r3 plus a pool that knows the stock's market (5.5, 5.5a) and US session edges (5.2 item 9). r3 was r2 answering docs/reviews/001-spec-r1-claude.md, plus two decisions
 made while implementing it (section 2a). Prepared for Base "Stocksmaxxing",
 track Programmable Stock Markets, submission 2026-12-05. Testnet only.
@@ -66,6 +67,12 @@ Non-goals:
   Funded, where anyone may start its auctions; after three that nobody fills it is Expired. A squatter's
   reachable target can simply be filled by other backers. On testnet tUSDC is free to mint, so none of this
   costs a griefer money there; on mainnet it is real USDC, and the minimum target applies.
+- **Every target lies between 10 and 10^9 USDC** (r5, Codex r6 #1), whatever the owner's minimum says. The
+  cap keeps the pace check from overflowing, which would make a round impossible to replace; the floor
+  keeps a funded round's LP share large enough to seed its pool.
+- **No auction outlives its round** (r5, Codex r6 #4). `startAuction` is refused unless the whole auction
+  window ends by the deadline, and a round's deadline must leave room for one window. A round funded in its
+  last hour expires and refunds.
 - **A minimum target, set later** (`SummonFactory.setMinTarget`, 0 on testnet). A tiny round cannot cover
   a filler's fixed cost per mint (at most 1% of a $300 round is $3). The number comes from issuers' real
   costs, asked after the hackathon; it is not guessed now. Before money is asked for, signed intents show

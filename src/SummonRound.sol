@@ -137,6 +137,7 @@ contract SummonRound is IUnlockCallback {
     error PolicyForbids(bytes32 scope, address account);
     error PriceJumped(uint256 observedBps, uint256 limitBps);
     error PriceNotAfterStart(uint256 publishedAt, uint64 auctionStart);
+    error TooLateToStart(uint64 deadline);
     error LpLocked(uint64 until);
     error TransferFailed();
 
@@ -162,7 +163,7 @@ contract SummonRound is IUnlockCallback {
 
     constructor(Deps memory deps_, Params memory params_) {
         if (
-            params_.token == address(0) || params_.priceSource == address(0) || params_.target == 0 || params_.deadline <= block.timestamp
+            params_.token == address(0) || params_.priceSource == address(0) || params_.target == 0 || params_.deadline < block.timestamp + params_.windowSeconds
                 || params_.maxSpreadBps > MAX_SPREAD_CAP_BPS || params_.lpBps == 0 || params_.lpBps > MAX_LP_BPS
                 || params_.rampSeconds == 0 || params_.windowSeconds < params_.rampSeconds || params_.maxAuctions == 0
                 || params_.maxPythAge == 0 || params_.maxGuardAge == 0 || params_.maxJumpBps == 0
@@ -252,10 +253,12 @@ contract SummonRound is IUnlockCallback {
         emit Cancelled();
     }
 
-    /// Anyone may start the auction once the round is funded and every fill condition holds now.
+    /// Anyone may start the auction once the round is funded and every fill condition holds now, and the whole
+    /// auction window ends by the deadline, so no auction outlives its round (Codex r6 #4).
     function startAuction(bytes[] calldata pythUpdate) external payable nonReentrant {
         _sync();
         if (_state != State.Funded) revert WrongState(_state);
+        if (block.timestamp + p.windowSeconds > p.deadline) revert TooLateToStart(p.deadline);
         (uint256 ref,) = _checkConditions(pythUpdate);
         auctionStart = uint64(block.timestamp);
         auctionsRun += 1;

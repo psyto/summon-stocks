@@ -55,6 +55,8 @@ contract SummonRoundTest is Test {
     using PoolIdLibrary for PoolKey;
     using StateLibrary for IPoolManager;
 
+    uint256 constant MAX_TARGET = 1e15; // SummonFactory.MAX_TARGET
+
     bytes32 constant GME = keccak256("Equity.US.GME/USD");
     int64 constant PX = 2_345_000; // $23.45
     int32 constant EXPO = -5;
@@ -447,7 +449,7 @@ contract SummonRoundTest is Test {
         factory.openRound(address(t3), 10_000e6, uint64(block.timestamp + 7 days), 100, 31 days);
         // a squatter's round with a target nobody will meet...
         vm.prank(carol);
-        SummonRound squat = factory.openRound(address(t3), 1e30, uint64(block.timestamp + 30 days), 100, 30 days);
+        SummonRound squat = factory.openRound(address(t3), MAX_TARGET, uint64(block.timestamp + 30 days), 100, 30 days);
         // ...blocks a new one for a day, then anyone may replace it while nobody has pledged
         vm.expectRevert(abi.encodeWithSelector(SummonFactory.RoundActive.selector, address(squat)));
         factory.openRound(address(t3), 10_000e6, uint64(block.timestamp + 7 days), 100, 7 days);
@@ -498,7 +500,7 @@ contract SummonRoundTest is Test {
             }
             vm.warp(block.timestamp + 1 days);
             vm.expectRevert(abi.encodeWithSelector(SummonFactory.RoundActive.selector, address(r)));
-            factory.openRound(address(t3), 1e30, uint64(block.timestamp + 30 days), 100, 30 days);
+            factory.openRound(address(t3), MAX_TARGET, uint64(block.timestamp + 30 days), 100, 30 days);
         }
         // it stalls: by day 5 pace needs 3,571 and it has 2,250
         vm.warp(block.timestamp + 2 days);
@@ -653,9 +655,9 @@ contract SummonRoundTest is Test {
 
     function test_factoryRules() public {
         vm.expectRevert(abi.encodeWithSelector(SummonFactory.NotListed.selector, address(usdc)));
-        factory.openRound(address(usdc), 1e6, uint64(block.timestamp + 1 days), 100, 1 days);
+        factory.openRound(address(usdc), 10e6, uint64(block.timestamp + 1 days), 100, 1 days);
         vm.expectRevert(abi.encodeWithSelector(SummonFactory.RoundActive.selector, address(round)));
-        factory.openRound(address(token), 1e6, uint64(block.timestamp + 1 days), 100, 1 days);
+        factory.openRound(address(token), 10e6, uint64(block.timestamp + 1 days), 100, 1 days);
         vm.expectRevert(abi.encodeWithSelector(SummonFactory.AlreadyListed.selector, address(token)));
         factory.list(address(token), address(pyth), bytes32(uint256(1)), 60, false);
         vm.prank(alice);
@@ -664,9 +666,9 @@ contract SummonRoundTest is Test {
         // spread above 1% is refused
         vm.warp(block.timestamp + 8 days);
         vm.expectRevert(SummonRound.BadParams.selector);
-        factory.openRound(address(token), 1e6, uint64(block.timestamp + 1 days), 101, 1 days);
+        factory.openRound(address(token), 10e6, uint64(block.timestamp + 1 days), 101, 1 days);
         // after expiry a new round may open; after a fill it may not
-        SummonRound r2 = factory.openRound(address(token), 1e6, uint64(block.timestamp + 1 days), 100, 1 days);
+        SummonRound r2 = factory.openRound(address(token), 10e6, uint64(block.timestamp + 1 days), 100, 1 days);
         assertTrue(address(r2) != address(round));
     }
 
@@ -682,11 +684,62 @@ contract SummonRoundTest is Test {
         factory.openRound(address(token), 20_000e6, uint64(block.timestamp + 1 days), 100, 1 days);
     }
 
+    /// Codex r6 #1: a target too large for the pace check, or too small to seed a pool, is refused; a round at
+    /// the cap is still replaced, and one at the floor fills and seeds its pool.
+    function test_targetBounds() public {
+        MockB20 t3 = new MockB20(policies);
+        factory.list(address(t3), address(pyth), GME, 60, false);
+        uint256 cap = factory.MAX_TARGET();
+        assertEq(cap, MAX_TARGET);
+        vm.expectRevert(SummonFactory.BadRoundTerms.selector);
+        factory.openRound(address(t3), cap + 1, uint64(block.timestamp + 30 days), 100, 30 days);
+        vm.expectRevert(abi.encodeWithSelector(SummonFactory.TargetTooSmall.selector, 10e6 - 1, 10e6));
+        factory.openRound(address(t3), 10e6 - 1, uint64(block.timestamp + 30 days), 100, 30 days);
+        SummonRound big = factory.openRound(address(t3), cap, uint64(block.timestamp + 30 days), 100, 30 days);
+        vm.warp(block.timestamp + 29 days);
+        factory.openRound(address(t3), 10e6, uint64(block.timestamp + 7 days), 100, 7 days);
+        assertEq(uint8(big.state()), uint8(SummonRound.State.Expired));
+
+        // the setUp round has expired by now; a floor-sized one fills and seeds its pool
+        SummonRound small = factory.openRound(address(token), 10e6, uint64(block.timestamp + 7 days), 100, 7 days);
+        vm.prank(alice);
+        usdc.approve(address(small), type(uint256).max);
+        vm.prank(alice);
+        small.pledge(10e6);
+        _heartbeat();
+        small.startAuction{value: 1}(_fresh());
+        vm.warp(block.timestamp + 60);
+        _heartbeat();
+        bytes[] memory u = _fresh();
+        vm.startPrank(ap);
+        token.approve(address(small), type(uint256).max);
+        small.fill{value: 1}(u);
+        vm.stopPrank();
+        assertEq(uint8(small.state()), uint8(SummonRound.State.Filled));
+        assertGt(IPoolManager(address(pm)).getLiquidity(PoolIdLibrary.toId(small.poolKey())), 0);
+    }
+
+    /// Codex r6 #4: an auction may not start unless its whole window ends by the round's deadline.
+    function test_noAuctionPastTheDeadline() public {
+        _fund();
+        uint64 deadline = round.params().deadline;
+        vm.warp(deadline - 3600 + 1);
+        _heartbeat();
+        bytes[] memory u = _fresh();
+        vm.expectRevert(abi.encodeWithSelector(SummonRound.TooLateToStart.selector, deadline));
+        round.startAuction{value: 1}(u);
+        vm.warp(deadline - 3600);
+        _heartbeat();
+        round.startAuction{value: 1}(_fresh());
+        vm.warp(deadline + 1);
+        assertEq(uint8(round.state()), uint8(SummonRound.State.Expired));
+    }
+
     function test_noNewRoundAfterFill() public {
         _start();
         _fillAfter(60);
         vm.expectRevert(abi.encodeWithSelector(SummonFactory.TokenLive.selector, address(round)));
-        factory.openRound(address(token), 1e6, uint64(block.timestamp + 1 days), 100, 1 days);
+        factory.openRound(address(token), 10e6, uint64(block.timestamp + 1 days), 100, 1 days);
     }
 
     // ------------------------------------------------------------------ claims and policy

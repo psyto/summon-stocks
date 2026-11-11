@@ -44,8 +44,13 @@ contract SummonFactory {
     /// a squatter must keep a growing share of the target locked, and at the target the round is Funded,
     /// where anyone may run its auctions. A round on pace is never cancelled, whatever its pledges' sizes.
     uint16 public constant PACE_BPS = 5000;
+    /// Every round's target lies between these, in USDC (6 decimals), whatever minTarget says. The floor keeps
+    /// a funded round's LP share large enough to seed its pool; the cap keeps the pace check from overflowing,
+    /// which would make a round impossible to replace (Codex r6 #1).
+    uint256 public constant MIN_TARGET = 10e6;
+    uint256 public constant MAX_TARGET = 1e15;
 
-    /// The smallest target a round may have, in USDC (6 decimals). 0 = no minimum (testnet). Set from what
+    /// The smallest target a round may have, in USDC (6 decimals), above MIN_TARGET. 0 = only MIN_TARGET (testnet). Set from what
     /// a fill costs the filler (an issuer's fixed cost per mint), not guessed; the owner can change it.
     uint256 public minTarget;
 
@@ -107,7 +112,10 @@ contract SummonFactory {
     {
         Feed memory feed = feedOf[token];
         if (feed.source == address(0)) revert NotListed(token);
-        if (target < minTarget) revert TargetTooSmall(target, minTarget);
+        if (target < minTarget || target < MIN_TARGET) {
+            revert TargetTooSmall(target, minTarget > MIN_TARGET ? minTarget : MIN_TARGET);
+        }
+        if (target > MAX_TARGET) revert BadRoundTerms();
         if (deadline > block.timestamp + MAX_ROUND_SECONDS || lpLockSeconds > MAX_LP_LOCK_SECONDS) revert BadRoundTerms();
         address prev = latestRound[token];
         if (prev != address(0)) {
