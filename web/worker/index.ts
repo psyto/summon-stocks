@@ -5,6 +5,8 @@
  *   POST /api/intents        <- { ticker, token, usd, expiry, nonce, address, signature }
  *   GET  /api/demand         -> every unexpired intent with its signature, so an issuer can verify the
  *                               totals itself instead of trusting this Worker (?ticker=GME narrows it)
+ *   GET  /api/elsewhere      -> { readAt, source, markets: { [ticker]: { dex, oiUsd, volume24hUsd } } }:
+ *                               registered stocks that trade as Hyperliquid HIP-3 perps (display only)
  *
  * Each intent is an EIP-712 signature checked here. It names the stock by ticker and by its B20 contract
  * address, and the address must match the snapshot (Base's docs: identify stocks by address, since a
@@ -18,6 +20,7 @@
  */
 import { verifyTypedData, getAddress, isAddress } from "viem";
 import { IntentStore, MAX_EXPIRY_DAYS } from "./store";
+import { elsewhere } from "./elsewhere";
 
 export { IntentStore };
 
@@ -154,6 +157,7 @@ export default {
     }
     const url = new URL(req.url);
     if (url.pathname === "/api/demand" && req.method === "GET") return demand(req, env);
+    if (url.pathname === "/api/elsewhere" && req.method === "GET") return json(await elsewhere(() => tickers(env, req).then((m) => new Set(m.keys()))));
     if (url.pathname === "/api/intents") {
       if (req.method === "GET") return json(await board(env, req));
       if (req.method === "POST") return post(req, env);

@@ -89,7 +89,7 @@ Principles:
   unclear. The round page now makes whichever step can be taken the primary button. Pledge stays disabled
   until there is test USDC, and the amount is checked against the balance and the room left.
 
-## Planned (2026-11-08): demand from elsewhere
+## Demand from elsewhere (planned 2026-11-08; Hyperliquid built 2026-11-11, Robinhood Chain to come)
 - On the register, a never-minted stock that already trades elsewhere gets a mark: Hyperliquid HIP-3 (open
   interest and 24 h volume) or Robinhood Chain (token supply). The mark is set by an amount, never by a
   listing alone. xStocks lists 164 of the 227, so a listing alone would mark nearly every cell.
@@ -98,3 +98,9 @@ Principles:
 - The framing is "stocks with proven demand come to Base first", not "Base is behind".
 - Hyperliquid prices are shown for reference only. A HIP-3 deployer sets its own oracle, so fills keep
   pricing from Pyth.
+- Built (Hyperliquid): the Worker's `/api/elsewhere` reads every HIP-3 dex at most once per 5 minutes
+  (`ts/hip3.ts`, shared with the guard) and keeps the last read if Hyperliquid fails. A cell not yet trading
+  on Base gets a 10 px hairline tick at its top right when open interest or 24 h volume is $100K or more:
+  29 cells on 11-11. The detail adds a "Hyperliquid perp" row with both amounts, the dex, "matched by ticker"
+  and the read time. HIP-3 lists only tickers, so the match is by ticker; the doubtful ones were checked by
+  hand on 11-11 (BIRD is Allbirds, renamed Smartbird in 2026-06), and every match is on a stock-perp dex.

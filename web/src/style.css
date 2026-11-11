@@ -387,6 +387,14 @@ a {
 .cell--never .cell__ticker {
   color: var(--muted);
 }
+/* trades elsewhere in size: a hairline tick, no badge (docs/design.md) */
+.cell__away {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 10px;
+  border-top: 1px solid var(--ink);
+}
 .cell__intent {
   position: absolute;
   bottom: 6px;

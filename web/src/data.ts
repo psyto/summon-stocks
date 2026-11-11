@@ -34,3 +34,23 @@ export const statusLine: Record<Ink, string> = {
   issued: "Issued, but no Base pool holds $10K or more. Hard to buy onchain.",
   trading: "Trading on Base.",
 };
+
+/** Registered stocks that trade as Hyperliquid HIP-3 perps, from the Worker (display only). */
+export interface Elsewhere {
+  readAt: string | null;
+  source: string;
+  markets: Record<string, { dex: string; oiUsd: number; volume24hUsd: number }>;
+}
+
+/** A cell is marked by an amount, never by a listing alone (docs/design.md): open interest or 24 h volume. */
+export const ELSEWHERE_MARK_USD = 100_000;
+
+export async function loadElsewhere(): Promise<Elsewhere> {
+  try {
+    const r = await fetch("/api/elsewhere");
+    if (r.ok) return await r.json();
+  } catch {
+    // the register loads without the marks
+  }
+  return { readAt: null, source: "", markets: {} };
+}

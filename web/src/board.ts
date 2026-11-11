@@ -1,5 +1,5 @@
 import { h } from "./el";
-import { loadSnapshot, statusLine, usd, type Snapshot, type Stock } from "./data";
+import { ELSEWHERE_MARK_USD, loadElsewhere, loadSnapshot, statusLine, usd, type Elsewhere, type Snapshot, type Stock } from "./data";
 import { rosette, type Ink } from "./rosette";
 import { loadTotals, signIntent, type Totals } from "./intents";
 import { client, D, DEMOS, DEMO_ROUND, demoAt, demoFor, factoryAbi, OPEN_AT_INTENT_USD, roundAbi, STATES } from "./chain";
@@ -17,8 +17,8 @@ const FILTER_LABEL: Record<Filter, string> = {
 const ORDER: Record<Ink, number> = { never: 0, issued: 1, trading: 2 };
 
 export async function renderBoard(main: HTMLElement) {
-  const [snap, totals] = await Promise.all([loadSnapshot(), loadTotals()]);
-  main.append(hero(snap), rounds(), register(snap, totals), how(), foot(snap));
+  const [snap, totals, away] = await Promise.all([loadSnapshot(), loadTotals(), loadElsewhere()]);
+  main.append(hero(snap), rounds(), register(snap, totals, away), how(), foot(snap));
 }
 
 function hero(s: Snapshot): HTMLElement {
@@ -57,7 +57,7 @@ function hero(s: Snapshot): HTMLElement {
   );
 }
 
-function register(s: Snapshot, totals: Totals): HTMLElement {
+function register(s: Snapshot, totals: Totals, away: Elsewhere): HTMLElement {
   let filter: Filter = "never";
   let query = "";
   let selected: Stock = s.stocks.find((x) => x.ticker === "GME") ?? s.stocks[0]!;
@@ -83,6 +83,11 @@ function register(s: Snapshot, totals: Totals): HTMLElement {
   });
 
   const backed = (x: Stock) => totals[x.ticker]?.usd ?? 0;
+  // not yet on Base, and already trading in size elsewhere
+  const proven = (x: Stock) => {
+    const m = away.markets[x.ticker];
+    return x.status !== "trading" && !!m && Math.max(m.oiUsd, m.volume24hUsd) >= ELSEWHERE_MARK_USD;
+  };
   const sorted = [...s.stocks].sort(
     (a, b) =>
       ORDER[a.status] - ORDER[b.status] ||
@@ -101,9 +106,10 @@ function register(s: Snapshot, totals: Totals): HTMLElement {
           class: `cell cell--${x.status}`,
           type: "button",
           "aria-pressed": String(x === selected),
-          "aria-label": `${x.ticker}, ${FILTER_LABEL[x.status].toLowerCase()}`,
+          "aria-label": `${x.ticker}, ${FILTER_LABEL[x.status].toLowerCase()}${proven(x) ? ", trades on Hyperliquid" : ""}`,
         });
         b.append(rosette(x.ticker, { detail: "cell", ink: x.status }), h("span", { class: "cell__ticker wide" }, x.ticker));
+        if (proven(x)) b.append(h("span", { class: "cell__away", title: "Trades on Hyperliquid" }));
         if (backed(x) > 0) b.append(h("span", { class: "cell__intent" }, usd(backed(x))));
         b.addEventListener("click", () => {
           selected = x;
@@ -124,6 +130,11 @@ function register(s: Snapshot, totals: Totals): HTMLElement {
     row("Base pools", x.liquidityUsd > 0 ? usd(x.liquidityUsd) : "none");
     row("24h volume", x.volume24hUsd > 0 ? usd(x.volume24hUsd) : "none");
     row("Price feed", x.pythFeed ? "Pyth, can open a round" : "none yet, cannot open a round");
+    const m = away.markets[x.ticker];
+    row(
+      "Hyperliquid perp",
+      m ? `${usd(m.oiUsd)} open interest, ${usd(m.volume24hUsd)} 24h volume (HIP-3 ${m.dex}, matched by ticker, read ${when(away.readAt!)}). Reference only: fills price from Pyth.` : away.readAt ? "none" : "not read",
+    );
 
     const amount = h("input", { type: "number", min: "1", step: "1", value: "100", inputmode: "decimal", "aria-label": "Amount in USD" });
     const sign = h("button", { class: "btn btn--seal", type: "button" }, "Sign intent");

@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { DatabaseSync } from "node:sqlite";
 import worker, { IntentStore } from "./index";
+import { resetElsewhere } from "./elsewhere";
 import { MAX_LIVE, MAX_NONCES } from "./store";
 
 /** The Durable Object namespace, with IntentStore over an in-memory node:sqlite database. */
@@ -373,6 +374,58 @@ const tests: [string, () => Promise<void>][] = [
       const a = privateKeyToAccount(generatePrivateKey());
       for (let i = 0; i < 20; i++) assert.equal((await intent(e, a, "RKT", 10 + i)).status, 200);
       assert.equal((await intent(e, a, "RKT", 99)).status, 429);
+    },
+  ],
+  [
+    "the register's Hyperliquid marks: registered tickers only, the busiest dex, one read per five minutes, and a failed read keeps the last",
+    async () => {
+      const real = globalThis.fetch;
+      let calls = 0;
+      let down = false;
+      const ctx = (oi: string, px: string, vol: string) => ({ openInterest: oi, oraclePx: px, dayNtlVlm: vol });
+      globalThis.fetch = (async (_u: string, init: RequestInit) => {
+        calls++;
+        if (down) return new Response("busy", { status: 429 });
+        const b = JSON.parse(String(init.body));
+        if (b.type === "perpDexs") return Response.json([null, { name: "xyz" }, { name: "para" }]);
+        if (b.dex === "xyz")
+          return Response.json([
+            { universe: [{ name: "xyz:DELL" }, { name: "xyz:SOFI" }, { name: "xyz:NOTREG" }, { name: "xyz:RKT", isDelisted: true }] },
+            [ctx("1000", "100", "5000"), ctx("10", "20", "1"), ctx("1", "1", "1"), ctx("9", "9", "9")],
+          ]);
+        return Response.json([{ universe: [{ name: "para:SOFI" }] }, [ctx("1000", "20", "70")]]);
+      }) as typeof fetch;
+      try {
+        resetElsewhere();
+        const e = env();
+        const r = (await (await worker.fetch(req("/api/elsewhere"), e)).json()) as { readAt: string; markets: Record<string, { dex: string; oiUsd: number; volume24hUsd: number }> };
+        assert.deepEqual(r.markets.DELL, { dex: "xyz", oiUsd: 100_000, volume24hUsd: 5000 });
+        assert.deepEqual(r.markets.SOFI, { dex: "para", oiUsd: 20_000, volume24hUsd: 70 });
+        assert.equal(r.markets.NOTREG, undefined); // not a registered B20 stock
+        assert.equal(r.markets.RKT, undefined); // delisted
+        const after = calls;
+        await worker.fetch(req("/api/elsewhere"), e);
+        assert.equal(calls, after); // served from the last read
+        down = true;
+        const now = Date.now;
+        Date.now = () => now() + 6 * 60_000; // past the five minutes: Hyperliquid is asked again, and fails
+        try {
+          const kept = (await (await worker.fetch(req("/api/elsewhere"), e)).json()) as typeof r;
+          assert.equal(calls, after + 1);
+          assert.equal(kept.readAt, r.readAt); // the last read, with its time
+          assert.deepEqual(kept.markets.DELL, r.markets.DELL);
+        } finally {
+          Date.now = now;
+        }
+        resetElsewhere();
+        const empty = (await (await worker.fetch(req("/api/elsewhere"), e)).json()) as { readAt: null; markets: object };
+        assert.equal(empty.readAt, null);
+        assert.deepEqual(empty.markets, {});
+        // US visitors are refused here too
+        assert.equal((await worker.fetch(req("/api/elsewhere", {}, "US"), e)).status, 451);
+      } finally {
+        globalThis.fetch = real;
+      }
     },
   ],
 ];

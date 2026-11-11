@@ -21,11 +21,11 @@ import { GUARD_FEED_MAX_AGE_SECONDS, NASDAQ_HALTS_URL, marketStateFor, parseNasd
 import { parseAbi, type Hex } from "viem";
 import { guardFeedAbi, marketAbi, STATES } from "./abi.js";
 import { deployment, publicClient, wallet } from "./env.js";
+import { hip3Markets, hlInfo } from "./hip3.js";
 
 const INTERVAL_SECONDS = Number(process.env.GUARD_INTERVAL ?? "30"); // rounds accept prices up to 60 s old
 const HEARTBEAT_SECONDS = 240; // under the rounds' maxGuardAge of 300 s
 const HALTS_EVERY_SECONDS = 60; // the Trade Halt RSS page: "do not query the data more than once a minute"
-const HL_INFO = "https://api.hyperliquid.xyz/info";
 const policy: GuardPolicy = { market: { haltSync: true, issuerSync: false, badPrintBandBps: 0, session: "core-hours", maxStateAgeSeconds: 300 } };
 const factoryAbi = parseAbi(["function latestRound(address) view returns (address)"]);
 const roundAbi = parseAbi(["function state() view returns (uint8)"]);
@@ -130,30 +130,11 @@ async function quote(symbol: string): Promise<Quote> {
   throw new Error(`unknown QUOTE_SOURCE ${source}`);
 }
 
-async function hlInfo(body: object): Promise<unknown> {
-  const res = await fetch(HL_INFO, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-  if (!res.ok) throw new Error(`hyperliquid info ${res.status}`);
-  return res.json();
-}
-
 let hlDexOf: Map<string, string> | undefined;
 
 /** Which HIP-3 dex lists each stock, read once: the one with the most open interest when several do. */
 async function dexOf(symbol: string): Promise<string> {
-  if (!hlDexOf) {
-    const best = new Map<string, { dex: string; oi: number }>();
-    const dexes = ((await hlInfo({ type: "perpDexs" })) as ({ name: string } | null)[]).filter((x) => x !== null).map((x) => x!.name);
-    for (const dex of dexes) {
-      const [meta, ctxs] = (await hlInfo({ type: "metaAndAssetCtxs", dex })) as [{ universe: { name: string; isDelisted?: boolean }[] }, { openInterest: string; oraclePx: string }[]];
-      meta.universe.forEach((a, i) => {
-        if (a.isDelisted) return;
-        const t = a.name.split(":").pop()!;
-        const oi = Number(ctxs[i]?.openInterest) * Number(ctxs[i]?.oraclePx);
-        if (!(best.get(t)?.oi! >= oi)) best.set(t, { dex, oi });
-      });
-    }
-    hlDexOf = new Map([...best].map(([t, v]) => [t, v.dex]));
-  }
+  hlDexOf ??= new Map([...(await hip3Markets())].map(([t, m]) => [t, m.dex]));
   const dex = hlDexOf.get(symbol);
   if (!dex) throw new Error(`no HIP-3 market for ${symbol}`);
   return dex;
