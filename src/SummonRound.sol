@@ -69,7 +69,7 @@ contract SummonRound is IUnlockCallback {
         uint256 target; // USDC, 6 decimals
         uint64 deadline;
         uint16 maxSpreadBps; // <= 100
-        uint16 lpBps; // share of the round that seeds the pool, <= 5000
+        uint16 lpBps; // share of the round that seeds the pool, <= MAX_LP_BPS
         uint32 rampSeconds;
         uint32 windowSeconds;
         uint8 maxAuctions;
@@ -83,7 +83,9 @@ contract SummonRound is IUnlockCallback {
     }
 
     uint16 public constant MAX_SPREAD_CAP_BPS = 100;
-    uint16 public constant MAX_LP_BPS = 5000;
+    /// Below half, so the filler's share buys more tokens than the seed even at the 1% spread cap:
+    /// 5050 / 4950 / 1.01 > 1 (Codex r8 #3).
+    uint16 public constant MAX_LP_BPS = 4950;
     /// The pool's seed must be at least this many raw token units, so rounding each amount up by one unit
     /// moves the seed's price and the filler's delivery by at most 1 bp. A target too small for the token's
     /// decimals and price cannot start, and its round expires and refunds (Codex r7 #2).
@@ -298,7 +300,7 @@ contract SummonRound is IUnlockCallback {
         uint256 usdcFiller = pledged - usdcLp;
         uint256 q = SummonPrice.tokensFor(usdcFiller, ref, s, tokenDecimals);
         uint256 qLp = _lpTokens(ref);
-        if (qLp >= q) revert BadParams(); // lpBps <= 5000 and spread <= 1% make this unreachable
+        if (qLp >= q) revert BadParams(); // lpBps <= 4950 and spread <= 1% make this unreachable
 
         _state = State.Filled;
         filledAt = uint64(block.timestamp);

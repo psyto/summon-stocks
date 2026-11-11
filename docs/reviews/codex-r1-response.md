@@ -100,3 +100,13 @@ checked on the next live run) and verdict CHANGES on two points.
 | 2 major | The 10 USDC floor does not make every seed priceable: a 6-decimal token at $9m gives a 1-unit seed (fill reverts) or one priced far off the reference | `MIN_SEED_UNITS` 10^4: `startAuction` and `fill` refuse a seed below it (`SeedTooSmall`), so rounding moves the seed's price and the filler's delivery by at most 1 bp; such a round expires and refunds | `test_seedLargeEnoughToPrice` (6-decimal token: refused at $9m, starts at $23.45, refunds after expiry). Without the check at start it fails. `test_noAuctionPastTheDeadline` also checks the constructor boundary |
 
 `forge test`: 56.
+
+## Codex r8 (2026-11-11): APPROVE
+
+Codex r8 ([codex-r8.md](codex-r8.md)) found r7 #1 and #2 fixed and approved, with one minor point, fixed:
+
+| # | Finding | Fix | Test |
+|---|---|---|---|
+| 3 minor | At a 50% LP share, a fill at any spread above 0 has `qLp >= q` and reverts | `MAX_LP_BPS` 4,950: 5050 / 4950 / 1.01 > 1, so the filler's tokens exceed the seed's even at the 1% cap (the deployment uses 20%) | `test_largestLpShareStillFills` (4,951 cannot open; 4,950 fills at 1% on a 6-decimal token). With the cap at 5,000 it fails |
+
+`forge test`: 57.

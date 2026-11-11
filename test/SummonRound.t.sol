@@ -749,6 +749,44 @@ contract SummonRoundTest is Test {
         r.refund();
     }
 
+    /// Codex r8 #3: at the largest LP share, a fill at the full 1% spread still goes through; past it a round
+    /// cannot open.
+    function test_largestLpShareStillFills() public {
+        SummonRound.Deps memory dp = factory.getDeps();
+        SummonFactory over = new SummonFactory(address(this), dp, SummonFactory.Defaults(4951, 1800, 3600, 3, 300, 50, 300, 3600));
+        over.list(address(token), address(pyth), GME, 60, false);
+        vm.expectRevert(SummonRound.BadParams.selector);
+        over.openRound(address(token), 10e6, uint64(vm.getBlockTimestamp() + 7 days), 100, 7 days);
+
+        // a second hook for a second factory: a hook serves one factory
+        dp.hook = address((uint160(0x6) << 152) | uint160((1 << 13) | (1 << 11) | (1 << 7)));
+        deployCodeTo("SummonHook.sol:SummonHook", abi.encode(address(pm), address(this)), dp.hook);
+        SummonFactory f = new SummonFactory(address(this), dp, SummonFactory.Defaults(4950, 1800, 3600, 3, 300, 50, 300, 3600));
+        SummonHook(dp.hook).setFactory(ISummonRegistry(address(f)));
+        MockB20Of t6 = new MockB20Of(policies, 6);
+        market.setState(address(t6), false, 0, 0);
+        f.list(address(t6), address(pyth), GME, 60, false);
+        SummonRound r = f.openRound(address(t6), 10e6, uint64(vm.getBlockTimestamp() + 7 days), 100, 7 days);
+        vm.startPrank(alice);
+        usdc.approve(address(r), type(uint256).max);
+        r.pledge(10e6);
+        vm.stopPrank();
+        address[] memory ts = new address[](1);
+        ts[0] = address(t6);
+        market.heartbeat(ts);
+        r.startAuction{value: 1}(_fresh());
+        vm.warp(vm.getBlockTimestamp() + 1800); // the spread is at its 1% cap
+        market.heartbeat(ts);
+        assertEq(r.currentSpreadBps(), 100);
+        t6.mint(ap, 1_000e6);
+        bytes[] memory u = _fresh();
+        vm.startPrank(ap);
+        t6.approve(address(r), type(uint256).max);
+        r.fill{value: 1}(u);
+        vm.stopPrank();
+        assertEq(uint8(r.state()), uint8(SummonRound.State.Filled));
+    }
+
     /// Codex r6 #4: an auction may not start unless its whole window ends by the round's deadline.
     function test_noAuctionPastTheDeadline() public {
         // a round must leave room for one auction window
