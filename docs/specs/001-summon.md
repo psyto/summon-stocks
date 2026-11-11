@@ -187,7 +187,8 @@ Open ──(pledged == target)──> Funded ──startAuction()──> Auction
 9. US equity session edges (r4): the guard reports the session closed in the first 15 minutes after the
    open and the last 25 minutes before the close (09:30-09:45 and 15:35-16:00 ET; 12:35-13:00 on early
    closes). Those are the periods when US Limit Up-Limit Down bands are doubled, and quotes and Pyth's
-   confidence are widest. Exchange holidays and early closes come from market-state (`v0.2.0`; Summon pins `v0.3.0`).
+   confidence are widest. Exchange holidays and early closes come from market-state (`v0.2.0`; Summon pins `v0.4.0`, where a
+   session name the guard does not know reads closed rather than open).
 
 ### 5.3 What a fill moves
 Let `P = target`, `U_lp = P × lpBps / 1e4` (default `lpBps` = 2000, at most 4950 so that `Q > Qlp` even at
