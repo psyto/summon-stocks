@@ -20,11 +20,16 @@ backers call it onchain like this:
 4. A public board ranks which ticker comes next. It uses signed, non-binding intents, and no funds move.
 
 A round fills only when every condition below holds:
-- the market is open and the stock is not halted;
-- the price is under 60 s old and its confidence interval is narrow;
+- the market is open, outside the first 15 and last 25 minutes of the session, and the stock is not halted;
+- the price is fresh (on a Pyth listing, the first print after a time the block sets; a guard price, under
+  60 s old), its confidence interval is narrow, and it has not jumped since the auction started;
 - no corporate action is pending, i.e. no multiplier change near the fill;
-- the token is not paused;
+- neither the token nor its issuer's registry is paused;
 - every transfer policy allows the transfer.
+
+After the fill, the pool keeps knowing the stock's market: its hook stops swaps while the stock is halted,
+around a corporate action, or while the issuer pauses it, and charges 1.00% instead of 0.30% while the US
+session is closed.
 
 ## Why it matters
 
@@ -47,14 +52,14 @@ track). **Testnet only (Base Sepolia).** Mainnet data is only read and shown.
 
 | Part | State |
 |---|---|
-| Spec ([docs/specs/001-summon.md](docs/specs/001-summon.md)) | r5 (after Codex r3: a Pyth price taken at a set time, round replacement, the issuer pause in the hook). Reviews in [docs/reviews](docs/reviews): one independent review of r1, then Codex r1 of the spec and code on 2026-11-10 ([findings](docs/reviews/codex-r1.md), [what changed](docs/reviews/codex-r1-response.md)): 3 major and 4 minor, all fixed; then Codex r2 ([findings](docs/reviews/codex-r2.md)): 1 blocker and 3 major, all fixed (intents now live in a Durable Object); then Codex r3 ([findings](docs/reviews/codex-r3.md)): 4 major, fixed; then Codex r4 ([findings](docs/reviews/codex-r4.md)): 4 major and 1 minor, 4 fixed and 1 kept by design with reasons (Codex r5 accepted them); then Codex r5 ([findings](docs/reviews/codex-r5.md)): 1 blocker, 1 major, 1 minor, fixed; r6 and r7 (1 blocker and 1 major each: target bounds, an auction past its deadline, the factory's size, the pool seed), fixed; **Codex r8: APPROVE** ([findings](docs/reviews/codex-r8.md)), its one minor point fixed |
+| Spec ([docs/specs/001-summon.md](docs/specs/001-summon.md)) | r5. Reviewed by Codex (a different model) over eight rounds of spec and code on 2026-11-10 and 11-11, every finding fixed or answered, ending in **APPROVE** at [r8](docs/reviews/codex-r8.md). Each round's findings and what changed are in [docs/reviews](docs/reviews) ([what changed, r1-r8](docs/reviews/codex-r1-response.md)), after one independent review of r1 |
 | Price math (`src/SummonPrice.sol`, spec 5.1) | done, with tests: split invariance, dividend multiplier, fuzzed rounding |
 | Round, factory, pool hook, swap (`src/SummonRound.sol`, `SummonFactory.sol`, `SummonHook.sol`, `SummonSwap.sol`) | done, 51 tests: each fill condition failing alone, pledge cap, target bounds (10 to 10^9 USDC), a pool seed of at least 10^4 token units, no auction past the deadline, withdraw rules, expiry and refunds, claims under transfer policies, LP unwind, pool initialization and liquidity restricted to the round, a fill's price published after the auction started, on a Pyth listing the first print after a time the block sets, round terms of at most 30 days with a round behind pace replaceable (and cancelled) after a day, swaps stopped while the issuer pauses, the router trading only Summon pools, the guard price feed, trading the summoned pool, and the pool that knows the stock's market (below). Removing any of 8 fill checks, or any of the hook's 6 rules, makes a test fail |
 | Stock-aware pool (`SummonHook`, `SummonRound.realign`, spec 5.5 and 5.5a, r4) | built 2026-11-08, deployed 2026-11-11, not yet traded on chain: no swaps in a corporate action window, while the multiplier differs from the one the pool was priced at, or while the listing exchange has the stock halted; a 1.00% fee instead of 0.30% while the session is closed or the guard is quiet; after a split or a dividend in shares, anyone can `realign` the backers' pool to the new multiplier, so the first trader cannot take the difference. No fills in the first 15 and last 25 minutes of the session, while US LULD bands are doubled (market-state `core-hours`). Holidays and 13:00 early closes from market-state `v0.2.0` |
 | Base Sepolia deployment | **redeployed 2026-11-11 with the stock-aware pool** (Codex r8 approved): factory, hook, swap router, registries, and the five B20 demo stocks listed again (see below). No rounds are open yet: the e2e script or the register opens them. The first deployment (2026-11-07) ran the first fill: sGME round [`0xa799…046D`](https://sepolia.basescan.org/address/0xa799fC499Af97a474D02878fC10fB8B733b1046D) |
 | Guard (`ts/guard.ts`) | done: Nasdaq Trader halts (once a minute) and, for guard pricing, the HIP-3 oracle price from Hyperliquid's chain. It writes nothing while the market is closed. `npm run guard -- --quote GME` prints the price it would post and writes nothing |
-| End-to-end fill on Base Sepolia (`ts/e2e.ts`) | **first fill done 2026-11-10 (ET), sGME**: three demo backers pledged 300 tUSDC, the auction started, and the demo filler filled at a $25.115 reference (the HIP-3 oracle price the guard posted), 6 bp under it; the Uniswap v4 pool was seeded and every backer claimed. [pledge](https://sepolia.basescan.org/tx/0x3dbe7c7ad11fdd223ddeab48fbc05393fa85a334a9a2b7ed7054433b7cd7a60c) · [auction start](https://sepolia.basescan.org/tx/0x4b5831f2ca5fc62b8695315ca29670eb433421307826bad32aef927df572bb9a) · [fill](https://sepolia.basescan.org/tx/0xb71b8eb7f4cf16fd1bb060b11247b29741a0caf7151036d79965f09497ffb9eb) · [claim](https://sepolia.basescan.org/tx/0xda9dddb16b677e784f2d4bd6868c5e01fefbd6b699f63f7cc8d36d9e75b3b5dc). It picks up the stock's open round wherever it stands, so pledges made from the web page count. Weekdays 09:30–16:00 ET |
-| Web (`web/`) | built 2026-11-07: the register of all 298 stocks; live round pages; signed intents, with a round opening from the register once a demo stock's intents reach $250; trading a summoned pool; a demand export issuers can verify; the US block and per-network limits (23 Worker tests, intents in one Durable Object so nonce checks and limits are exact, with totals kept per token (named by the current snapshot) and live intents and nonces capped: totals count only unexpired intents, a replay sent with its replacement loses, expired intents are swept, the demand export is paged, an intent lasts at most 31 days, an older signature cannot restore a replaced intent, a nonce far ahead is refused, and a request with no country is refused). Runs locally; goes public once the Codex review is addressed |
+| End-to-end fill on Base Sepolia (`ts/e2e.ts`) | **first fill done 2026-11-10 (ET), sGME**: three demo backers pledged 300 tUSDC, the auction started, and the demo filler filled at a $25.115 reference (the HIP-3 oracle price the guard posted), 6 bp under it; the Uniswap v4 pool was seeded and every backer claimed. [pledge](https://sepolia.basescan.org/tx/0x3dbe7c7ad11fdd223ddeab48fbc05393fa85a334a9a2b7ed7054433b7cd7a60c) · [auction start](https://sepolia.basescan.org/tx/0x4b5831f2ca5fc62b8695315ca29670eb433421307826bad32aef927df572bb9a) · [fill](https://sepolia.basescan.org/tx/0xb71b8eb7f4cf16fd1bb060b11247b29741a0caf7151036d79965f09497ffb9eb) · [claim](https://sepolia.basescan.org/tx/0xda9dddb16b677e784f2d4bd6868c5e01fefbd6b699f63f7cc8d36d9e75b3b5dc). It picks up the stock's open round wherever it stands, so pledges made from the web page count. On a Pyth listing it moves to a later price band only when Pyth printed nothing in the one it tried. Weekdays 09:45–15:35 ET |
+| Web (`web/`) | built 2026-11-07: the register of all 298 stocks; live round pages; signed intents, with a round opening from the register once a demo stock's intents reach $250; trading a summoned pool; a demand export issuers can verify; the US block and per-network limits (23 Worker tests, intents in one Durable Object so nonce checks and limits are exact, with totals kept per token (named by the current snapshot) and live intents and nonces capped: totals count only unexpired intents, a replay sent with its replacement loses, expired intents are swept, the demand export is paged, an intent lasts at most 31 days, an older signature cannot restore a replaced intent, a nonce far ahead is refused, and a request with no country is refused). Runs locally. Not public yet: the code review is done, and the author decides when |
 | Demand from elsewhere | **Hyperliquid built 2026-11-11**: a register cell not yet trading on Base gets a hairline tick when its HIP-3 perp has $100K or more of open interest or 24 h volume (29 cells on 11-11), and the detail shows both amounts and when they were read (`/api/elsewhere`, read at most every 5 minutes, through `ts/hip3.ts`, which the guard uses too). Robinhood Chain token supply is next. Display only: fills still price from Pyth. Counts are under "The numbers" |
 
 First use (2026-11-07, with v1 intents; v2 also signs the token address, so that intent is to be signed
@@ -66,7 +71,7 @@ fill and a trade from the page are next.
 
 Docs:
 - [docs/specs/001-summon.md](docs/specs/001-summon.md): the spec (r5)
-- [docs/reviews/](docs/reviews): reviews, and the request for the next one
+- [docs/reviews/](docs/reviews): the reviews (Codex r1-r8 with each request, and what changed after each)
 - [docs/design.md](docs/design.md): the web design
 
 ## Open question: who fills
@@ -79,7 +84,8 @@ small round cannot cover a mint's fixed cost.
 
 How Summon handles it:
 - **A minimum target.** `SummonFactory.minTarget` is set by the owner (0 on testnet). It will be set from
-  issuers' real fixed costs, which have not been asked yet.
+  issuers' real fixed costs, which have not been asked yet. Whatever it says, a target is between 10 and
+  10^9 USDC, and a round whose pool seed would be under 10^4 token units cannot start.
 - **Intents before money.** Signed intents are free and show whether a ticker could reach that minimum. A
   round opens once they get close, so backers do not lock money in a round that cannot fill.
 - **A clean exit.** If nobody fills, every pledge is refunded.
@@ -103,7 +109,9 @@ Reproduce them with `python3 scripts/count_b20.py`. It reads public APIs and nee
 The same stocks elsewhere (read 2026-11-08 from public sources, no keys). Of the 227 never minted on B20:
 - 80 are stock tokens on Robinhood Chain (212 tokens from its `StockFactory`
   `0x4783C67b63dE2B358Ac5951a7D41F47A38F3C046`, chain 4663), including JPM, V, DIS, CRM and UBER;
-- 24 trade as perps on Hyperliquid's HIP-3 markets, led by DELL (about $6.3M open interest);
+- 24 trade as perps on Hyperliquid's HIP-3 markets, led by DELL (about $6.3M open interest; $5.9M on
+  11-11). The register now reads this live and marks each stock with $100K or more of open interest or
+  24 h volume;
 - 164 are listed as xStocks (`api.backed.fi`). Backed lists 1,533 tokens, so a listing alone is not
   evidence of demand.
 
@@ -123,7 +131,8 @@ cd summon-stocks
 forge test
 ```
 
-Requires [Foundry](https://getfoundry.sh). The B20 precompiles exist only on Base and Base Sepolia, not on
+Requires [Foundry](https://getfoundry.sh). It builds with `via_ir` (foundry.toml): without it the factory,
+which carries the round's creation code, is over the 24,576-byte contract limit. The B20 precompiles exist only on Base and Base Sepolia, not on
 anvil, so unit tests use mocks and the end-to-end run broadcasts to Base Sepolia.
 
 ## Run it on Base Sepolia
@@ -162,9 +171,9 @@ npm run e2e                                    # trading days 09:45-15:35 ET (12
 
   The guard key already decides whether the market is open. With guard pricing, it also sets the price.
 
-Both sources go through the same checks in the round: the price is at most 60 s old, its confidence is
-within 50 bp, and it has not jumped more than 3% since the auction started. A guard that stops posting
-therefore stops fills.
+Both sources go through the same checks in the round: the price is fresh (a guard price at most 60 s old;
+a Pyth price, the first print after the time the block sets), its confidence is within 50 bp, and it has
+not jumped more than 3% since the auction started. A guard that stops posting therefore stops fills.
 
 **Deployed on Base Sepolia** (2026-11-11, with the stock-aware pool; priced from the guard feed; addresses
 also in `deployments/84532.json`). The five demo stocks are the ones created on 2026-11-07, listed again in
@@ -198,7 +207,7 @@ anyone can mint; `DemoOracleRegistry`, which stands in for Coinbase's mainnet or
 `web/` is the page and a Cloudflare Worker. The page shows the register of all 298 stocks, each with
 its own guilloché seal, and a round page that reads the fill conditions live from Base Sepolia. The
 Worker stores signed intents and exports them at `/api/demand`, with signatures, so an issuer can verify the
-totals itself. It checks each EIP-712 signature. An intent names the stock by ticker and by its B20
+totals itself. `/api/elsewhere` gives the register its Hyperliquid marks. It checks each EIP-712 signature. An intent names the stock by ticker and by its B20
 contract address, and the address must match the snapshot: Base's docs say to identify a stock by address,
 because its symbol can be changed. The Worker keeps one intent per wallet per stock, and refuses the project's own demo wallets, so the board never counts them. Each network may write 20
 intents an hour and add 5 new wallets a day. The page's transactions carry a Base Builder Code (ERC-8021)

@@ -187,10 +187,11 @@ Open ──(pledged == target)──> Funded ──startAuction()──> Auction
 9. US equity session edges (r4): the guard reports the session closed in the first 15 minutes after the
    open and the last 25 minutes before the close (09:30-09:45 and 15:35-16:00 ET; 12:35-13:00 on early
    closes). Those are the periods when US Limit Up-Limit Down bands are doubled, and quotes and Pyth's
-   confidence are widest. Exchange holidays and early closes come from market-state `v0.2.0`.
+   confidence are widest. Exchange holidays and early closes come from market-state (`v0.2.0`; Summon pins `v0.3.0`).
 
 ### 5.3 What a fill moves
-Let `P = target`, `U_lp = P × lpBps / 1e4` (default `lpBps` = 2000), and `U_f = P − U_lp`.
+Let `P = target`, `U_lp = P × lpBps / 1e4` (default `lpBps` = 2000, at most 4950 so that `Q > Qlp` even at
+the 1% spread cap, Codex r8 #3), and `U_f = P − U_lp`. `Qlp` must be at least 10^4 raw units (Codex r7 #2).
 - The filler delivers `Q = qRaw(U_f, s)` raw tokens and receives `U_f` USDC.
 - From `Q`, the round puts `Qlp = qRaw(U_lp, 0)` tokens and `U_lp` USDC into the pool at the reference price
   `ref`, with no spread. The remaining `Q − Qlp` tokens are owed to backers pro rata.
