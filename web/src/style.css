@@ -1430,3 +1430,62 @@ details.checks[open] summary {
 .sigs__bad {
   color: var(--seal);
 }
+
+/* EIP-6963: the wallets installed in this browser */
+.picker {
+  width: min(420px, calc(100vw - 32px));
+  padding: 24px;
+  border: 1px solid var(--ink);
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--ink-2);
+}
+.picker::backdrop {
+  background: rgba(14, 33, 28, 0.45);
+}
+.picker h2 {
+  margin: 0 0 6px;
+  font-size: 25px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.picker__lede {
+  margin: 0 0 14px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.picker ul {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+}
+.picker__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+.picker__item:hover,
+.picker__item:focus-visible {
+  border-color: var(--ink);
+  outline: none;
+}
+.picker__item img {
+  border-radius: 6px;
+}
+.picker__last {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+}
