@@ -18,6 +18,7 @@ import {
   type RoundState,
 } from "./chain";
 import { loadElsewhere } from "./data";
+import { fillMoves, position as lpPosition, quoteSwap, wouldRevert } from "./quote";
 import { h } from "./el";
 import { rosette, type Ink } from "./rosette";
 import { connect, current, onWallet, short, walletClient } from "./wallet";
@@ -156,6 +157,7 @@ async function readState(round: Addr, p: Params) {
     backerTokens: backerTokens as bigint,
     unwound: unwound as boolean,
     multiplier: Number(mult) / 1e18,
+    multRaw: mult as bigint,
     /** tUSDC the round still holds: in an expired round, what is left to refund */
     held: held as bigint,
     mine: mine && {
@@ -329,7 +331,10 @@ async function readPool(round: Addr, p: Params, s: S) {
   const gate = s.unwound
     ? { stopped: { why: "The backers took their pool apart after the LP lock. There is nothing left to trade against.", error: "no liquidity" }, feePct: 0, market: "closed" as const }
     : await swapGate(round, p);
-  return { key, px: poolPriceUsd(sqrtP, tokenIs0), liq, gate };
+  const lp = s.unwound ? undefined : await lpPosition(key, round, sqrtP).catch(() => undefined);
+  // the position's tokens and tUSDC, held and earned, whichever currency the stock is
+  const pos = lp && (tokenIs0 ? { tok: lp.held0, usdc: lp.held1, feeTok: lp.fees0, feeUsdc: lp.fees1 } : { tok: lp.held1, usdc: lp.held0, feeTok: lp.fees1, feeUsdc: lp.fees0 });
+  return { key, px: poolPriceUsd(sqrtP, tokenIs0), liq, gate, pos };
 }
 type Pool = Awaited<ReturnType<typeof readPool>>;
 
@@ -354,6 +359,10 @@ function spreadAt(v: View, t: number): number {
   const el = Math.max(0, t - v.s.auctionStart);
   return el >= v.p.rampSeconds ? v.p.maxSpreadBps : Math.floor((v.p.maxSpreadBps * el) / v.p.rampSeconds);
 }
+
+/** The reference per token as the round computes it (18 decimals), from the price shown. */
+const refWad = (v: View) => (v.ref !== undefined ? (BigInt(Math.round(v.ref * 1e8)) * 10n ** 10n * v.s.multRaw) / 10n ** 18n : undefined);
+const raw = (n: bigint) => Number(formatUnits(n, DEMO_DECIMALS));
 
 function inkFor(s: RoundState): Ink {
   return s === "Filled" ? "trading" : s === "Expired" ? "never" : "issued";
@@ -561,7 +570,7 @@ function stage(v: View): HTMLElement {
 const add = (box: HTMLElement, ...kids: (Node | string | null | undefined)[]) => box.append(...(kids.filter((k) => k !== null && k !== undefined) as (Node | string)[]));
 
 /** A row of "label · value" in a quote. */
-function row(label: string, value: string | Node, cls = "") {
+function row(label: string | Node, value: string | Node, cls = "") {
   return h("div", { class: `quote__row ${cls}` }, h("dt", {}, label), h("dd", {}, value));
 }
 
@@ -577,6 +586,9 @@ function ticket(v: View): HTMLElement {
     try {
       const w = walletClient();
       for (const st of steps) {
+        // the chain's own answer first: a step that would revert is not sent, and says why
+        const why = await wouldRevert(st as never, me!);
+        if (why) throw new Error(`${label}: the contract refuses: ${why}`);
         msg.textContent = `${label}: confirm in your wallet.`;
         const hash = await w.writeContract({ ...st, account: me!, chain: client.chain } as never);
         msg.replaceChildren(`${label}: waiting for Base Sepolia. `, h("a", { href: explorer("tx", hash), target: "_blank", rel: "noopener" }, "View transaction"));
@@ -616,14 +628,16 @@ function ticket(v: View): HTMLElement {
       const share = a / Number(formatUnits(p.target, 6));
       v.preview?.((Number(formatUnits(s.pledged, 6)) + a) / Number(formatUnits(p.target, 6)));
       // spec 5.3: backers get Q − Qlp tokens; Q is (1 − lp) of the round at ref × (1 + s), Qlp is lp of it at ref
-      const tokensAt = (sp: number) => (refTok ? (a * ((1 - lpShare) / (1 + sp) - lpShare)) / refTok : undefined);
-      const best = tokensAt(0);
-      const worst = tokensAt(maxS);
+      // the round's own integer math (SummonPrice) for a full round at today's price, then this pledge's share of it
+      const rw = refWad(v);
+      const mine = (sp: number) => (rw ? (raw(fillMoves(p.target, p.lpBps, rw, sp, DEMO_DECIMALS).backers) * a) / Number(formatUnits(p.target, 6)) : undefined);
+      const best = mine(0);
+      const worst = mine(p.maxSpreadBps);
       quote.replaceChildren(
         row("Your share of the round", `${(share * 100).toFixed(1)}%`),
         row("At the fill you get", worst !== undefined ? `${worst.toFixed(4)}–${best!.toFixed(4)} ${demo.symbol}` : "—", "quote__row--key"),
         row("", refTok ? `at today's ${usd(refTok)}, with a spread of 0 to ${pct(p.maxSpreadBps)}` : "priced when the market is open", "quote__row--note"),
-        row("And a share of the pool", refTok ? `${usd(a * lpShare)} + ${toks((a * lpShare) / refTok)}` : `${usd(a * lpShare)} + the same in ${demo.symbol}`),
+        row("And a share of the pool", rw ? `${usd(a * lpShare)} + ${toks((raw(fillMoves(p.target, p.lpBps, rw, 0, DEMO_DECIMALS).qLp) * a) / Number(formatUnits(p.target, 6)))}` : `${usd(a * lpShare)} + the same in ${demo.symbol}`),
         row("", `${p.lpBps / 100}% of the round seeds the stock's pool; you are one of its LPs, and can take it out ${p.lpLockSeconds / 3600} h after the fill`, "quote__row--note"),
         row("If no fill by the deadline", `$${a.toLocaleString("en-US")} back`),
       );
@@ -673,10 +687,11 @@ function ticket(v: View): HTMLElement {
       h("p", { class: "act__note" }, tooLate ? `Too late to start: an auction must end by the deadline. The round will expire and every pledge can be refunded.` : hold ? "" : "Waits until every fill condition holds, which needs the US market open."),
     );
   } else if (s.state === "Auction") {
-    const uf = Number(formatUnits(p.target, 6)) * (1 - lpShare);
+    const uf = Number(formatUnits(s.pledged - (s.pledged * BigInt(p.lpBps)) / 10_000n, 6));
+    // the round's own math at this second's spread: the exact raw units fill() would pull at this price
     const deliver = () => {
-      const sp = spreadAt(v, now()) / 10_000;
-      return refTok ? toks(uf / (refTok * (1 + sp))) : "—";
+      const rw = refWad(v);
+      return rw ? `${raw(fillMoves(s.pledged, p.lpBps, rw, spreadAt(v, now()), DEMO_DECIMALS).q).toFixed(8)} ${demo.symbol}` : "—";
     };
     add(box,
       h("h2", { class: "ticket__title wide" }, "Fill this round"),
@@ -748,53 +763,73 @@ function trade(v: View, run: (label: string, steps: { address: Addr; abi: Abi; f
   const unit = h("span", {});
   const quote = h("dl", { class: "quote" });
   const go = h("button", { class: "btn btn--seal btn--wide", type: "button" });
-  const est = () => {
-    const n = Number(amount.value) || 0;
-    const keep = 1 - g.feePct / 100;
-    return v.keep.buying ? (n / pl.px) * keep : n * pl.px * keep;
+  // the exact output, asked of the pool and its hook through Uniswap's quoter; undefined while it is asked
+  let quoted: { out: bigint } | { refused: string } | undefined;
+  let asked = 0;
+  const amountIn = () => parseUnits(String(Number(amount.value) || 0), v.keep.buying ? 6 : DEMO_DECIMALS);
+  const zeroForOne = () => pl.key.currency0.toLowerCase() === (v.keep.buying ? D.usdc! : p.token).toLowerCase();
+  const ask = async () => {
+    const n = ++asked;
+    quoted = undefined;
+    paint();
+    const q = await quoteSwap(pl.key as never, zeroForOne(), amountIn());
+    if (n === asked) {
+      quoted = q;
+      paint();
+    }
+  };
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const askSoon = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => void ask(), 300);
   };
   const paint = () => {
     for (const t of tabs.querySelectorAll("button")) t.setAttribute("aria-selected", String((t.dataset.side === "buy") === v.keep.buying));
     unit.textContent = v.keep.buying ? "tUSDC" : demo.symbol;
     const n = Number(amount.value) || 0;
-    const out = est();
+    const got = quoted && "out" in quoted ? Number(formatUnits(quoted.out, v.keep.buying ? DEMO_DECIMALS : 6)) : undefined;
+    const refused = quoted && "refused" in quoted ? quoted.refused : undefined;
     quote.replaceChildren(
       row("Pool fee now", `${g.feePct.toFixed(2)}%`, "quote__row--key"),
       row("", g.market === "open" ? "the US session is open" : "the US session is closed: 1.00% instead of 0.30%", "quote__row--note"),
       row("You pay", v.keep.buying ? `${n.toLocaleString("en-US")} tUSDC` : toks(n)),
-      row("You get about", v.keep.buying ? toks(out) : `${out.toFixed(2)} tUSDC`),
-      row("", "Reverts below 97% of this: the pool is small, so size moves the price.", "quote__row--note"),
+      refused
+        ? row("The pool refuses", refused, "quote__row--refused")
+        : row("You get", got === undefined ? "asking the pool…" : v.keep.buying ? toks(got) : `${got.toFixed(6)} tUSDC`, "quote__row--key"),
+      row("", refused ? "Simulated on Base Sepolia just now: this is the contract's own error." : "Exact: simulated on Base Sepolia just now, through the pool and its hook. Reverts if a trade before yours moves it more than 1%.", "quote__row--note"),
     );
     go.textContent = !me ? "Connect a wallet" : v.keep.buying ? `Buy ${demo.symbol}` : `Sell ${demo.symbol}`;
+    go.toggleAttribute("disabled", !!me && (refused !== undefined || got === undefined || n <= 0));
   };
   for (const [side, label] of [["buy", "Buy"], ["sell", "Sell"]] as const) {
     const t = h("button", { class: "tab", type: "button", role: "tab", "data-side": side }, label);
     t.addEventListener("click", () => {
       v.keep.buying = side === "buy";
-      paint();
+      void ask();
     });
     tabs.append(t);
   }
   amount.addEventListener("input", () => {
     v.keep.trade = Number(amount.value) || 0;
-    paint();
+    askSoon();
   });
   go.addEventListener("click", () => {
     if (!me) return void connect().catch((e) => (msg.textContent = (e as Error).message));
     const buying = v.keep.buying;
     const inDec = buying ? 6 : DEMO_DECIMALS;
     const outDec = buying ? DEMO_DECIMALS : 6;
-    const amountIn = parseUnits(String(Number(amount.value) || 0), inDec);
-    if (amountIn === 0n) return void (msg.textContent = "Enter an amount above 0.");
-    const minOut = parseUnits((est() * 0.97).toFixed(outDec), outDec);
+    const inAmt = parseUnits(String(Number(amount.value) || 0), inDec);
+    if (inAmt === 0n || !quoted || !("out" in quoted)) return void (msg.textContent = "Enter an amount above 0.");
+    void outDec;
+    const minOut = (quoted.out * 99n) / 100n;
     const tokenIn = buying ? D.usdc! : p.token;
-    const zeroForOne = pl.key.currency0.toLowerCase() === tokenIn.toLowerCase();
     void run(buying ? "Buy" : "Sell", [
-      { address: tokenIn, abi: erc20Abi, functionName: "approve", args: [D.swap!, amountIn] },
-      { address: D.swap!, abi: swapAbi as Abi, functionName: "swapExactIn", args: [pl.key, zeroForOne, amountIn, minOut, me] },
+      { address: tokenIn, abi: erc20Abi, functionName: "approve", args: [D.swap!, inAmt] },
+      { address: D.swap!, abi: swapAbi as Abi, functionName: "swapExactIn", args: [pl.key, zeroForOne(), inAmt, minOut, me] },
     ]);
   });
   paint();
+  void ask();
   box.append(tabs, h("label", { class: "money" }, amount, unit), quote, go);
   return box;
 }
@@ -805,6 +840,14 @@ function position(v: View, run: (label: string, steps: { address: Addr; abi: Abi
   const m = s.mine!;
   const owed = p.target > 0n ? (s.backerTokens * m.pledge) / p.target : 0n;
   const unlock = s.filledAt + p.lpLockSeconds;
+  // valued at the pool's price now; the pool share is this backer's part of the round's position and its fees
+  const px = v.pool?.px ?? 0;
+  const share = Number(m.pledge) / Number(s.pledged || 1n);
+  const stockUsd = raw(owed) * px;
+  const pos = v.pool?.pos;
+  const lpUsd = pos ? (raw(pos.tok) * px + Number(formatUnits(pos.usdc, 6))) * share : 0;
+  const feeUsd = pos ? (raw(pos.feeTok) * px + Number(formatUnits(pos.feeUsdc, 6))) * share : 0;
+  const pnl = stockUsd + lpUsd + feeUsd - Number(formatUnits(m.pledge, 6));
   const box = h(
     "section",
     { class: "position" },
@@ -812,9 +855,10 @@ function position(v: View, run: (label: string, steps: { address: Addr; abi: Abi
     h(
       "dl",
       { class: "quote" },
-      row("Pledged", `$${tusdc(m.pledge)} (${((Number(m.pledge) / Number(p.target)) * 100).toFixed(1)}%)`),
-      row(demo.symbol, m.claimed ? "claimed" : `${Number(formatUnits(owed, DEMO_DECIMALS)).toFixed(4)} to claim`, "quote__row--key"),
-      row("Pool share", s.unwound ? (m.claimedLP ? "claimed" : "ready to claim") : livetext(() => (now() >= unlock ? "unlocked: unwind it to claim" : `locked ${until(unlock)}`))),
+      row(`${raw(owed).toFixed(4)} ${demo.symbol}${m.claimed ? ", claimed" : " to claim"}`, usd(stockUsd)),
+      row(s.unwound ? "Pool share" : livetext(() => `Pool share, ${now() >= unlock ? "unlocked" : `locked ${until(unlock)}`}`), s.unwound ? (m.claimedLP ? "claimed" : "ready to claim") : pos ? usd(lpUsd) : "—"),
+      row("Fees it has earned", pos ? usd(feeUsd) : "—"),
+      row(`Against the $${tusdc(m.pledge)} pledged`, `${pnl >= 0 ? "+" : "−"}${usd(Math.abs(pnl))}`, "quote__row--key"),
     ),
   );
   if (!m.claimed) box.append(btn(`Claim ${Number(formatUnits(owed, DEMO_DECIMALS)).toFixed(4)} ${demo.symbol}`, () => void run("Claim", [{ address: round, abi: roundAbi as Abi, functionName: "claim" }]), true));

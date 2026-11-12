@@ -380,7 +380,7 @@ try {
         await until(".position", /claimed/, 120_000);
         await sleep(1500);
       }
-      await caption("Anyone can trade it. Before signing: the fee the hook will charge now and what comes back.");
+      await caption("Anyone can trade it. The ticket asks the pool itself: the exact amount out at the fee the hook charges now, simulated on Base Sepolia.");
       await moveToSel(".ticket__trade .quote");
       await sleep(3000);
       // the demo pool holds about $60 a side: 1 tUSDC stays inside the page's 3% slippage limit
@@ -403,7 +403,9 @@ try {
         await sendAs("operator", dep.marketState, marketAbi, "setState", [stock.address, before.halted, before.reason, before.resumeAfter]);
       }
       await until(".rp__big", /%/, 60_000);
-      await caption("The halt lifts and trading resumes.");
+      await caption("The halt lifts and trading resumes. Alice's position: her stock, her share of the pool and the fees it has earned, against what she pledged.");
+      await moveToSel(".position");
+      await sleep(4500);
       await moveToSel(".dial");
       await sleep(4000);
     } else if (part === "unwind") {

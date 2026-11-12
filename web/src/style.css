@@ -1383,3 +1383,7 @@ details.checks[open] summary {
   stroke: var(--seal);
   stroke-width: 0.02;
 }
+.quote__row--refused dd {
+  color: var(--seal);
+  font-weight: 800;
+}
