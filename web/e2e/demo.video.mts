@@ -12,6 +12,9 @@
  *   wait     <out.mp4>   (round funded) the next summoning; Follow and the Telegram alerts (the bot's own messages); the share card
  *   auction  <out.mp4>   (market open) the auction starts, the spread runs, the filler fills, alice claims
  *   trade    <out.mp4>   (round filled) alice buys at the pool's fee; a halt stops the pool, and it resumes
+ *   split    <out.mp4>   (round filled; run twice) first a 2:1 split is scheduled and the pool stops for the window;
+ *                        an hour later the pool is on the old multiplier, alice realigns it and trading resumes
+ *   closed   <out.mp4>   (round filled, US market closed) the same pool charges 1.00%; alice buys
  *   unwind   <out.mp4>   (LP lock over) the backers' pool is taken apart; alice claims her share
  *   me       <out.mp4>   alice's My summons: every round she backed and what each needs from her next
  *   join     <out.mp4> <part.mp4>...
@@ -30,7 +33,7 @@ import { latestRound } from "../worker/rounds";
 const BASE = process.env.BASE_URL ?? "http://localhost:8790";
 const RPC = process.env.BASE_SEPOLIA_RPC ?? "https://sepolia.base.org";
 const [part, out = "", ...rest] = process.argv.slice(2);
-if (!part) throw new Error("usage: demo.video.mts <title|now|register|trust|pledge|wait|auction|trade|unwind|me|join> <out.mp4> ...");
+if (!part) throw new Error("usage: demo.video.mts <title|now|register|trust|pledge|wait|auction|trade|split|closed|unwind|me|join> <out.mp4> ...");
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 if (part === "join") {
@@ -67,6 +70,7 @@ const dep = JSON.parse(readFileSync(new URL("../../deployments/84532.json", impo
   factory: Hex;
   usdc: Hex;
   marketState: Hex;
+  oracleRegistry: Hex;
   demoStocks: { ticker: string; symbol: string; address: Hex }[];
 };
 const TICKER = process.env.TICKER ?? "RDDT";
@@ -74,6 +78,9 @@ const stock = dep.demoStocks.find((s) => s.ticker === TICKER)!;
 const roundOf = () => pc.readContract({ address: dep.factory, abi: parseAbi(["function latestRound(address) view returns (address)"]), functionName: "latestRound", args: [stock.address] });
 const erc20 = parseAbi(["function mint(address to, uint256 amount)", "function approve(address spender, uint256 amount) returns (bool)"]);
 const roundAbi = parseAbi(["function pledge(uint256 amount)", "function pledged() view returns (uint256)", "function state() view returns (uint8)"]);
+const tokenAbi = parseAbi(["function multiplier() view returns (uint256)", "function effectiveAt() view returns (uint256)", "function updateUIMultiplier(uint256 newMultiplier, uint256 effectiveAt)"]);
+const oracleAbi = parseAbi(["function set(address token, uint256 multiplier, bool paused)", "function getOracleParams(address token) view returns (uint256, bool)"]);
+const poolMultAbi = parseAbi(["function poolMultiplier() view returns (uint256)", "function params() view returns ((address token, address priceSource, bytes32 priceId, uint256 target, uint64 deadline, uint16 maxSpreadBps, uint16 lpBps, uint32 rampSeconds, uint32 windowSeconds, uint8 maxAuctions, uint32 lpLockSeconds, uint32 maxGuardAge, uint32 maxPythAge, bool pull, uint16 maxConfBps, uint16 maxJumpBps, uint32 cooldownSeconds))"]);
 const marketAbi = parseAbi([
   "function setState(address token, bool halted, uint8 reason, uint64 resumeAfter)",
   "function stateOf(address token) view returns ((bool halted, uint8 reason, uint64 updatedAt, uint64 resumeAfter))",
@@ -122,6 +129,8 @@ async function rpc(method: string, paramsJson: string): Promise<string> {
 
 const browser = await puppeteer.launch({ headless: true, defaultViewport: { width: 1440, height: 900, deviceScaleFactor: 1 }, args: ["--lang=en-US"] });
 const page = await browser.newPage();
+// the market's own clock, whatever the recording machine's
+await page.emulateTimezone("America/New_York");
 await page.evaluateOnNewDocument("globalThis.__name = (f) => f");
 await page.exposeFunction("__demoRpc", rpc);
 await page.evaluateOnNewDocument(() => {
@@ -450,14 +459,17 @@ try {
       const round = await roundOf();
       await start(`${BASE}/#/round/${round}`, ".rp__stage");
       await record();
-      await caption("Market hours. The guard confirms ${TICKER} is open and not halted, and posts its price.");
-      await until(".tiles", /6 of 6/, 240_000);
-      await moveToSel(".tiles .tile:nth-child(2)");
-      await sleep(3000);
-      await caption("Every fill condition holds, so anyone can start the auction. Here the filler does.");
-      await connectAs("filler");
-      await click("Start the auction", 800);
-      await until(".seq__now", /Auction/, 120_000);
+      // a retake can begin with the auction already started
+      if (!/Auction/.test(await page.$eval(".seq__now", (e) => e.textContent ?? ""))) {
+        await caption(`Market hours. The guard confirms ${TICKER} is open and not halted, and posts its price.`);
+        await until(".tiles", /6 of 6/, 240_000);
+        await moveToSel(".tiles .tile:nth-child(2)");
+        await sleep(3000);
+        await caption("Every fill condition holds, so anyone can start the auction. Here the filler does.");
+        await connectAs("filler");
+        await click("Start the auction", 800);
+        await until(".seq__now", /Auction/, 120_000);
+      } else await connectAs("filler");
       await caption("The spread starts at 0 and rises each second, up to the 1% cap the backers accepted when they pledged.");
       await moveToSel(".dial");
       await sleep(9000);
@@ -468,7 +480,10 @@ try {
       await moveToSel(".ticket .quote");
       await sleep(6000);
       await click("Fill now", 800);
-      await until(".seq__now", /Filled/, 180_000);
+      await until(".seq__now", /Filled/, 180_000).catch(async (e) => {
+        console.error("not filled; the ticket says:", await page.$eval(".act__msg", (m) => m.textContent).catch(() => "—"));
+        throw e;
+      });
       await caption("Filled. Part of the round seeds a Uniswap v4 pool that the backers own, at the fill's reference price.");
       await moveToSel(".dial");
       await sleep(5000);
@@ -516,19 +531,100 @@ try {
       await sleep(4500);
       await moveToSel(".dial");
       await sleep(4000);
-    } else if (part === "unwind") {
+    } else if (part === "split") {
+      const round = (await roundOf()) as Hex;
+      const [m, eff, pm, p] = await Promise.all([
+        pc.readContract({ address: stock.address, abi: tokenAbi, functionName: "multiplier" }),
+        pc.readContract({ address: stock.address, abi: tokenAbi, functionName: "effectiveAt" }),
+        pc.readContract({ address: round, abi: poolMultAbi, functionName: "poolMultiplier" }),
+        pc.readContract({ address: round, abi: poolMultAbi, functionName: "params" }),
+      ]);
+      const t = BigInt(Math.floor(Date.now() / 1000));
+      const cd = BigInt(p.cooldownSeconds);
+      if (m === pm && (eff === 0n || t > eff + cd)) {
+        // the first take: the issuer schedules a 2:1 split two minutes out
+        await start(`${BASE}/#/round/${round}`, ".rp__stage");
+        await record();
+        await caption(`A stock is not a plain token: its issuer can split it. Here ${stock.symbol}'s issuer schedules a 2:1 split.`);
+        await sleep(3500);
+        await sendAs("operator", stock.address, tokenAbi, "updateUIMultiplier", [m * 2n, t + 120n]);
+        await until(".ticket", /CorporateActionWindow/, 90_000);
+        await caption(`The pool's hook stops trading ${Number(cd) / 60} min either side of the change, so nobody trades on a price that is about to be wrong.`);
+        await moveToSel(".refuse");
+        await sleep(7000);
+        console.log(`split scheduled: run this part again after ${new Date(Number(t + 120n + cd) * 1000).toISOString()}`);
+      } else if (t <= eff + cd) {
+        // a retake of the first take, inside the window: the split is already scheduled
+        if (process.env.RETAKE !== "1") throw new Error(`still in the corporate action window: run again after ${new Date(Number(eff + cd) * 1000).toISOString()} (or RETAKE=1 to film the first take again)`);
+        await start(`${BASE}/#/round/${round}`, ".rp__stage");
+        await record();
+        await caption(`A stock is not a plain token: its issuer can split it. Here ${stock.symbol}'s issuer has scheduled a 2:1 split.`);
+        await until(".ticket", /CorporateActionWindow/, 90_000);
+        await sleep(3500);
+        await caption(`The pool's hook stops trading ${Number(cd) / 60} min either side of the change, so nobody trades on a price that is about to be wrong.`);
+        await moveToSel(".refuse");
+        await sleep(7000);
+      } else {
+        // the second take: the window is over and the pool is still priced at the old multiplier
+        const [rm] = await pc.readContract({ address: dep.oracleRegistry, abi: oracleAbi, functionName: "getOracleParams", args: [stock.address] });
+        if (rm !== m) await sendAs("operator", dep.oracleRegistry, oracleAbi, "set", [stock.address, m, false]);
+        await start(`${BASE}/#/round/${round}`, ".rp__stage");
+        await record();
+        await caption("The split has taken effect. The backers' pool is still priced for the old share count, so the hook keeps it stopped.");
+        await until(".ticket", /StaleMultiplier/, 60_000);
+        await moveToSel(".refuse");
+        await sleep(5000);
+        await caption("Anyone can realign it: the pool is re-priced by the change, so the first trader cannot take the difference.");
+        await connectAs("alice");
+        await click("Realign the pool", 800);
+        await page.waitForFunction(() => !/StaleMultiplier/.test(document.querySelector(".ticket")?.textContent ?? "") && /Buy|Sell/.test(document.querySelector(".ticket__trade")?.textContent ?? ""), { timeout: 120_000, polling: 1000 });
+        await caption("Realigned to the new multiplier. Trading resumes, and the quote is the pool's own again.");
+        await moveToSel(".ticket__trade .quote");
+        await sleep(6000);
+      }
+    } else if (part === "closed") {
       const round = await roundOf();
       await start(`${BASE}/#/round/${round}`, ".rp__stage");
       await record();
-      await caption("After the LP lock, anyone can take the backers' pool apart for them.");
+      await caption(`After 16:00 New York time the US market is closed. ${stock.symbol}'s pool still trades, but the hook charges 1.00% instead of 0.30%.`);
+      await until(".rp__big", /1\.00%/, 60_000);
+      await moveToSel(".dial");
+      await sleep(5000);
+      await caption("The ticket asks the pool for the exact amount out at that fee, before anyone signs.");
       await connectAs("alice");
-      await click("Unwind the pool for the backers", 800);
-      await until(".rp__big", /Unwound/, 120_000);
-      await caption("Each backer claims a share of what the pool held: stock and USDC, pro rata.");
-      await click("Claim my share of the pool", 800);
-      await until(".position", /claimed/, 120_000);
-      await moveToSel(".position");
+      await click("css:.ticket__trade input", 200);
+      await page.$eval(".ticket__trade input", (e) => (e as HTMLInputElement).select());
+      await page.keyboard.type("1", { delay: 160 });
+      await moveToSel(".ticket__trade .quote");
       await sleep(4000);
+      await click(`Buy ${stock.symbol}`, 800);
+      await sleep(6000);
+      await caption("A wider fee while nobody can hedge on the exchange: the backers, who are the pool's LPs, are paid for that risk.");
+      if (await page.$(".position")) await moveToSel(".position");
+      await sleep(4500);
+    } else if (part === "unwind") {
+      const round = await roundOf();
+      await start(`${BASE}/#/round/${round}`, ".rp__stage");
+      if (process.env.AFTER === "1") {
+        // a retake of the ending only, once the pool is already apart and claimed
+        await record();
+        await connectAs("alice");
+        await until(".position", /claimed/, 60_000);
+        await caption("Her share is claimed. The position still counts it: her stock and her part of the pool, against what she pledged.");
+        await moveToSel(".position");
+        await sleep(6000);
+      } else {
+        await record();
+        await caption("After the LP lock, anyone can take the backers' pool apart for them.");
+        await connectAs("alice");
+        await click("Unwind the pool for the backers", 800);
+        await until(".rp__big", /Unwound/, 120_000);
+        await caption("Each backer claims a share of what the pool held: stock and USDC, pro rata.");
+        await click("Claim my share of the pool", 800);
+        await until(".position", /claimed/, 120_000);
+        await moveToSel(".position");
+        await sleep(4000);
+      }
     } else {
       throw new Error(`unknown part ${part}`);
     }

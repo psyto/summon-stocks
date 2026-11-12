@@ -127,7 +127,7 @@ async function readState(round: Addr, p: Params) {
   const r = (fn: string, args: unknown[] = []) =>
     client.readContract({ address: round, abi: roundAbi as Abi, functionName: fn, args }) as Promise<unknown>;
   const me = current();
-  const [st, pledged, auctionStart, auctionsRun, filledAt, fillRef, fillSpread, backerTokens, unwound, mult, held] = await Promise.all([
+  const [st, pledged, auctionStart, auctionsRun, filledAt, fillRef, fillSpread, backerTokens, unwound, mult, held, lpTokens, lpUsdc] = await Promise.all([
     r("state"),
     r("pledged"),
     r("auctionStart"),
@@ -139,6 +139,8 @@ async function readState(round: Addr, p: Params) {
     r("unwound"),
     client.readContract({ address: p.token, abi: b20Abi, functionName: "multiplier" }),
     client.readContract({ address: D.usdc!, abi: erc20Abi, functionName: "balanceOf", args: [round] }),
+    r("lpTokens"),
+    r("lpUsdc"),
   ]);
   const mine = me
     ? await Promise.all([
@@ -159,6 +161,8 @@ async function readState(round: Addr, p: Params) {
     fillSpread: Number(fillSpread),
     backerTokens: backerTokens as bigint,
     unwound: unwound as boolean,
+    /** what the unwind took out of the pool, for every backer pro rata */
+    lp: { tok: lpTokens as bigint, usdc: lpUsdc as bigint },
     multiplier: Number(mult) / 1e18,
     multRaw: mult as bigint,
     /** tUSDC the round still holds: in an expired round, what is left to refund */
@@ -875,7 +879,8 @@ function position(v: View, run: (label: string, steps: { address: Addr; abi: Abi
   const share = Number(m.pledge) / Number(s.pledged || 1n);
   const stockUsd = raw(owed) * px;
   const pos = v.pool?.pos;
-  const lpUsd = pos ? (raw(pos.tok) * px + Number(formatUnits(pos.usdc, 6))) * share : 0;
+  // after the unwind the pool share is what the round took out, claimed or not
+  const lpUsd = s.unwound ? (raw(s.lp.tok) * px + Number(formatUnits(s.lp.usdc, 6))) * share : pos ? (raw(pos.tok) * px + Number(formatUnits(pos.usdc, 6))) * share : 0;
   const feeUsd = pos ? (raw(pos.feeTok) * px + Number(formatUnits(pos.feeUsdc, 6))) * share : 0;
   const pnl = stockUsd + lpUsd + feeUsd - Number(formatUnits(m.pledge, 6));
   const box = h(
@@ -886,7 +891,7 @@ function position(v: View, run: (label: string, steps: { address: Addr; abi: Abi
       "dl",
       { class: "quote" },
       row(`${raw(owed).toFixed(4)} ${demo.symbol}${m.claimed ? ", claimed" : " to claim"}`, usd(stockUsd)),
-      row(s.unwound ? "Pool share" : livetext(() => `Pool share, ${now() >= unlock ? "unlocked" : `locked ${until(unlock)}`}`), s.unwound ? (m.claimedLP ? "claimed" : "ready to claim") : pos ? usd(lpUsd) : "—"),
+      row(s.unwound ? "Pool share" : livetext(() => `Pool share, ${now() >= unlock ? "unlocked" : `locked ${until(unlock)}`}`), s.unwound ? `${usd(lpUsd)}, ${m.claimedLP ? "claimed" : "ready to claim"}` : pos ? usd(lpUsd) : "—"),
       row("Fees it has earned", pos ? usd(feeUsd) : "—"),
       row(`Against the $${tusdc(m.pledge)} pledged`, `${pnl >= 0 ? "+" : "−"}${usd(Math.abs(pnl))}`, "quote__row--key"),
     ),

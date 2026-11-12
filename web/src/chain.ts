@@ -50,6 +50,8 @@ export const roundAbi = parseAbi([
   "function backerTokens() view returns (uint256)",
   "function liquidity() view returns (uint128)",
   "function unwound() view returns (bool)",
+  "function lpTokens() view returns (uint256)",
+  "function lpUsdc() view returns (uint256)",
   "function params() view returns ((address token, address priceSource, bytes32 priceId, uint256 target, uint64 deadline, uint16 maxSpreadBps, uint16 lpBps, uint32 rampSeconds, uint32 windowSeconds, uint8 maxAuctions, uint32 lpLockSeconds, uint32 maxGuardAge, uint32 maxPythAge, bool pull, uint16 maxConfBps, uint16 maxJumpBps, uint32 cooldownSeconds))",
   "function pledge(uint256 amount)",
   "function withdraw(uint256 amount)",
