@@ -62,8 +62,9 @@ Layout:
 Principles:
 1. The rosette is the one bold thing. Everything else is quiet: hairlines, paper, ink.
 2. State is drawn, not badged: ink density and the seal carry status. No coloured pills.
-3. One orchestrated motion: the hero rosette draws itself on load. Nothing else animates by itself.
-   Reduced motion shows it drawn.
+3. One orchestrated motion: the hero rosette draws itself on load. Nothing else animates by itself:
+   what moves on the round page moves because the chain did (see "Round page, redone"). Reduced motion
+   shows everything still.
 4. Every number names where it came from (API snapshot time, block, feed age).
 5. Honest testnet: the demo stock, test USDC and demo wallets say so wherever they appear.
 
@@ -88,6 +89,21 @@ Principles:
 - First use by the author (11-07): with Pledge always enabled, the order (get test USDC, then pledge) was
   unclear. The round page now makes whichever step can be taken the primary button. Pledge stays disabled
   until there is test USDC, and the amount is checked against the balance and the room left.
+
+## Round page, redone (2026-11-12)
+Set beside another of our pages' trade page, the certificate round page read as a document: little changed when
+something happened, and the demo had to be told in a terminal. Now:
+- One screen at 1440×900, no scrolling: the seal sits inside a 270° dial. Open: the dial fills with
+  pledges, and the amount being chosen shows as a dashed arc before anything is signed. Auction: the dial
+  is the spread, moving each second, because the contract's spread does. Filled: the pool's fee, or a red
+  dashed ring when the hook stops trading. Under it, one big number and three tiles.
+- A ticket on the right says what an order gets before it is signed, with numbers from the chain: a swap
+  quoted through the pool and its hook (V4Quoter), pledges and fills by the round's integer math, every
+  transaction simulated first so a refusal is the contract's own error.
+- Motion follows the chain: reads every 4 s while a round moves, the dial glides between reads, the big
+  number counts up. The fill conditions fold below the screen.
+- Still Summon's: paper, ink and seal red, the rosette at the centre. Not another of our pages' dark trading look,
+  so the two do not read as one product.
 
 ## Demand from elsewhere (planned 2026-11-08; Hyperliquid built 2026-11-11, Robinhood Chain to come)
 - On the register, a never-minted stock that already trades elsewhere gets a mark: Hyperliquid HIP-3 (open
