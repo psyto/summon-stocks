@@ -580,8 +580,10 @@ function ticket(v: View): HTMLElement {
       fund?.toggleAttribute("hidden", !short_);
       go.toggleAttribute("disabled", !!me && (a <= 0 || s.mine!.usdc < parseUnits(String(a), 6)));
     };
-    for (const n of [25, 50, 100, Math.floor(room)]) {
-      if (n <= 0 || (n > room && n !== Math.floor(room))) continue;
+    // the fixed amounts that fit, and "Max" unless it is one of them
+    const fixed = [25, 50, 100].filter((n) => n < room);
+    for (const n of [...fixed, Math.floor(room)]) {
+      if (n <= 0) continue;
       const b = h("button", { class: "preset", type: "button", "data-v": String(n) }, n === Math.floor(room) ? `Max $${n}` : `$${n}`);
       b.addEventListener("click", () => {
         v.keep.pledge = n;
@@ -709,8 +711,7 @@ function trade(v: View, run: (label: string, steps: { address: Addr; abi: Abi; f
       row("", g.market === "open" ? "the US session is open" : "the US session is closed: 1.00% instead of 0.30%", "quote__row--note"),
       row("You pay", v.keep.buying ? `${n.toLocaleString("en-US")} tUSDC` : toks(n)),
       row("You get about", v.keep.buying ? toks(out) : `${out.toFixed(2)} tUSDC`),
-      row("Pool price", `${usd(pl.px)} per ${demo.symbol}`),
-      row("", "The trade reverts if it would get less than 97% of the estimate; the pool is small, so size moves the price.", "quote__row--note"),
+      row("", "Reverts below 97% of this: the pool is small, so size moves the price.", "quote__row--note"),
     );
     go.textContent = !me ? "Connect a wallet" : v.keep.buying ? `Buy ${demo.symbol}` : `Sell ${demo.symbol}`;
   };

@@ -5,14 +5,14 @@
  * (testnet only), or a throwaway key for the intent, which the local Worker stores (never the live board).
  *
  *   title    <out.mp4> <line> [<sub>]   a card between parts
- *   register <out.mp4>   the register: 227 stocks never issued; RIVN; a signed intent; its round
+ *   register <out.mp4>   the register: 227 stocks never issued; a signed intent takes the stock past $250; that wallet opens its round
  *   pledge   <out.mp4>   alice pledges on the round page; bob and carol fill it; the round waits for the market
  *   auction  <out.mp4>   (market open) the auction starts, the spread runs, the filler fills, alice claims
  *   trade    <out.mp4>   (round filled) alice buys at the pool's fee; a halt stops the pool, and it resumes
  *   unwind   <out.mp4>   (LP lock over) the backers' pool is taken apart; alice claims her share
  *   join     <out.mp4> <part.mp4>...
  *
- * TICKER picks the demo stock (default RIVN). Run from web/: npx tsx e2e/demo.video.mts <part> <out.mp4>
+ * TICKER picks the demo stock (default SOFI). Run from web/: npx tsx e2e/demo.video.mts <part> <out.mp4>
  */
 import { execFileSync } from "node:child_process";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -63,7 +63,7 @@ const dep = JSON.parse(readFileSync(new URL("../../deployments/84532.json", impo
   marketState: Hex;
   demoStocks: { ticker: string; symbol: string; address: Hex }[];
 };
-const TICKER = process.env.TICKER ?? "RIVN";
+const TICKER = process.env.TICKER ?? "SOFI";
 const stock = dep.demoStocks.find((s) => s.ticker === TICKER)!;
 const roundOf = () => pc.readContract({ address: dep.factory, abi: parseAbi(["function latestRound(address) view returns (address)"]), functionName: "latestRound", args: [stock.address] });
 const erc20 = parseAbi(["function mint(address to, uint256 amount)", "function approve(address spender, uint256 amount) returns (bool)"]);
@@ -127,6 +127,7 @@ await page.evaluateOnNewDocument(() => {
     on: (e: string, f: (...a: unknown[]) => void) => (listeners[e] ??= []).push(f),
     removeListener: () => {},
   };
+  (window as unknown as { __demoEmit: (e: string) => void }).__demoEmit = (e) => (listeners[e] ?? []).forEach((f) => f());
 });
 
 /** A cursor the viewer can follow, and a caption at the bottom left, in the page's own colours. */
@@ -165,8 +166,8 @@ async function caption(text: string) {
 
 let at = { x: 720, y: 450 };
 async function moveTo(el: ElementHandle<Element>) {
-  await el.evaluate((e) => e.scrollIntoView({ block: "center", behavior: "smooth" }));
-  await sleep(700);
+  // the pages fit one screen; anything off it is brought in at once, never scrolled on camera
+  await el.evaluate((e) => e.scrollIntoView({ block: "nearest", behavior: "instant" }));
   const b = (await el.boundingBox())!;
   const to = { x: b.x + b.width / 2, y: b.y + b.height / 2 };
   const steps = Math.max(12, Math.round(Math.hypot(to.x - at.x, to.y - at.y) / 18));
@@ -212,9 +213,25 @@ async function start(url: string, ready: string) {
   await page.mouse.move(at.x, at.y);
 }
 
-async function connectAs(r: Role | "throwaway") {
-  who = r === "throwaway" ? privateKeyToAccount(generatePrivateKey()) : demoAccount(r);
+async function connectAs(r: Role | LocalAccount) {
+  // a connected page first hears the account change, which disconnects it, as a real wallet would
+  if (await page.$(".wallet__addr")) await page.evaluate(() => (window as unknown as { __demoEmit: (e: string) => void }).__demoEmit("accountsChanged"));
+  who = typeof r === "string" ? demoAccount(r) : r;
   await click("Connect wallet", 1400);
+}
+
+/** Intents from throwaway wallets, straight to the local Worker, so the stock starts the part with some demand. */
+async function seedIntents(amounts: number[]) {
+  const listed = (JSON.parse(readFileSync(new URL("../public/b20.json", import.meta.url), "utf8")) as { stocks: { ticker: string; address: Hex }[] }).stocks.find((x) => x.ticker === TICKER)!;
+  const types = { Intent: [{ name: "ticker", type: "string" }, { name: "token", type: "address" }, { name: "usd", type: "uint256" }, { name: "expiry", type: "uint256" }, { name: "nonce", type: "uint256" }] } as const;
+  for (const usd of amounts) {
+    const a = privateKeyToAccount(generatePrivateKey());
+    const nonce = Date.now();
+    const expiry = Math.floor(nonce / 1000) + 7 * 86_400;
+    const signature = await a.signTypedData({ domain: { name: "Summon", version: "2", chainId: baseSepolia.id }, types, primaryType: "Intent", message: { ticker: TICKER, token: listed.address, usd: BigInt(usd), expiry: BigInt(expiry), nonce: BigInt(nonce) } });
+    const r = await fetch(`${BASE}/api/intents`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ticker: TICKER, token: listed.address, usd, expiry, nonce, address: a.address, signature }) });
+    if (!r.ok) throw new Error(`seed intent: ${r.status} ${await r.text()}`);
+  }
 }
 
 const webm = out.replace(/\.mp4$/, "") + ".webm";
@@ -243,13 +260,22 @@ try {
       });
       await sleep(3000);
     } else if (part === "register") {
+      if (!/^http:\/\/(localhost|127\.0\.0\.1)/.test(BASE)) throw new Error("the register part writes intents: run it against a local Worker");
+      // the wallet that signs on camera also opens the round, so it needs a little gas
+      const signer = privateKeyToAccount(generatePrivateKey());
+      const gas = await walletOf(demoAccount("operator")).sendTransaction({ to: signer.address, value: 40_000_000_000_000n, chain: baseSepolia });
+      await pc.waitForTransactionReceipt({ hash: gas });
+      const board = (await (await fetch(`${BASE}/api/intents`)).json()) as Record<string, { usd: number }>;
+      const have = board[TICKER]?.usd ?? 0;
+      if (have < 160) await seedIntents([Math.min(100, 160 - have), ...(160 - have > 100 ? [160 - have - 100] : [])]);
       await start(`${BASE}/`, ".register");
       await record();
       await caption("Coinbase has registered 298 tokenized US stocks on Base. 227 of them have never been issued: nobody can hold one.");
       await sleep(5200);
+      // a cut, not a scroll: the register with its detail panel fills the next screen
+      await page.evaluate(() => window.scrollTo({ top: document.querySelector(".register")!.getBoundingClientRect().top + scrollY - 16, behavior: "instant" }));
       await caption("The register shows every one. A filled seal trades on Base; a faint one was never issued.");
-      await moveToSel(".register__head");
-      await sleep(3400);
+      await sleep(3800);
       await click("css:.filters button:first-child", 1000);
       await typeInto(".register .search", TICKER);
       await sleep(1400);
@@ -257,12 +283,18 @@ try {
       await caption(`${TICKER}: anyone can sign a non-binding intent. It costs nothing and tells issuers which stocks people want on Base.`);
       await moveToSel(".detail");
       await sleep(3600);
-      await connectAs("throwaway");
+      await connectAs(signer);
       await click("Sign intent", 2400);
-      await sleep(1600);
-      await caption(`Intents reached $250, so a round is open for the testnet demo stock s${TICKER}.`);
-      await sleep(2800);
-      await click("Open the round", 600);
+      await until(".detail", /Open a round for|Open the round/, 30_000);
+      await caption(`Signed intents passed $250, so a round can open for s${TICKER}, the testnet demo stock that tracks ${TICKER}.`);
+      await moveToSel(".detail .demo");
+      await sleep(3600);
+      // the first take opens the round from here; a retake finds it open and follows the link
+      const opening = await page.$$eval(".detail .demo button", (bs) => bs.some((b) => /Open a round/.test(b.textContent ?? "")));
+      await click(opening ? `Open a round for s${TICKER}` : "Open the round", 600);
+      await page.waitForFunction(() => location.hash.startsWith("#/round/") || /fund|revert|denied|error/i.test(document.querySelector(".detail .intent__msg:last-of-type, .demo .intent__msg")?.textContent ?? ""), { timeout: 120_000, polling: 1000 });
+      const err = await page.$eval(".demo .intent__msg", (m) => m.textContent).catch(() => "");
+      if (!(await page.evaluate(() => location.hash)).startsWith("#/round/")) throw new Error(`opening the round failed: ${err}`);
       await caption("");
       await page.waitForSelector(".rp__stage", { timeout: 60_000 });
       await sleep(3000);
@@ -301,7 +333,7 @@ try {
       }
       await until(".seq__now", /Funded/, 120_000);
       await caption("Full. The round waits for the auction, which can start only while the US market is open and the stock is not halted.");
-      await moveToSel("details.checks summary");
+      await moveToSel(".tiles .tile:nth-child(2)");
       await sleep(5200);
     } else if (part === "auction") {
       const round = await roundOf();

@@ -1304,3 +1304,68 @@ details.checks[open] summary {
 [hidden] {
   display: none !important;
 }
+
+/* the round page fits one 1440×900 screen: header, dial, number, tiles and ticket without scrolling */
+.cert:has(.rp) {
+  margin-top: 8px;
+  padding: 24px 32px 28px;
+}
+.rp__head {
+  padding-bottom: 14px;
+}
+.rp__head .cert__ticker {
+  font-size: 44px;
+}
+.rp__head .cert__sub {
+  margin-top: 4px;
+  font-size: 15px;
+}
+.rp__head .cert__addr {
+  margin-top: 2px;
+}
+.rp {
+  padding-top: 18px;
+}
+.dial__wrap {
+  max-width: 350px;
+}
+.rp__big {
+  font-size: clamp(44px, 6vw, 62px);
+}
+.rp__bigsub {
+  margin-top: 6px;
+  font-size: 15px;
+}
+.tiles {
+  margin-top: 16px;
+}
+.tile {
+  padding: 10px 14px;
+}
+.tile__value {
+  font-size: 20px;
+}
+.ticket {
+  padding: 18px 20px;
+}
+.ticket__amount {
+  font-size: 42px;
+}
+
+/* the register's detail panel fits under the register's heading on one screen */
+.detail {
+  padding: 20px;
+}
+.detail > .rosette {
+  float: left;
+  width: 84px;
+  height: 84px;
+  margin: 0 16px 6px 0;
+}
+.detail__ticker {
+  margin-top: 12px;
+}
+.detail__status {
+  clear: both;
+  margin-top: 12px;
+}
