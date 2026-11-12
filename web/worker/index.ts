@@ -21,6 +21,7 @@
 import { verifyTypedData, getAddress, isAddress } from "viem";
 import { IntentStore, MAX_EXPIRY_DAYS } from "./store";
 import { elsewhere } from "./elsewhere";
+import { paymaster } from "./paymaster";
 
 export { IntentStore };
 
@@ -28,6 +29,8 @@ interface Env {
   ASSETS: Fetcher;
   INTENTS: DurableObjectNamespace;
   GEO_BLOCK?: string;
+  /** the CDP Paymaster endpoint for Base Sepolia, with the project's key: a secret, never sent to the page */
+  CDP_PAYMASTER_URL?: string;
 }
 
 /** Projects that enable trading for US users are out of scope (Stocks Maxxing FAQ), and Coinbase
@@ -157,6 +160,7 @@ export default {
     }
     const url = new URL(req.url);
     if (url.pathname === "/api/demand" && req.method === "GET") return demand(req, env);
+    if (url.pathname === "/api/paymaster") return paymaster(req, env.CDP_PAYMASTER_URL);
     if (url.pathname === "/api/elsewhere" && req.method === "GET") return json(await elsewhere(() => tickers(env, req).then((m) => new Set(m.keys()))));
     if (url.pathname === "/api/intents") {
       if (req.method === "GET") return json(await board(env, req));

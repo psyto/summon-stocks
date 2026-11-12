@@ -21,7 +21,7 @@ import { loadElsewhere } from "./data";
 import { fillMoves, position as lpPosition, quoteSwap, wouldRevert } from "./quote";
 import { h } from "./el";
 import { rosette, type Ink } from "./rosette";
-import { connect, current, onWallet, short, walletClient } from "./wallet";
+import { connect, current, onWallet, sendSteps, short } from "./wallet";
 
 type Addr = `0x${string}`;
 type Params = Awaited<ReturnType<typeof readParams>>;
@@ -584,17 +584,18 @@ function ticket(v: View): HTMLElement {
   const run = async (label: string, steps: { address: Addr; abi: Abi; functionName: string; args?: unknown[]; value?: bigint }[]) => {
     v.setBusy(true);
     try {
-      const w = walletClient();
-      for (const st of steps) {
+      await sendSteps(
+        steps,
+        (what, hash) =>
+          what === "confirm"
+            ? (msg.textContent = `${label}: confirm in your wallet.`)
+            : msg.replaceChildren(`${label}: waiting for Base Sepolia. `, ...(hash ? [h("a", { href: explorer("tx", hash), target: "_blank", rel: "noopener" }, "View transaction")] : [])),
         // the chain's own answer first: a step that would revert is not sent, and says why
-        const why = await wouldRevert(st as never, me!);
-        if (why) throw new Error(`${label}: the contract refuses: ${why}`);
-        msg.textContent = `${label}: confirm in your wallet.`;
-        const hash = await w.writeContract({ ...st, account: me!, chain: client.chain } as never);
-        msg.replaceChildren(`${label}: waiting for Base Sepolia. `, h("a", { href: explorer("tx", hash), target: "_blank", rel: "noopener" }, "View transaction"));
-        const rc = await client.waitForTransactionReceipt({ hash });
-        if (rc.status !== "success") throw new Error(`${label} reverted on chain.`);
-      }
+        async (st) => {
+          const why = await wouldRevert(st as never, me!);
+          if (why) throw new Error(`${label}: the contract refuses: ${why}`);
+        },
+      );
       v.setBusy(false);
       await v.redraw();
     } catch (e) {

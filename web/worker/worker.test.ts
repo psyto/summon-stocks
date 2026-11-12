@@ -5,6 +5,9 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
+import { encodeFunctionData, parseAbi } from "viem";
+
+const erc20 = parseAbi(["function approve(address spender, uint256 amount) returns (bool)"]);
 import { DatabaseSync } from "node:sqlite";
 import worker, { IntentStore } from "./index";
 import { resetElsewhere } from "./elsewhere";
@@ -423,6 +426,57 @@ const tests: [string, () => Promise<void>][] = [
         assert.deepEqual(empty.markets, {});
         // US visitors are refused here too
         assert.equal((await worker.fetch(req("/api/elsewhere", {}, "US"), e)).status, 451);
+      } finally {
+        globalThis.fetch = real;
+      }
+    },
+  ],
+  [
+    "gas sponsorship: off without the secret; only Summon's calls, to its contracts or the factory's rounds, with no ETH",
+    async () => {
+      const dep = JSON.parse(readFileSync(new URL("../../deployments/84532.json", import.meta.url), "utf8")) as { usdc: `0x${string}`; factory: `0x${string}` };
+      const round = "0x1111111111111111111111111111111111111111";
+      const stranger = "0x2222222222222222222222222222222222222222";
+      const acct = parseAbi(["function execute(address target, uint256 value, bytes data)", "function executeBatch((address target, uint256 value, bytes data)[] calls)"]);
+      const op = (callData: `0x${string}`) => ({ sender: stranger, callData });
+      const rpc = (method: string, callData: `0x${string}`, chain = "0x14a34") =>
+        req("/api/paymaster", { method: "POST", body: JSON.stringify({ jsonrpc: "2.0", id: 7, method, params: [op(callData), "0x0000000071727De22E5E9d8BAf0edAc6f37da032", chain, {}] }) });
+      const real = globalThis.fetch;
+      const sent: string[] = [];
+      globalThis.fetch = (async (u: string, init: RequestInit) => {
+        const b = JSON.parse(String(init.body));
+        if (b.method === "eth_call") {
+          // a round answers factory() with the factory; anything else with another address
+          const who = b.params[0].to.toLowerCase() === round ? dep.factory.slice(2) : "0".repeat(40);
+          return Response.json({ jsonrpc: "2.0", id: 1, result: `0x${"0".repeat(24)}${who.toLowerCase()}` });
+        }
+        sent.push(String(u));
+        return Response.json({ jsonrpc: "2.0", id: b.id, result: { paymasterAndData: "0xok" } });
+      }) as typeof fetch;
+      try {
+        // no secret: the page sees sponsorship is off
+        assert.equal((await worker.fetch(req("/api/paymaster"), env("off"))).status, 503);
+        const e = { ...(env("off") as object), CDP_PAYMASTER_URL: "https://cdp.test/rpc/v1/base-sepolia/KEY" } as never;
+        assert.equal((await worker.fetch(req("/api/paymaster"), e)).status, 200);
+        const answer = async (r: Request) => (await (await worker.fetch(r, e)).json()) as { result?: unknown; error?: { message: string } };
+        const approve = encodeFunctionData({ abi: erc20, functionName: "approve", args: [round, 1n] });
+        // approve then pledge, in one batch: test USDC and a round of the factory's
+        const ok = await answer(rpc("pm_getPaymasterStubData", encodeFunctionData({ abi: acct, functionName: "executeBatch", args: [[{ target: dep.usdc, value: 0n, data: approve }, { target: round, value: 0n, data: "0x" }]] })));
+        assert.deepEqual(ok.result, { paymasterAndData: "0xok" });
+        assert.equal(sent.length, 1);
+        // a contract that is not Summon's, ETH sent, another chain, another method: refused, never forwarded
+        const no = [
+          rpc("pm_getPaymasterData", encodeFunctionData({ abi: acct, functionName: "execute", args: [stranger, 0n, "0x"] })),
+          rpc("pm_getPaymasterData", encodeFunctionData({ abi: acct, functionName: "execute", args: [dep.usdc, 1n, "0x"] })),
+          rpc("pm_getPaymasterData", encodeFunctionData({ abi: acct, functionName: "execute", args: [dep.usdc, 0n, approve] }), "0x2105"),
+          rpc("eth_sendRawTransaction", "0x"),
+          rpc("pm_getPaymasterData", "0xdeadbeef"),
+        ];
+        for (const r of no) assert.ok((await answer(r)).error, "refused");
+        assert.equal(sent.length, 1);
+        // US visitors are refused before any of this
+        const onUS = { ...(env("on") as object), CDP_PAYMASTER_URL: "https://cdp.test/rpc/v1/base-sepolia/KEY" } as never;
+        assert.equal((await worker.fetch(req("/api/paymaster", {}, "US"), onUS)).status, 451);
       } finally {
         globalThis.fetch = real;
       }

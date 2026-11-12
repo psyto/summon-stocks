@@ -3,8 +3,8 @@ import { ELSEWHERE_MARK_USD, loadElsewhere, loadSnapshot, statusLine, usd, type 
 import { rosette, type Ink } from "./rosette";
 import { loadTotals, signIntent, type Totals } from "./intents";
 import { client, D, DEMOS, DEMO_ROUND, demoAt, demoFor, factoryAbi, OPEN_AT_INTENT_USD, roundAbi, STATES } from "./chain";
-import { verifyTypedData, type Hex } from "viem";
-import { connect, current, short, walletClient } from "./wallet";
+import { verifyTypedData, type Abi, type Hex } from "viem";
+import { connect, current, sendSteps, short } from "./wallet";
 
 type Filter = "all" | Ink;
 
@@ -288,16 +288,10 @@ function demoBlock(ticker: string, intentUsd: number): HTMLElement | null {
           btn.setAttribute("disabled", "");
           msg.textContent = "Confirm in your wallet.";
           const deadline = BigInt(Math.floor(Date.now() / 1000) + DEMO_ROUND.days * 86_400);
-          const hash = await walletClient().writeContract({
-            account: me,
-            chain: client.chain,
-            address: D.factory!,
-            abi: factoryAbi,
-            functionName: "openRound",
-            args: [demo.address, DEMO_ROUND.target, deadline, DEMO_ROUND.maxSpreadBps, DEMO_ROUND.lpLockSeconds],
-          });
-          msg.textContent = "Opening on Base Sepolia…";
-          await client.waitForTransactionReceipt({ hash });
+          await sendSteps(
+            [{ address: D.factory!, abi: factoryAbi as Abi, functionName: "openRound", args: [demo.address, DEMO_ROUND.target, deadline, DEMO_ROUND.maxSpreadBps, DEMO_ROUND.lpLockSeconds] }],
+            (what) => (msg.textContent = what === "confirm" ? "Confirm in your wallet." : "Opening on Base Sepolia…"),
+          );
           const nr = await client.readContract({ address: D.factory!, abi: factoryAbi, functionName: "latestRound", args: [demo.address] });
           location.hash = `#/round/${nr}`;
         } catch (e) {
