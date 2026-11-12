@@ -108,6 +108,10 @@ How Summon handles it:
 - **Intents before money.** Signed intents are free and show whether a ticker could reach that minimum. A
   round opens once they get close, so backers do not lock money in a round that cannot fill.
 - **A clean exit.** If nobody fills, every pledge is refunded.
+- **A reference filler.** `npm run keeper` starts an auction once the round accepts it, fills when the
+  spread reaches a level the filler sets (`FILL_AT_BPS`, default 25 bp) or in the auction's last 2 minutes,
+  and ends an auction nobody filled. It prints what the fill pays: the round's USDC for the stock, plus the
+  spread. Any holder can run it; on testnet the demo filler wallet does.
 
 Issuer policies on mainnet: Coinbase's stock tokens (NVDAc, MSTRc, GMEc, checked 2026-11-07) use a
 blocklist-style transfer policy (id 5). Secondary transfers are open except to blocked addresses. Summon
@@ -178,6 +182,7 @@ npm run demo -- halt                           # a halt stops the pool (stop the
 npm run demo -- split                          # a 2:1 split: window, stale multiplier, realign (run again after 1 h)
 npm run demo -- unwind                         # after the LP lock: unwindLP and each backer's claimLP
 npm run demo -- expire                         # AMC: a round no one fills, a withdrawal, refunds (run again after 1 h)
+npm run keeper                                 # keep running: start, fill and end auctions (DRY_RUN=1 to watch)
 ```
 
 **Price source.** Each listed token is bound to one feed, chosen by the factory owner:
@@ -230,9 +235,14 @@ anyone can mint; `DemoOracleRegistry`, which stands in for Coinbase's mainnet or
 ## Web
 
 `web/` is the page and a Cloudflare Worker. The page shows the register of all 298 stocks, each with
-its own guilloché seal, and a round page that reads the fill conditions live from Base Sepolia. The
-Worker stores signed intents and exports them at `/api/demand`, with signatures, so an issuer can verify the
-totals itself. `/api/elsewhere` gives the register its Hyperliquid marks. It checks each EIP-712 signature. An intent names the stock by ticker and by its B20
+its own guilloché seal, and a round page that fits one screen: a dial that fills with pledges, runs with
+the auction's spread and shows the pool's fee, and a ticket that shows what an order gets before it is
+signed. Its numbers come from the chain: a swap is quoted through the pool and its hook (Uniswap's
+V4Quoter), pledges and fills use the round's own integer math, and every transaction is simulated before
+it is sent, so a refusal is the contract's own error. A backer sees their stock, pool share and the fees
+it has earned against what they pledged. The Worker stores signed intents and exports them at
+`/api/demand`, with signatures, so an issuer can verify the totals itself; the register's "Check every
+signature" does that in the browser. `/api/elsewhere` gives the register its Hyperliquid marks. It checks each EIP-712 signature. An intent names the stock by ticker and by its B20
 contract address, and the address must match the snapshot: Base's docs say to identify a stock by address,
 because its symbol can be changed. The Worker keeps one intent per wallet per stock, and refuses the project's own demo wallets, so the board never counts them. Each network may write 20
 intents an hour and add 5 new wallets a day. The page's transactions carry a Base Builder Code (ERC-8021)
