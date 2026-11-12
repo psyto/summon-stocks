@@ -1369,3 +1369,17 @@ details.checks[open] summary {
   clear: both;
   margin-top: 12px;
 }
+
+/* the pledge being chosen, ghosted on the dial before anyone signs */
+.dial__ghost {
+  fill: none;
+  stroke: var(--seal);
+  stroke-width: 0.07;
+  stroke-dasharray: 0.035 0.045;
+  opacity: 0.55;
+}
+.dial__ghostdot {
+  fill: var(--paper);
+  stroke: var(--seal);
+  stroke-width: 0.02;
+}

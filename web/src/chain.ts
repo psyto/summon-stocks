@@ -12,7 +12,8 @@ export interface Demo {
 const dep = deployment as unknown as Record<string, Addr> & { demoStocks?: Demo[] };
 export const D = dep as Record<string, Addr>;
 export const chain = baseSepolia;
-export const client = createPublicClient({ chain, transport: http("https://sepolia.base.org") });
+// reads in one tick go out as one Multicall3 call, so the round page can read every few seconds
+export const client = createPublicClient({ chain, transport: http("https://sepolia.base.org", { batch: true }), batch: { multicall: { wait: 16 } } });
 export const explorer = (kind: "address" | "tx", x: string) => `https://sepolia.basescan.org/${kind}/${x}`;
 
 /** Demo stocks on Base Sepolia: real B20 tokens with no value, each tracking a real ticker's price; each

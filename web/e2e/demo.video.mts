@@ -12,7 +12,7 @@
  *   unwind   <out.mp4>   (LP lock over) the backers' pool is taken apart; alice claims her share
  *   join     <out.mp4> <part.mp4>...
  *
- * TICKER picks the demo stock (default SOFI). Run from web/: npx tsx e2e/demo.video.mts <part> <out.mp4>
+ * TICKER picks the demo stock (default RDDT). Run from web/: npx tsx e2e/demo.video.mts <part> <out.mp4>
  */
 import { execFileSync } from "node:child_process";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -63,7 +63,7 @@ const dep = JSON.parse(readFileSync(new URL("../../deployments/84532.json", impo
   marketState: Hex;
   demoStocks: { ticker: string; symbol: string; address: Hex }[];
 };
-const TICKER = process.env.TICKER ?? "SOFI";
+const TICKER = process.env.TICKER ?? "RDDT";
 const stock = dep.demoStocks.find((s) => s.ticker === TICKER)!;
 const roundOf = () => pc.readContract({ address: dep.factory, abi: parseAbi(["function latestRound(address) view returns (address)"]), functionName: "latestRound", args: [stock.address] });
 const erc20 = parseAbi(["function mint(address to, uint256 amount)", "function approve(address spender, uint256 amount) returns (bool)"]);
@@ -309,7 +309,10 @@ try {
       await sleep(4600);
       await connectAs("alice");
       await page.waitForFunction(() => /Pledge \$/.test(document.querySelector(".ticket")?.textContent ?? ""), { timeout: 60_000 });
-      await click("$100", 1200);
+      await caption("Choose an amount: the dashed arc shows where this pledge would bring the round, before anything is signed.");
+      await click("$25", 1400);
+      await click("$50", 1400);
+      await click("$100", 2200);
       if (await page.$$eval(".ticket button", (bs) => bs.some((b) => b.textContent === "Get 1,000 test USDC" && !b.hidden))) {
         await caption("Test USDC first. It has no value and exists only on Base Sepolia.");
         await click("Get 1,000 test USDC", 800);
@@ -321,7 +324,7 @@ try {
       await caption("The first $100 is in.");
       await moveToSel(".dial");
       await sleep(3000);
-      await caption("Two more backers pledge the rest.");
+      await caption("Two more backers pledge the rest. The page reads Base Sepolia every few seconds.");
       const r = round as Hex;
       for (const b of ["bob", "carol"] as const) {
         const left = 300_000_000n - (await pc.readContract({ address: r, abi: roundAbi, functionName: "pledged" }));

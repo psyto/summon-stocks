@@ -82,6 +82,7 @@ export async function renderRound(main: HTMLElement, round: Addr) {
   // the ticket's amount survives a redraw, so a chain read does not reset what someone is typing
   const keep = { pledge: 50, trade: 10, buying: true };
   let busy = false;
+  let settled = false;
   const draw = async () => {
     if (busy) return;
     try {
@@ -90,6 +91,7 @@ export async function renderRound(main: HTMLElement, round: Addr) {
       // a field with focus means someone is typing: wait for the next read
       if (page.contains(document.activeElement) && document.activeElement?.tagName === "INPUT") return;
       live = [];
+      settled = s.state === "Expired" || (s.state === "Filled" && s.unwound);
       const v: View = { round, p, s, checks: read.checks, ref: read.ref, refFrom: read.refFrom, pool: pl, keep, redraw: draw, setBusy: (b) => (busy = b) };
       page.replaceChildren(head(v), h("div", { class: "rp" }, stage(v), ticket(v)), conditions(v));
       page.removeAttribute("aria-busy");
@@ -103,10 +105,14 @@ export async function renderRound(main: HTMLElement, round: Addr) {
   const tick = () => live.forEach((f) => f());
   await draw();
   onWallet(() => void draw());
-  const timer = setInterval(() => {
-    if (!document.body.contains(page)) clearInterval(timer);
-    else void draw();
-  }, 15_000);
+  // a round that is moving is read every 4 s; a settled one (filled with nothing pending, or expired) every 15 s
+  const next = () =>
+    setTimeout(async () => {
+      if (!document.body.contains(page)) return;
+      await draw();
+      next();
+    }, settled ? 15_000 : 4_000);
+  next();
   const second = setInterval(() => {
     if (!document.body.contains(page)) clearInterval(second);
     else tick();
@@ -339,6 +345,8 @@ interface View {
   keep: { pledge: number; trade: number; buying: boolean };
   redraw: () => Promise<void>;
   setBusy: (b: boolean) => void;
+  /** the stage's dial, ghosting where a pledge being chosen would bring it (null: none) */
+  preview?: (f: number | null) => void;
 }
 
 /** The spread a fill gets at `t` (spec 4): linear from 0 to the maximum over the ramp, then flat. */
@@ -397,7 +405,7 @@ const arc = (f: number, r: number) => {
  * The round's instrument: the stock's seal inside a 270° dial. Open: the dial fills as pledges come in.
  * Auction: it is the spread, moving each second. Filled: it is the pool's fee, or red when the hook stops it.
  */
-function dial(v: View): { el: SVGSVGElement; set: (f: number, cls: string) => void } {
+function dial(v: View): { el: SVGSVGElement; set: (f: number, cls: string) => void; preview: (f: number | null) => void } {
   const svg = svgEl("svg", { viewBox: "-1.25 -1.2 2.5 2.2", class: "dial", "aria-hidden": "true" }) as SVGSVGElement;
   // the seal keeps its own svg (and its ink classes), nested in the dial's centre
   const g = rosette(demo.ticker, { detail: "detail", ink: inkFor(v.s.state) });
@@ -409,17 +417,59 @@ function dial(v: View): { el: SVGSVGElement; set: (f: number, cls: string) => vo
     svg.append(svgEl("line", { x1: a.toFixed(3), y1: b.toFixed(3), x2: c.toFixed(3), y2: d.toFixed(3), class: "dial__tick" }));
   }
   const value = svgEl("path", { d: arc(0, 1), class: "dial__value" });
+  const ghost = svgEl("path", { d: "", class: "dial__ghost" });
+  const ghostDot = svgEl("circle", { r: "0.04", class: "dial__ghostdot" });
   const dot = svgEl("circle", { r: "0.055", class: "dial__dot" });
-  svg.append(g, value, dot);
+  svg.append(g, ghost, ghostDot, value, dot);
+  let now_ = 0;
   const set = (f: number, cls: string) => {
     const c = Math.max(0, Math.min(1, f));
+    now_ = c;
     value.setAttribute("d", arc(c, 1));
     const [x, y] = at(c, 1);
     dot.setAttribute("cx", x.toFixed(4));
     dot.setAttribute("cy", y.toFixed(4));
     svg.setAttribute("class", `dial ${cls}`);
   };
-  return { el: svg, set };
+  /** a dashed arc from where the dial is to `f`: what the order being chosen would do */
+  const preview = (f: number | null) => {
+    if (f === null || f <= now_) {
+      ghost.setAttribute("d", "");
+      ghostDot.setAttribute("r", "0");
+      return;
+    }
+    const c = Math.min(1, f);
+    ghost.setAttribute("d", arc(c, 1));
+    const [x, y] = at(c, 1);
+    ghostDot.setAttribute("cx", x.toFixed(4));
+    ghostDot.setAttribute("cy", y.toFixed(4));
+    ghostDot.setAttribute("r", "0.04");
+  };
+  return { el: svg, set, preview };
+}
+
+/** Values the big number last showed, by what it measures, so a change counts up instead of jumping. */
+const shown = new Map<string, number>();
+function countUp(el: HTMLElement, key: string, to: number, fmt: (n: number) => string) {
+  const from = shown.get(key) ?? to;
+  shown.set(key, to);
+  if (from === to || matchMedia("(prefers-reduced-motion: reduce)").matches) return void (el.textContent = fmt(to));
+  const t0 = performance.now();
+  const step = (t: number) => {
+    const k = Math.min(1, (t - t0) / 900);
+    el.textContent = fmt(from + (to - from) * (1 - (1 - k) ** 3));
+    if (k < 1 && el.isConnected) requestAnimationFrame(step);
+  };
+  el.textContent = fmt(from);
+  requestAnimationFrame(step);
+}
+
+/** The dial is drawn anew on each read: start it where it was, and let it move to where it is now. */
+function glide(d: { set: (f: number, cls: string) => void }, key: string, f: number, cls: string) {
+  const from = shown.get(key) ?? f;
+  shown.set(key, f);
+  d.set(from, cls);
+  if (from !== f) requestAnimationFrame(() => requestAnimationFrame(() => d.set(f, cls)));
 }
 
 function tile(label: string, value: string | Node, sub: string | Node = "") {
@@ -446,8 +496,9 @@ function stage(v: View): HTMLElement {
 
   if (s.state === "Open" || s.state === "Funded") {
     const f = Number((s.pledged * 10_000n) / p.target) / 10_000;
-    d.set(f, "dial--pledge");
-    big.textContent = `$${tusdc(s.pledged)}`;
+    glide(d, `dial:${v.round}`, f, "dial--pledge");
+    if (s.state === "Open") v.preview = d.preview;
+    countUp(big, `pledged:${v.round}`, Number(formatUnits(s.pledged, 6)), (n) => `$${Math.round(n).toLocaleString("en-US")}`);
     sub.textContent = s.state === "Open" ? `pledged of $${tusdc(p.target)}. The stock is summoned when the dial is full.` : `pledged: the target is reached. Next, anyone starts the auction while the market is open.`;
     ends.append(h("span", {}, "$0"), h("span", {}, `$${tusdc(p.target)} target`));
     tiles.append(
@@ -474,7 +525,7 @@ function stage(v: View): HTMLElement {
   } else if (s.state === "Filled") {
     const g = v.pool?.gate;
     const stopped = !!g?.stopped && !s.unwound;
-    d.set(s.unwound ? 0 : stopped ? 1 : (g?.feePct ?? 0) / 1, s.unwound ? "dial--expired" : stopped ? "dial--stopped" : g?.market === "open" ? "dial--open" : "dial--closed");
+    glide(d, `dial:${v.round}`, s.unwound ? 0 : stopped ? 1 : (g?.feePct ?? 0) / 1, s.unwound ? "dial--expired" : stopped ? "dial--stopped" : g?.market === "open" ? "dial--open" : "dial--closed");
     if (s.unwound) {
       big.textContent = "Unwound";
       sub.textContent = "The backers took their pool apart after the LP lock; each claims a share of what it held.";
@@ -563,6 +614,7 @@ function ticket(v: View): HTMLElement {
       amountView.textContent = `$${a.toLocaleString("en-US")}`;
       for (const b of presets.querySelectorAll("button")) b.setAttribute("aria-pressed", String(Number(b.dataset.v) === v.keep.pledge));
       const share = a / Number(formatUnits(p.target, 6));
+      v.preview?.((Number(formatUnits(s.pledged, 6)) + a) / Number(formatUnits(p.target, 6)));
       // spec 5.3: backers get Q − Qlp tokens; Q is (1 − lp) of the round at ref × (1 + s), Qlp is lp of it at ref
       const tokensAt = (sp: number) => (refTok ? (a * ((1 - lpShare) / (1 + sp) - lpShare)) / refTok : undefined);
       const best = tokensAt(0);
