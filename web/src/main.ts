@@ -1,6 +1,7 @@
 import "./style.css";
 import { renderBoard } from "./board";
 import { renderRound } from "./round";
+import { renderMe } from "./me";
 import { h } from "./el";
 import { rosette } from "./rosette";
 import { walletButton } from "./wallet";
@@ -13,7 +14,7 @@ function bar(): HTMLElement {
   return h(
     "header",
     { class: "shell" },
-    h("div", { class: "bar" }, mark, h("span", { class: "bar__net" }, "Base Sepolia testnet"), walletButton()),
+    h("div", { class: "bar" }, mark, h("a", { class: "bar__me", href: "#/me" }, "My summons"), h("span", { class: "bar__net" }, "Base Sepolia testnet"), walletButton()),
   );
 }
 
@@ -23,6 +24,7 @@ async function route() {
   const main = h("main", { class: "shell" });
   app.append(main);
   if (m) await renderRound(main, m[1] as `0x${string}`);
+  else if (location.hash === "#/me") await renderMe(main);
   else await renderBoard(main);
   window.scrollTo(0, 0);
 }

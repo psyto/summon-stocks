@@ -5,6 +5,7 @@ import { loadTotals, signIntent, type Totals } from "./intents";
 import { client, D, DEMOS, DEMO_ROUND, demoAt, demoFor, factoryAbi, OPEN_AT_INTENT_USD, roundAbi, STATES } from "./chain";
 import { verifyTypedData, type Abi, type Hex } from "viem";
 import { connect, current, sendSteps, short } from "./wallet";
+import { followButton } from "./me";
 
 type Filter = "all" | Ink;
 
@@ -187,7 +188,7 @@ function register(s: Snapshot, totals: Totals, away: Elsewhere): HTMLElement {
     const proof = t.backers > 0 ? signatures(x.ticker, t.backers) : null;
     detailBox.replaceChildren(
       rosette(x.ticker, { detail: "detail", ink: x.status, label: `${x.ticker} seal` }),
-      h("p", { class: "detail__ticker wide" }, x.ticker),
+      h("p", { class: "detail__ticker wide" }, x.ticker, " ", followButton(x.ticker)),
       h("p", { class: "detail__name" }, x.name),
       h("p", { class: "detail__status" }, statusLine[x.status]),
       facts,

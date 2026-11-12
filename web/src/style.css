@@ -1495,3 +1495,117 @@ details.checks[open] summary {
   font-weight: 400;
   color: var(--muted);
 }
+
+/* following a stock, and My summons */
+.follow {
+  vertical-align: middle;
+  padding: 4px 12px;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font: 600 13px/1.4 var(--font);
+  font-stretch: 100%;
+  cursor: pointer;
+}
+.follow[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--paper);
+}
+.bar__me {
+  margin-left: auto;
+  margin-right: 20px;
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 15px;
+}
+.bar__me + .bar__net {
+  margin-left: 0;
+}
+.me {
+  margin: 12px 0 72px;
+}
+.me__title {
+  margin: 0;
+  font-size: 49px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.me__lede {
+  margin: 8px 0 28px;
+  color: var(--muted);
+}
+.me__h {
+  margin: 28px 0 10px;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.me__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.me__row a {
+  display: grid;
+  grid-template-columns: 48px 110px 80px 150px 1fr;
+  gap: 14px;
+  align-items: center;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  color: var(--ink-2);
+  text-decoration: none;
+}
+.me__row a:hover,
+.me__row a:focus-visible {
+  border-color: var(--ink);
+}
+.me__row--act a {
+  border-color: var(--seal);
+  border-left-width: 4px;
+}
+.me__row--act .me__next {
+  color: var(--seal);
+  font-weight: 700;
+}
+.me__seal .rosette {
+  width: 44px;
+  height: 44px;
+  display: block;
+}
+.me__sym {
+  font-weight: 800;
+  color: var(--ink);
+}
+.me__state,
+.me__amt {
+  font-size: 14px;
+  color: var(--muted);
+}
+.me__chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.me__chips li {
+  padding: 8px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  font-size: 14px;
+}
+.me__empty {
+  color: var(--muted);
+}
+@media (max-width: 720px) {
+  .me__row a {
+    grid-template-columns: 44px 1fr;
+  }
+  .me__row a > :nth-child(n + 3) {
+    grid-column: 2;
+  }
+}

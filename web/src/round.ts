@@ -22,6 +22,7 @@ import { fillMoves, position as lpPosition, quoteSwap, wouldRevert } from "./quo
 import { h } from "./el";
 import { rosette, type Ink } from "./rosette";
 import { connect, current, onWallet, sendSteps, short } from "./wallet";
+import { followButton } from "./me";
 
 type Addr = `0x${string}`;
 type Params = Awaited<ReturnType<typeof readParams>>;
@@ -377,7 +378,7 @@ function head(v: View): HTMLElement {
     h(
       "div",
       {},
-      h("p", { class: "cert__ticker wide" }, demo.symbol),
+      h("p", { class: "cert__ticker wide" }, demo.symbol, " ", followButton(demo.ticker)),
       h("p", { class: "cert__sub" }, `A round to bring ${demo.ticker} onto Base. Testnet: the stock token tracks ${demo.ticker} and has no value.`),
       h("p", { class: "cert__addr" }, "Round ", h("a", { href: explorer("address", v.round), target: "_blank", rel: "noopener" }, short(v.round)), " on Base Sepolia"),
     ),
