@@ -7,6 +7,7 @@ import { verifyTypedData, type Abi, type Hex } from "viem";
 import { connect, current, sendSteps, short } from "./wallet";
 import { followButton } from "./me";
 import { shareLinks } from "./share";
+import { nextSummoning, summoningLabel } from "../../ts/schedule";
 
 type Filter = "all" | Ink;
 
@@ -364,7 +365,7 @@ function rounds(): HTMLElement {
           a.append(
             rosette(r.ticker, { detail: "mark", ink }),
             h("span", { class: "round-link__t wide" }, r.symbol),
-            h("span", {}, `${r.state}. ${r.pledged.toLocaleString("en-US")} of ${r.target.toLocaleString("en-US")} tUSDC pledged`),
+            h("span", {}, `${r.state}. ${r.pledged.toLocaleString("en-US")} of ${r.target.toLocaleString("en-US")} tUSDC pledged${r.state === "Funded" ? `. Auction at the next summoning, ${summoningLabel(nextSummoning(Math.floor(Date.now() / 1000)))}` : ""}`),
           );
           return a;
         }),

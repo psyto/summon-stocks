@@ -24,6 +24,7 @@ import { rosette, type Ink } from "./rosette";
 import { connect, current, onWallet, sendSteps, short } from "./wallet";
 import { followButton } from "./me";
 import { shareLinks } from "./share";
+import { nextSummoning, summoningLabel } from "../../ts/schedule";
 
 type Addr = `0x${string}`;
 type Params = Awaited<ReturnType<typeof readParams>>;
@@ -511,10 +512,12 @@ function stage(v: View): HTMLElement {
     glide(d, `dial:${v.round}`, f, "dial--pledge");
     if (s.state === "Open") v.preview = d.preview;
     countUp(big, `pledged:${v.round}`, Number(formatUnits(s.pledged, 6)), (n) => `$${Math.round(n).toLocaleString("en-US")}`);
-    sub.textContent = s.state === "Open" ? `pledged of $${tusdc(p.target)}. The stock is summoned when the dial is full.` : `pledged: the target is reached. Next, anyone starts the auction while the market is open.`;
+    sub.textContent = s.state === "Open" ? `pledged of $${tusdc(p.target)}. The stock is summoned when the dial is full.` : `pledged: the target is reached. Its auction starts at the next summoning, ${summoningLabel(nextSummoning(now()))}.`;
     ends.append(h("span", {}, "$0"), h("span", {}, `$${tusdc(p.target)} target`));
     tiles.append(
-      tile("Worst price for backers", `+${pct(p.maxSpreadBps)}`, "over the reference, set before anyone pledges"),
+      s.state === "Open"
+        ? tile("Worst price for backers", `+${pct(p.maxSpreadBps)}`, "over the reference, set before anyone pledges")
+        : tile("Next summoning", livetext(() => until(nextSummoning(now()))), `${summoningLabel(nextSummoning(now()))}: the auction starts then`),
       s.state === "Open" ? tile("Deadline", livetext(() => until(Number(p.deadline))), "no fill by then: every pledge is refunded") : conds,
       refTile,
     );
@@ -681,7 +684,7 @@ function ticket(v: View): HTMLElement {
     const tooLate = now() + p.windowSeconds > Number(p.deadline);
     box.append(
       h("h2", { class: "ticket__title wide" }, "Start the auction"),
-      h("p", { class: "ticket__lede" }, `The round is full. Anyone can start the auction; the spread begins at 0 and rises to ${pct(p.maxSpreadBps)} over ${p.rampSeconds / 60} min.`),
+      h("p", { class: "ticket__lede" }, `The round is full. Its auction starts at the next summoning, ${summoningLabel(nextSummoning(now()))}; anyone may start it sooner once every fill condition holds. The spread begins at 0 and rises to ${pct(p.maxSpreadBps)} over ${p.rampSeconds / 60} min.`),
       h("dl", { class: "quote" }, row("Fill conditions", `${v.checks.filter((c) => c.ok).length} of ${v.checks.length} hold`, "quote__row--key"), row("Auction length", `${p.windowSeconds / 60} min`), row("Auctions left", `${p.maxAuctions - s.auctionsRun} of ${p.maxAuctions}`)),
       !me
         ? connectBtn()
