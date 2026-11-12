@@ -6,7 +6,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "worker": "wrangler dev --port 8787",
-    "deploy": "vite build && wrangler deploy",
+    "og": "tsx scripts/og.mts",
+    "deploy": "vite build && tsx scripts/og.mts && wrangler deploy",
     "test:worker": "tsx worker/worker.test.ts"
   },
   "dependencies": {

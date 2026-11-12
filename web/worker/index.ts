@@ -22,6 +22,7 @@ import { verifyTypedData, getAddress, isAddress } from "viem";
 import { IntentStore, MAX_EXPIRY_DAYS } from "./store";
 import { elsewhere } from "./elsewhere";
 import { paymaster } from "./paymaster";
+import { PREVIEW_BOTS, sharePage } from "./share";
 
 export { IntentStore };
 
@@ -153,12 +154,21 @@ async function demand(req: Request, env: Env): Promise<Response> {
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const country = (req as Request & { cf?: { country?: string } }).cf?.country;
+    // link previews (X's fetcher runs from the US) may read a share page and its card, nothing else: the
+    // page sends a person on to the site, which stays closed to them
+    const preview = /^\/(s|og)\//.test(new URL(req.url).pathname) && PREVIEW_BOTS.test(req.headers.get("user-agent") ?? "");
     // an unknown country is refused too (Codex r1 #6); local development sets GEO_BLOCK=off
-    if (env.GEO_BLOCK !== "off" && (!country || BLOCKED_COUNTRIES.has(country))) {
+    if (!preview && env.GEO_BLOCK !== "off" && (!country || BLOCKED_COUNTRIES.has(country))) {
       if (new URL(req.url).pathname.startsWith("/api/")) return json({ error: "Summon is not available in the United States." }, 451);
       return new Response(BLOCKED_PAGE, { status: 451, headers: { "content-type": "text/html; charset=utf-8" } });
     }
     const url = new URL(req.url);
+    const shared = /^\/s\/([A-Za-z0-9.]{1,10})$/.exec(url.pathname);
+    if (shared) {
+      const ticker = shared[1]!.toUpperCase();
+      const [known, totals] = await Promise.all([tickers(env, req), board(env, req).catch(() => ({}) as Record<string, { backers: number; usd: number }>)]);
+      return sharePage(req, ticker, known.get(ticker), totals[ticker]);
+    }
     if (url.pathname === "/api/demand" && req.method === "GET") return demand(req, env);
     if (url.pathname === "/api/paymaster") return paymaster(req, env.CDP_PAYMASTER_URL);
     if (url.pathname === "/api/elsewhere" && req.method === "GET") return json(await elsewhere(() => tickers(env, req).then((m) => new Set(m.keys()))));

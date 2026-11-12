@@ -482,6 +482,38 @@ const tests: [string, () => Promise<void>][] = [
       }
     },
   ],
+  [
+    "share page: link previews from anywhere get the card and live numbers; people in the US stay blocked",
+    async () => {
+      const real = globalThis.fetch;
+      // RDDT's demo round: latestRound answers a round, state() answers 1 (funded)
+      globalThis.fetch = (async (_u: string, init: RequestInit) => {
+        const b = JSON.parse(String(init.body));
+        const data = b.params[0].data as string;
+        return Response.json({ jsonrpc: "2.0", id: 1, result: data.startsWith("0xb83c9a48") ? `0x${"0".repeat(24)}${"ab".repeat(20)}` : `0x${"0".repeat(63)}1` });
+      }) as typeof fetch;
+      try {
+        const e = env("on");
+        await intent(e, privateKeyToAccount(generatePrivateKey()), "RDDT", 100);
+        const bot = (path: string, country: string) => worker.fetch(req(path, { headers: { "user-agent": "Twitterbot/1.0" } }, country), e);
+        const page = await bot("/s/RDDT", "US");
+        assert.equal(page.status, 200);
+        const html = await page.text();
+        assert.match(html, /og:image" content="https:\/\/summon\.test\/og\/RDDT\.jpg"/);
+        assert.match(html, /\$100 of intents from 1 backer to bring RDDT onto Base\./);
+        assert.match(html, /Testnet demo round for sRDDT: funded\./);
+        // the preview pass covers the share page and its card only
+        assert.equal((await bot("/api/intents", "US")).status, 451);
+        assert.equal((await bot("/", "US")).status, 451);
+        // a person in the US is blocked on the share page too
+        assert.equal((await worker.fetch(req("/s/RDDT", {}, "US"), e)).status, 451);
+        // not a registered stock
+        assert.equal((await worker.fetch(req("/s/NOPE"), e)).status, 404);
+      } finally {
+        globalThis.fetch = real;
+      }
+    },
+  ],
 ];
 
 let failed = 0;

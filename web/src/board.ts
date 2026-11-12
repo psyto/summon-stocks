@@ -6,6 +6,7 @@ import { client, D, DEMOS, DEMO_ROUND, demoAt, demoFor, factoryAbi, OPEN_AT_INTE
 import { verifyTypedData, type Abi, type Hex } from "viem";
 import { connect, current, sendSteps, short } from "./wallet";
 import { followButton } from "./me";
+import { shareLinks } from "./share";
 
 type Filter = "all" | Ink;
 
@@ -18,9 +19,12 @@ const FILTER_LABEL: Record<Filter, string> = {
 
 const ORDER: Record<Ink, number> = { never: 0, issued: 1, trading: 2 };
 
-export async function renderBoard(main: HTMLElement) {
+export async function renderBoard(main: HTMLElement, pick?: string) {
   const [snap, totals, away] = await Promise.all([loadSnapshot(), loadTotals(), loadElsewhere()]);
-  main.append(hero(snap), rounds(), register(snap, totals, away), how(), foot(snap));
+  const reg = register(snap, totals, away, pick);
+  main.append(hero(snap), rounds(), reg, how(), foot(snap));
+  // a shared link (#/s/TICKER) opens on that stock
+  if (pick) requestAnimationFrame(() => reg.scrollIntoView({ block: "start" }));
 }
 
 function hero(s: Snapshot): HTMLElement {
@@ -59,10 +63,11 @@ function hero(s: Snapshot): HTMLElement {
   );
 }
 
-function register(s: Snapshot, totals: Totals, away: Elsewhere): HTMLElement {
-  let filter: Filter = "never";
+function register(s: Snapshot, totals: Totals, away: Elsewhere, pick?: string): HTMLElement {
+  const picked = pick ? s.stocks.find((x) => x.ticker === pick) : undefined;
+  let filter: Filter = picked ? "all" : "never";
   let query = "";
-  let selected: Stock = s.stocks.find((x) => x.ticker === "GME") ?? s.stocks[0]!;
+  let selected: Stock = picked ?? s.stocks.find((x) => x.ticker === "GME") ?? s.stocks[0]!;
 
   const cells = h("ul", { class: "cells", "aria-label": "Registered stocks" });
   const detailBox = h("aside", { class: "detail", "aria-live": "polite" });
@@ -160,9 +165,14 @@ function register(s: Snapshot, totals: Totals, away: Elsewhere): HTMLElement {
       try {
         const r = await signIntent(x.ticker, x.address as `0x${string}`, n);
         totals[x.ticker] = r;
-        msg.textContent = `Signed. ${x.ticker} now has ${usd(r.usd)} from ${r.backers} ${r.backers === 1 ? "backer" : "backers"}.`;
         draw();
         detail();
+        // the panel is drawn anew: say it there, with the way to pass it on
+        const done = detailBox.querySelector(".intent__msg");
+        done?.replaceChildren(
+          `Signed. ${x.ticker} now has ${usd(r.usd)} from ${r.backers} ${r.backers === 1 ? "backer" : "backers"}. Bring others: `,
+          shareLinks(x.ticker, `I signed an intent to bring ${x.ticker} onto Base. ${usd(r.usd)} from ${r.backers} ${r.backers === 1 ? "backer" : "backers"} so far.`),
+        );
       } catch (e) {
         msg.textContent = (e as Error).message.split("\n")[0] ?? "Signing failed.";
         sign.removeAttribute("disabled");
@@ -193,6 +203,7 @@ function register(s: Snapshot, totals: Totals, away: Elsewhere): HTMLElement {
       h("p", { class: "detail__status" }, statusLine[x.status]),
       facts,
       intent,
+      shareLinks(x.ticker, x.status === "trading" ? `${x.ticker} trades on Base.` : `Bring ${x.ticker} onto Base: ${usd(t.usd)} of intents so far. A signature is free.`),
       ...(proof ? [proof] : []),
       ...(demoBox ? [demoBox] : []),
     );
