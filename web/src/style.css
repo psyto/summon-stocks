@@ -1512,6 +1512,11 @@ details.checks[open] summary {
   background: var(--ink);
   color: var(--paper);
 }
+.follow--tg {
+  display: inline-block;
+  text-decoration: none;
+  border-style: dashed;
+}
 .bar__me {
   margin-left: auto;
   margin-right: 20px;

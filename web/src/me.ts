@@ -46,6 +46,24 @@ export function followButton(ticker: string): HTMLElement {
   return b;
 }
 
+let bot: Promise<string | undefined> | undefined;
+/** "Alerts on Telegram" for a demo stock: opens the bot already following it. Hidden until the Worker says
+ * the bot is set up. */
+export function alertLink(ticker: string): HTMLElement {
+  const a = h("a", { class: "follow follow--tg", target: "_blank", rel: "noopener", hidden: "" }, "Alerts on Telegram");
+  if (!demoFor(ticker)) return a;
+  bot ??= fetch("/api/alerts")
+    .then((r) => (r.ok ? (r.json() as Promise<{ bot: string }>) : undefined))
+    .then((r) => r?.bot)
+    .catch(() => undefined);
+  void bot.then((name) => {
+    if (!name) return;
+    a.setAttribute("href", `https://t.me/${name}?start=${encodeURIComponent(ticker)}`);
+    a.hidden = false;
+  });
+  return a;
+}
+
 const now = () => Math.floor(Date.now() / 1000);
 const tusdc = (n: bigint) => Number(formatUnits(n, 6)).toLocaleString("en-US", { maximumFractionDigits: 2 });
 const inFor = (t: number) => {
@@ -207,6 +225,8 @@ export async function renderMe(main: HTMLElement) {
                   f.round ? h("a", { href: `#/round/${f.round}` }, `${f.symbol} round: ${f.state}`) : f.symbol ? `${f.symbol}: no round yet` : "no testnet demo stock",
                   " ",
                   followButton(f.ticker),
+                  " ",
+                  alertLink(f.ticker),
                 ),
               ),
             )

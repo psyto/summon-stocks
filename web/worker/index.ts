@@ -5,6 +5,7 @@
  *   POST /api/intents        <- { ticker, token, usd, expiry, nonce, address, signature }
  *   GET  /api/demand         -> every unexpired intent with its signature, so an issuer can verify the
  *                               totals itself instead of trusting this Worker (?ticker=GME narrows it)
+ *   POST /api/telegram, GET /api/alerts: round alerts on Telegram (alerts.ts)
  *   GET  /api/elsewhere      -> { readAt, source, markets: { [ticker]: { dex, oiUsd, volume24hUsd } } }:
  *                               registered stocks that trade as Hyperliquid HIP-3 perps (display only)
  *
@@ -23,10 +24,11 @@ import { IntentStore, MAX_EXPIRY_DAYS } from "./store";
 import { elsewhere } from "./elsewhere";
 import { paymaster } from "./paymaster";
 import { PREVIEW_BOTS, sharePage } from "./share";
+import { AlertStore, alertsInfo, telegram, tick, type AlertEnv } from "./alerts";
 
-export { IntentStore };
+export { IntentStore, AlertStore };
 
-interface Env {
+interface Env extends AlertEnv {
   ASSETS: Fetcher;
   INTENTS: DurableObjectNamespace;
   GEO_BLOCK?: string;
@@ -157,6 +159,8 @@ export default {
     // link previews (X's fetcher runs from the US) may read a share page and its card, nothing else: the
     // page sends a person on to the site, which stays closed to them
     const preview = /^\/(s|og)\//.test(new URL(req.url).pathname) && PREVIEW_BOTS.test(req.headers.get("user-agent") ?? "");
+    // Telegram's servers call the webhook from wherever they are; it is checked by its secret instead
+    if (new URL(req.url).pathname === "/api/telegram") return telegram(req, env);
     // an unknown country is refused too (Codex r1 #6); local development sets GEO_BLOCK=off
     if (!preview && env.GEO_BLOCK !== "off" && (!country || BLOCKED_COUNTRIES.has(country))) {
       if (new URL(req.url).pathname.startsWith("/api/")) return json({ error: "Summon is not available in the United States." }, 451);
@@ -170,6 +174,7 @@ export default {
       return sharePage(req, ticker, known.get(ticker), totals[ticker]);
     }
     if (url.pathname === "/api/demand" && req.method === "GET") return demand(req, env);
+    if (url.pathname === "/api/alerts" && req.method === "GET") return alertsInfo(env);
     if (url.pathname === "/api/paymaster") return paymaster(req, env.CDP_PAYMASTER_URL);
     if (url.pathname === "/api/elsewhere" && req.method === "GET") return json(await elsewhere(() => tickers(env, req).then((m) => new Set(m.keys()))));
     if (url.pathname === "/api/intents") {
@@ -178,5 +183,8 @@ export default {
       return json({ error: "Use GET or POST." }, 405);
     }
     return env.ASSETS.fetch(req);
+  },
+  async scheduled(_c: ScheduledController, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(tick(env).then(() => undefined));
   },
 } satisfies ExportedHandler<Env>;

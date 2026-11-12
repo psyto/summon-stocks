@@ -3,7 +3,7 @@ import { Attribution } from "ox/erc8021";
 import { BUILDER_CODE, chain } from "./chain";
 import { h } from "./el";
 
-type Provider = { request: (a: { method: string; params?: unknown[] }) => Promise<unknown>; on?: (e: string, f: () => void) => void };
+type Provider = { request: (a: { method: string; params?: unknown[] }) => Promise<unknown>; on?: (e: string, f: () => void) => void; isCoinbaseBrowser?: boolean };
 declare global {
   interface Window {
     ethereum?: Provider;
@@ -61,6 +61,27 @@ export const sponsored = () =>
     .catch(() => false));
 export const usingBaseAccount = () => chosen !== undefined && chosen === base;
 
+/** Inside Coinbase Wallet's app (the Base app before) the page runs in its browser, whose wallet is the
+ * person's own: no picker there. */
+const inWalletApp = () => !!window.ethereum?.isCoinbaseBrowser;
+
+/**
+ * Whether this send can go as one sponsored batch: Base Account, or the wallet inside Coinbase Wallet's
+ * app when it says it takes a paymaster on Base Sepolia (a smart wallet does; a key-based one does not).
+ * The Worker's paymaster only signs for Coinbase smart-wallet calls to Summon's contracts.
+ */
+async function batchable(): Promise<boolean> {
+  if (!(await sponsored())) return false;
+  if (usingBaseAccount()) return true;
+  if (!inWalletApp() || chosen !== window.ethereum || !account) return false;
+  try {
+    const caps = (await chosen!.request({ method: "wallet_getCapabilities", params: [account, [`0x${chain.id.toString(16)}`]] })) as Record<string, { paymasterService?: { supported?: boolean } }>;
+    return !!(caps[`0x${chain.id.toString(16)}`] ?? caps[String(chain.id)])?.paymasterService?.supported;
+  } catch {
+    return false;
+  }
+}
+
 export function walletClient(): WalletClient {
   const p = chosen ?? window.ethereum;
   if (!p) throw new Error("No wallet found. Install a browser wallet such as Coinbase Wallet or MetaMask.");
@@ -71,6 +92,7 @@ export function walletClient(): WalletClient {
 async function pick(): Promise<Provider | undefined> {
   // the recorder's demo wallet signs in Node and is the only one there
   if ((window.ethereum as { isDemo?: boolean } | undefined)?.isDemo) return window.ethereum;
+  if (inWalletApp()) return window.ethereum;
   const free = await sponsored();
   const all: (Announced & { lazy?: () => Promise<Provider>; note?: string })[] = [...announced.values()];
   if (all.length === 0 && window.ethereum) all.push({ info: { uuid: "injected", name: "Browser wallet", icon: BASE_ICON.replace("#0000ff", "#0e4a3b"), rdns: "injected" }, provider: window.ethereum });
@@ -153,14 +175,14 @@ export interface Step {
 }
 
 /**
- * Sends an order's steps. Base Account with sponsorship: all of them as one batch (EIP-5792), gas paid
+ * Sends an order's steps. Base Account (or a smart wallet in Coinbase Wallet's app) with sponsorship: all of them as one batch (EIP-5792), gas paid
  * through /api/paymaster, so approve-then-pledge is one confirmation. Any other wallet: one transaction
  * per step, `before` running first on each (the page simulates it there). Resolves to the last hash.
  */
 export async function sendSteps(steps: Step[], say: (what: "confirm" | "wait", hash?: Hex) => void, before?: (s: Step) => Promise<void>): Promise<Hex> {
   const w = walletClient();
   const me = account!;
-  if (usingBaseAccount() && (await sponsored())) {
+  if (await batchable()) {
     if (before) await before(steps[0]!);
     say("confirm");
     const { id } = await w.sendCalls({

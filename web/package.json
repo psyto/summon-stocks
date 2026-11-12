@@ -8,7 +8,8 @@
     "worker": "wrangler dev --port 8787",
     "og": "tsx scripts/og.mts",
     "deploy": "vite build && tsx scripts/og.mts && wrangler deploy",
-    "test:worker": "tsx worker/worker.test.ts"
+    "test:worker": "tsx worker/worker.test.ts",
+    "telegram": "tsx scripts/telegram.mts"
   },
   "dependencies": {
     "@base-org/account": "^2.6.0",

@@ -12,6 +12,8 @@ import { DatabaseSync } from "node:sqlite";
 import worker, { IntentStore } from "./index";
 import { resetElsewhere } from "./elsewhere";
 import { MAX_LIVE, MAX_NONCES } from "./store";
+import { AlertStore, tick } from "./alerts";
+import { nextSummoning } from "../../ts/schedule";
 
 /** The Durable Object namespace, with IntentStore over an in-memory node:sqlite database. */
 function memStore() {
@@ -36,8 +38,22 @@ function memStore() {
 const snapshot = readFileSync(new URL("../public/b20.json", import.meta.url), "utf8");
 const ASSETS = { fetch: async () => new Response(snapshot, { headers: { "content-type": "application/json" } }) };
 
+/** AlertStore over its own in-memory database, as a namespace. */
+function memAlerts() {
+  const db = new DatabaseSync(":memory:");
+  const sql = {
+    exec: (q: string, ...b: unknown[]) => {
+      const st = db.prepare(q);
+      const rows = /^\s*SELECT/i.test(q) ? (st.all(...(b as never[])) as Record<string, unknown>[]) : (st.run(...(b as never[])), []);
+      return { toArray: () => rows };
+    },
+  };
+  const obj = new AlertStore({ storage: { sql } });
+  return { idFromName: () => "all", get: () => ({ fetch: (u: string, i?: RequestInit) => obj.fetch(new Request(u, i)) }), db };
+}
+
 function env(geo = "on") {
-  return { ASSETS, INTENTS: memStore(), GEO_BLOCK: geo } as never;
+  return { ASSETS, INTENTS: memStore(), ALERTS: memAlerts(), GEO_BLOCK: geo } as never;
 }
 
 function req(path: string, init: RequestInit = {}, country = "JP", ip = "203.0.113.7") {
@@ -509,6 +525,121 @@ const tests: [string, () => Promise<void>][] = [
         assert.equal((await worker.fetch(req("/s/RDDT", {}, "US"), e)).status, 451);
         // not a registered stock
         assert.equal((await worker.fetch(req("/s/NOPE"), e)).status, 404);
+      } finally {
+        globalThis.fetch = real;
+      }
+    },
+  ],
+  [
+    "Telegram bot: commands answer in the webhook's response, only with the secret, only in private chats",
+    async () => {
+      const real = globalThis.fetch;
+      // RDDT's latest round is funded
+      globalThis.fetch = (async (_u: string, init: RequestInit) => {
+        const data = JSON.parse(String(init.body)).params[0].data as string;
+        return Response.json({ jsonrpc: "2.0", id: 1, result: data.startsWith("0xb83c9a48") ? `0x${"0".repeat(24)}${"ab".repeat(20)}` : `0x${"0".repeat(63)}1` });
+      }) as typeof fetch;
+      try {
+        const base = env("on") as object;
+        // no token: the page gets no link and the webhook is off
+        assert.equal((await worker.fetch(req("/api/alerts"), base as never)).status, 503);
+        assert.equal((await worker.fetch(req("/api/telegram", { method: "POST", body: "{}" }), base as never)).status, 503);
+        const e = { ...base, TELEGRAM_BOT_TOKEN: "T", TELEGRAM_WEBHOOK_SECRET: "S", TELEGRAM_BOT_NAME: "summon_alerts_bot", SITE_URL: "https://summon.test" } as never;
+        assert.deepEqual(await (await worker.fetch(req("/api/alerts"), e)).json(), { bot: "summon_alerts_bot" });
+        const say = async (text: string, o: { secret?: string; type?: string; country?: string } = {}) => {
+          const r = await worker.fetch(
+            req("/api/telegram", { method: "POST", headers: { "x-telegram-bot-api-secret-token": o.secret ?? "S" }, body: JSON.stringify({ message: { chat: { id: 42, type: o.type ?? "private" }, text } }) }, o.country ?? "JP"),
+            e,
+          );
+          return { status: r.status, body: r.headers.get("content-type")?.includes("json") ? ((await r.json()) as { method?: string; chat_id?: number; text?: string }) : undefined };
+        };
+        assert.equal((await say("/list", { secret: "wrong" })).status, 403);
+        // Telegram's servers may call from the US: the secret, not the country, admits them
+        const follow = await say("/start RDDT", { country: "US" });
+        assert.equal(follow.body?.method, "sendMessage");
+        assert.equal(follow.body?.chat_id, 42);
+        assert.match(follow.body!.text!, /^Following sRDDT\./);
+        assert.match(follow.body!.text!, /the round is full\. Its auction starts at the next summoning/);
+        assert.match(follow.body!.text!, /https:\/\/summon\.test\/#\/round\/0xabab/);
+        assert.match((await say("/follow nope")).body!.text!, /NOPE has no testnet round/);
+        await say("/follow $gme");
+        assert.equal((await say("/list")).body!.text, "You follow GME, RDDT.");
+        assert.match((await say("/unfollow GME")).body!.text!, /No more alerts for sGME/);
+        assert.equal((await say("/list")).body!.text, "You follow RDDT.");
+        assert.match((await say("hello")).body!.text!, /\/follow TICKER/);
+        // a group: no answer, nothing stored
+        assert.equal((await say("/follow AMC", { type: "group" })).body, undefined);
+        assert.equal((await say("/list")).body!.text, "You follow RDDT.");
+        await say("/stop");
+        assert.match((await say("/list")).body!.text!, /You follow nothing yet/);
+      } finally {
+        globalThis.fetch = real;
+      }
+    },
+  ],
+  [
+    "Telegram alerts: the first tick only records; then each change and each summoning reminder goes out once",
+    async () => {
+      const real = globalThis.fetch;
+      let state = 1;
+      let round = "ab".repeat(20);
+      const sent: { chat: number; text: string }[] = [];
+      let answer = (_chat: number) => 200;
+      const deployment = JSON.parse(readFileSync(new URL("../../deployments/84532.json", import.meta.url), "utf8")) as { demoStocks: { ticker: string; address: string }[] };
+      const rddt = deployment.demoStocks.find((d) => d.ticker === "RDDT")!.address.slice(2).toLowerCase();
+      const f = (async (u: string, init: RequestInit) => {
+        if (String(u).startsWith("https://api.telegram.org/botT/sendMessage")) {
+          const b = JSON.parse(String(init.body)) as { chat_id: number; text: string };
+          const status = answer(b.chat_id);
+          if (status === 200) sent.push({ chat: b.chat_id, text: b.text });
+          return new Response("{}", { status });
+        }
+        const data = JSON.parse(String(init.body)).params[0].data as string;
+        // only RDDT has a round
+        if (data.startsWith("0xb83c9a48")) return Response.json({ result: data.endsWith(rddt) ? `0x${"0".repeat(24)}${round}` : `0x${"0".repeat(64)}` });
+        return Response.json({ result: `0x${state.toString(16).padStart(64, "0")}` });
+      }) as typeof fetch;
+      globalThis.fetch = f;
+      try {
+        const e = { ...(env("on") as object), TELEGRAM_BOT_TOKEN: "T", TELEGRAM_WEBHOOK_SECRET: "S", SITE_URL: "https://summon.test" } as never;
+        const say = (chat: number, text: string) =>
+          worker.fetch(req("/api/telegram", { method: "POST", headers: { "x-telegram-bot-api-secret-token": "S" }, body: JSON.stringify({ message: { chat: { id: chat, type: "private" }, text } }) }), e);
+        await say(1, "/follow RDDT");
+        await say(2, "/follow RDDT");
+        await say(3, "/follow AMC");
+        // a Wednesday noon in New York: no summoning near
+        const wed = Date.UTC(2026, 10, 18, 17, 0) / 1000;
+        assert.equal((await tick(e, f, wed)).sent, 0);
+        // nothing changed: nothing sent
+        assert.equal((await tick(e, f, wed + 60)).sent, 0);
+        // the auction starts: both RDDT followers hear, AMC's does not
+        state = 2;
+        assert.equal((await tick(e, f, wed + 120)).sent, 2);
+        assert.deepEqual(sent.map((m) => m.chat).sort(), [1, 2]);
+        assert.match(sent[0]!.text, /sRDDT: the auction is running/);
+        // a new round opens and fills up; chat 2 blocked the bot meanwhile and is forgotten
+        sent.length = 0;
+        round = "cd".repeat(20);
+        state = 1;
+        answer = (chat) => (chat === 2 ? 403 : 200);
+        assert.equal((await tick(e, f, wed + 180)).sent, 1);
+        state = 2;
+        await tick(e, f, wed + 240);
+        assert.deepEqual(sent.map((m) => m.chat), [1, 1]);
+        // Telegram rate-limits: the message waits for the next tick
+        sent.length = 0;
+        state = 1;
+        answer = () => 429;
+        assert.equal((await tick(e, f, wed + 300)).sent, 0);
+        answer = () => 200;
+        assert.equal((await tick(e, f, wed + 360)).sent, 1);
+        assert.match(sent[0]!.text, /the round is full/);
+        // 10 minutes before Thursday's summoning: one reminder, once
+        sent.length = 0;
+        const thu = nextSummoning(wed + 400);
+        assert.equal((await tick(e, f, thu - 600)).sent, 1);
+        assert.match(sent[0]!.text, /^Summoning at Thu, Nov 19, 10:00 ET, in 10 min: sRDDT's auction starts then\.\nhttps:\/\/summon\.test\/#\/round\/0xcdcd/);
+        assert.equal((await tick(e, f, thu - 540)).sent, 0);
       } finally {
         globalThis.fetch = real;
       }

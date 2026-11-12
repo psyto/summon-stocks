@@ -105,6 +105,19 @@ something happened, and the demo had to be told in a terminal. Now:
 - Still Summon's: paper, ink and seal red, the rosette at the centre. Not another of our pages' dark trading look,
   so the two do not read as one product.
 
+## Bringing people back (2026-11-12)
+A round takes days: intents, then pledges, then a summoning. People who signed once need a reason and a
+time to come back.
+- A share link per stock (`/s/TICKER`) whose preview carries the stock's card and its live numbers.
+- "My summons": what each round a wallet backed needs from it next.
+- Summoning days: funded rounds' auctions start on Tuesdays and Thursdays at 10:00 New York time, so there
+  is a moment to watch, and something to post after.
+- Telegram alerts instead of a mini app. Base's mini apps were retired (Base's docs, read 11-12): the Base
+  app became Coinbase Wallet, whose browser opens any web page, so the page itself is the Base app's way
+  in. A Farcaster mini app would need a public domain and a signed manifest, and its wallet's Base Sepolia
+  and paymaster support are not confirmed; it can come after the site is public. Telegram needs neither,
+  and a message on a phone is what brings someone back for a 10:00 ET auction.
+
 ## Demand from elsewhere (planned 2026-11-08; Hyperliquid built 2026-11-11, Robinhood Chain to come)
 - On the register, a never-minted stock that already trades elsewhere gets a mark: Hyperliquid HIP-3 (open
   interest and 24 h volume) or Robinhood Chain (token supply). The mark is set by an amount, never by a
