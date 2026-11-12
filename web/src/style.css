@@ -1301,3 +1301,6 @@ details.checks[open] summary {
     transition: none;
   }
 }
+[hidden] {
+  display: none !important;
+}

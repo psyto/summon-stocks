@@ -556,6 +556,8 @@ function ticket(v: View): HTMLElement {
     const presets = h("div", { class: "presets" });
     const quote = h("dl", { class: "quote" });
     const go = h("button", { class: "btn btn--seal btn--wide", type: "button" });
+    // shown while the wallet holds less test USDC than the amount chosen
+    const fund = faucet();
     const paint = () => {
       const a = Math.max(0, Math.min(v.keep.pledge, room));
       amountView.textContent = `$${a.toLocaleString("en-US")}`;
@@ -573,7 +575,9 @@ function ticket(v: View): HTMLElement {
         row("", `${p.lpBps / 100}% of the round seeds the stock's pool; you are one of its LPs, and can take it out ${p.lpLockSeconds / 3600} h after the fill`, "quote__row--note"),
         row("If no fill by the deadline", `$${a.toLocaleString("en-US")} back`),
       );
-      go.textContent = !me ? "Connect a wallet" : s.mine!.usdc === 0n ? "Get test USDC first" : `Pledge $${a.toLocaleString("en-US")}`;
+      const short_ = !!me && s.mine!.usdc < parseUnits(String(a), 6);
+      go.textContent = !me ? "Connect a wallet" : short_ ? `Pledge $${a.toLocaleString("en-US")}: get test USDC first` : `Pledge $${a.toLocaleString("en-US")}`;
+      fund?.toggleAttribute("hidden", !short_);
       go.toggleAttribute("disabled", !!me && (a <= 0 || s.mine!.usdc < parseUnits(String(a), 6)));
     };
     for (const n of [25, 50, 100, Math.floor(room)]) {
@@ -595,7 +599,7 @@ function ticket(v: View): HTMLElement {
     });
     paint();
     box.append(h("h2", { class: "ticket__title wide" }, "Back this stock"), h("p", { class: "ticket__lede" }, `Pledge test USDC. When the round reaches $${tusdc(p.target)} and a holder fills it, you receive ${demo.symbol} and a share of its pool.`), amountView, presets, quote, go);
-    if (me && s.mine!.usdc === 0n) box.append(faucet()!);
+    if (fund) box.append(fund);
     if (me && s.mine!.pledge > 0n) {
       box.append(h("p", { class: "ticket__mine" }, `You pledged $${tusdc(s.mine!.pledge)}.`), btn("Take my pledge back", () => void run("Withdraw", [{ address: round, abi: roundAbi as Abi, functionName: "withdraw", args: [s.mine!.pledge] }])));
     }
