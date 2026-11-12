@@ -974,3 +974,330 @@ a {
 .filter[aria-pressed="true"] .rosette__seal circle {
   fill: var(--paper);
 }
+
+/* ------------------------------------------------------------------ round page: stage and ticket */
+
+.rp__head {
+  display: grid;
+  grid-template-columns: 1fr minmax(280px, 420px);
+  gap: 32px;
+  align-items: end;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--rule);
+}
+.rp__head .seq {
+  margin: 0;
+}
+.rp {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 40px;
+  padding-top: 28px;
+}
+.rp__stage {
+  text-align: center;
+}
+.dial__wrap {
+  position: relative;
+  max-width: 440px;
+  margin: 0 auto;
+}
+.dial {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.dial .rosette {
+  overflow: visible;
+}
+.dial__track {
+  fill: none;
+  stroke: var(--rule);
+  stroke-width: 0.05;
+  stroke-linecap: round;
+}
+.dial__tick {
+  stroke: var(--faint);
+  stroke-width: 0.012;
+}
+.dial__value {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 0.07;
+  stroke-linecap: round;
+  transition: d 0.9s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.dial__dot {
+  fill: var(--ink);
+  stroke: var(--paper);
+  stroke-width: 0.025;
+  transition: cx 0.9s cubic-bezier(0.2, 0.7, 0.2, 1), cy 0.9s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.dial--auction .dial__value,
+.dial--stopped .dial__value {
+  stroke: var(--seal);
+}
+.dial--auction .dial__dot,
+.dial--stopped .dial__dot {
+  fill: var(--seal);
+}
+.dial--auction .dial__value,
+.dial--auction .dial__dot {
+  transition-duration: 1s;
+  transition-timing-function: linear;
+}
+.dial--stopped .dial__value {
+  stroke-dasharray: 0.04 0.06;
+  stroke-linecap: butt;
+}
+.dial--closed .dial__value {
+  stroke: var(--muted);
+}
+.dial--closed .dial__dot {
+  fill: var(--muted);
+}
+.dial--expired .dial__dot {
+  fill: var(--faint);
+}
+.dial__ends {
+  position: absolute;
+  left: 9%;
+  right: 9%;
+  bottom: 4%;
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--muted);
+}
+.rp__big {
+  margin: 4px 0 0;
+  font-size: clamp(48px, 7vw, 76px);
+  line-height: 1;
+  font-weight: 800;
+  color: var(--ink);
+}
+.rp__stage:has(.dial--stopped) .rp__big,
+.rp__stage:has(.dial--auction) .rp__big {
+  color: var(--seal);
+}
+.rp__bigsub {
+  max-width: 52ch;
+  margin: 10px auto 0;
+  color: var(--muted);
+}
+.rp__bigsub code {
+  font-size: 13px;
+  color: var(--seal);
+}
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 28px;
+  text-align: left;
+}
+.tile {
+  padding: 14px 16px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--paper-2);
+}
+.tile__label {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.tile__value {
+  margin: 4px 0 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.tile__sub {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.ticket {
+  align-self: start;
+  position: sticky;
+  top: 24px;
+  padding: 22px;
+  border: 1px solid var(--ink);
+  border-radius: 8px;
+  background: var(--paper);
+  box-shadow: 0 0 0 4px var(--paper), 0 0 0 5px var(--rule);
+}
+.ticket__title {
+  margin: 0 0 6px;
+  font-size: 25px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.ticket__lede {
+  margin: 0 0 14px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.ticket__amount {
+  margin: 4px 0 10px;
+  font-size: 48px;
+  line-height: 1;
+  font-weight: 800;
+  color: var(--ink);
+}
+.ticket__bal,
+.ticket__mine {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.preset,
+.tab {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.preset[aria-pressed="true"],
+.tab[aria-selected="true"] {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+  font-weight: 700;
+}
+.preset:focus-visible,
+.tab:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.tabs {
+  display: flex;
+  gap: 6px;
+  margin: 8px 0 12px;
+}
+.quote {
+  margin: 14px 0;
+  padding: 0;
+}
+.quote__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  border-top: 1px solid var(--rule);
+  font-size: 14px;
+}
+.quote__row dt {
+  color: var(--muted);
+}
+.quote__row dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 600;
+}
+.quote__row--key dd {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.quote__row--note {
+  border-top: 0;
+  padding-top: 0;
+}
+.quote__row--note dt {
+  display: none;
+}
+.quote__row--note dd {
+  text-align: left;
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--muted);
+}
+.btn--wide {
+  display: block;
+  width: 100%;
+  margin: 8px 0 0;
+}
+.refuse {
+  margin: 8px 0 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--seal);
+  border-left-width: 4px;
+  border-radius: 6px;
+}
+.refuse p {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+.refuse__head {
+  font-weight: 800;
+  color: var(--seal);
+}
+.refuse__err code {
+  font-size: 13px;
+}
+.position {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--rule);
+}
+.position__title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--ink);
+}
+details.checks {
+  margin-top: 36px;
+  padding-top: 18px;
+  border-top: 1px solid var(--rule);
+}
+details.checks summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 15px;
+}
+details.checks summary .wide {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--ink);
+}
+details.checks[open] summary {
+  margin-bottom: 12px;
+}
+
+@media (max-width: 960px) {
+  .rp__head,
+  .rp {
+    grid-template-columns: 1fr;
+  }
+  .ticket {
+    position: static;
+  }
+}
+@media (max-width: 560px) {
+  .tiles {
+    grid-template-columns: 1fr;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dial__value,
+  .dial__dot {
+    transition: none;
+  }
+}

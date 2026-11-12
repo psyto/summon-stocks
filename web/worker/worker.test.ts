@@ -398,9 +398,9 @@ const tests: [string, () => Promise<void>][] = [
       try {
         resetElsewhere();
         const e = env();
-        const r = (await (await worker.fetch(req("/api/elsewhere"), e)).json()) as { readAt: string; markets: Record<string, { dex: string; oiUsd: number; volume24hUsd: number }> };
-        assert.deepEqual(r.markets.DELL, { dex: "xyz", oiUsd: 100_000, volume24hUsd: 5000 });
-        assert.deepEqual(r.markets.SOFI, { dex: "para", oiUsd: 20_000, volume24hUsd: 70 });
+        const r = (await (await worker.fetch(req("/api/elsewhere"), e)).json()) as { readAt: string; markets: Record<string, { dex: string; oiUsd: number; volume24hUsd: number; oraclePx: number }> };
+        assert.deepEqual(r.markets.DELL, { dex: "xyz", oiUsd: 100_000, volume24hUsd: 5000, oraclePx: 100 });
+        assert.deepEqual(r.markets.SOFI, { dex: "para", oiUsd: 20_000, volume24hUsd: 70, oraclePx: 20 });
         assert.equal(r.markets.NOTREG, undefined); // not a registered B20 stock
         assert.equal(r.markets.RKT, undefined); // delisted
         const after = calls;

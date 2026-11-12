@@ -39,7 +39,7 @@ export const statusLine: Record<Ink, string> = {
 export interface Elsewhere {
   readAt: string | null;
   source: string;
-  markets: Record<string, { dex: string; oiUsd: number; volume24hUsd: number }>;
+  markets: Record<string, { dex: string; oiUsd: number; volume24hUsd: number; oraclePx?: number }>;
 }
 
 /** A cell is marked by an amount, never by a listing alone (docs/design.md): open interest or 24 h volume. */

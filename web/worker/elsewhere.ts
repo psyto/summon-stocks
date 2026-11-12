@@ -9,7 +9,7 @@ import { hip3Markets, type Hip3Market } from "../../ts/hip3";
 export const ELSEWHERE_TTL_MS = 5 * 60_000;
 const SOURCE = "Hyperliquid info API (HIP-3 perps)";
 
-type Body = { readAt: string | null; source: string; markets: Record<string, Pick<Hip3Market, "dex" | "oiUsd" | "volume24hUsd">> };
+type Body = { readAt: string | null; source: string; markets: Record<string, Pick<Hip3Market, "dex" | "oiUsd" | "volume24hUsd" | "oraclePx">> };
 let cache: { at: number; body: Body } | undefined;
 
 /**
@@ -21,7 +21,7 @@ export async function elsewhere(registered: () => Promise<Set<string>>): Promise
     try {
       const [all, known] = await Promise.all([hip3Markets(), registered()]);
       const markets: Body["markets"] = {};
-      for (const [t, m] of all) if (known.has(t)) markets[t] = { dex: m.dex, oiUsd: Math.round(m.oiUsd), volume24hUsd: Math.round(m.volume24hUsd) };
+      for (const [t, m] of all) if (known.has(t)) markets[t] = { dex: m.dex, oiUsd: Math.round(m.oiUsd), volume24hUsd: Math.round(m.volume24hUsd), oraclePx: m.oraclePx };
       cache = { at: Date.now(), body: { readAt: new Date().toISOString(), source: SOURCE, markets } };
     } catch {
       if (!cache) return { readAt: null, source: SOURCE, markets: {} };
