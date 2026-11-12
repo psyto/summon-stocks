@@ -8,6 +8,7 @@ import { client, D, DEMO_DECIMALS, demoAt, demoFor, factoryAbi, roundAbi, STATES
 import { h } from "./el";
 import { rosette, type Ink } from "./rosette";
 import { connect, current, onWallet, short } from "./wallet";
+import { nextSummoning, summoningLabel } from "../../ts/schedule";
 
 type Addr = `0x${string}`;
 const FOLLOW = "summon.follow";
@@ -111,7 +112,7 @@ async function rounds(me: Addr): Promise<Mine[]> {
       let next = "";
       let act = false;
       if (state === "Open") next = `$${tusdc(params.target - (pledged as bigint))} still to pledge; the deadline is ${inFor(Number(params.deadline))}.`;
-      else if (state === "Funded") next = "Full. The auction starts once the US market is open and every fill condition holds.";
+      else if (state === "Funded") next = `Full. Its auction starts at the next summoning, ${summoningLabel(nextSummoning(now()))}.`;
       else if (state === "Auction") next = `Auction running; it ends ${inFor(Number(auctionStart) + params.windowSeconds)}.`;
       else if (state === "Filled") {
         const owed = (backerTokens as bigint) * pledge / (pledged as bigint);
@@ -167,7 +168,7 @@ async function follows(): Promise<{ ticker: string; symbol?: string; round?: Add
 
 export async function renderMe(main: HTMLElement) {
   const page = h("section", { class: "me" });
-  main.append(h("p", { class: "back" }, h("a", { href: "#/" }, "The register")), page);
+  main.append(page);
   const draw = async () => {
     const me = current();
     if (!me) {

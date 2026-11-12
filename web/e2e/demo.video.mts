@@ -6,10 +6,13 @@
  *
  *   title    <out.mp4> <line> [<sub>]   a card between parts
  *   register <out.mp4>   the register: 227 stocks never issued; a signed intent takes the stock past $250; that wallet opens its round
+ *   trust    <out.mp4>   anyone checks every intent's signature in the browser; the wallet picker offers Base Account, no ETH needed
  *   pledge   <out.mp4>   alice pledges on the round page; bob and carol fill it; the round waits for the market
+ *   wait     <out.mp4>   (round funded) the next summoning; Follow and the Telegram alerts (the bot's own messages); the share card
  *   auction  <out.mp4>   (market open) the auction starts, the spread runs, the filler fills, alice claims
  *   trade    <out.mp4>   (round filled) alice buys at the pool's fee; a halt stops the pool, and it resumes
  *   unwind   <out.mp4>   (LP lock over) the backers' pool is taken apart; alice claims her share
+ *   me       <out.mp4>   alice's My summons: every round she backed and what each needs from her next
  *   join     <out.mp4> <part.mp4>...
  *
  * TICKER picks the demo stock (default RDDT). Run from web/: npx tsx e2e/demo.video.mts <part> <out.mp4>
@@ -20,11 +23,13 @@ import puppeteer, { type ElementHandle, type Page } from "puppeteer";
 import { createPublicClient, createWalletClient, http, parseAbi, type Hex } from "viem";
 import { generatePrivateKey, mnemonicToAccount, privateKeyToAccount, type LocalAccount } from "viem/accounts";
 import { baseSepolia } from "viem/chains";
+import { announce } from "../worker/alerts";
+import { latestRound } from "../worker/rounds";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:8790";
 const RPC = process.env.BASE_SEPOLIA_RPC ?? "https://sepolia.base.org";
 const [part, out = "", ...rest] = process.argv.slice(2);
-if (!part) throw new Error("usage: demo.video.mts <title|register|pledge|auction|trade|unwind|join> <out.mp4> ...");
+if (!part) throw new Error("usage: demo.video.mts <title|register|trust|pledge|wait|auction|trade|unwind|me|join> <out.mp4> ...");
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 if (part === "join") {
@@ -272,8 +277,6 @@ try {
       await record();
       await caption("Coinbase has registered 298 tokenized US stocks on Base. 227 of them have never been issued: nobody can hold one.");
       await sleep(5200);
-      // a cut, not a scroll: the register with its detail panel fills the next screen
-      await page.evaluate(() => window.scrollTo({ top: document.querySelector(".register")!.getBoundingClientRect().top + scrollY - 16, behavior: "instant" }));
       await caption("The register shows every one. A filled seal trades on Base; a faint one was never issued.");
       await sleep(3800);
       await click("css:.filters button:first-child", 1000);
@@ -298,6 +301,96 @@ try {
       await caption("");
       await page.waitForSelector(".rp__stage", { timeout: 60_000 });
       await sleep(3000);
+    } else if (part === "trust") {
+      await start(`${BASE}/#/s/${TICKER}`, ".detail");
+      await record();
+      await caption("The board counts wallets, not promises. Anyone can check every signature behind a number, in the browser.");
+      await click(`css:.detail .sigs summary`, 600);
+      await until(".sigs__list", /verified in this browser/, 30_000);
+      await moveToSel(".sigs__list");
+      await sleep(4800);
+      await caption("Backing a round needs a wallet, not an extension or ETH: Base Account signs with a passkey, and Summon pays the testnet gas.");
+      // the recorder's wallet skips the picker; here it is shown, then closed
+      await page.evaluate(() => ((window as unknown as { ethereum: { isDemo: boolean } }).ethereum.isDemo = false));
+      await click("Connect wallet", 1200);
+      await moveToSel("dialog.picker li:last-child .picker__item");
+      await sleep(5200);
+      await click("Cancel", 800);
+    } else if (part === "wait") {
+      const round = await roundOf();
+      await start(`${BASE}/#/round/${round}`, ".rp__stage");
+      await record();
+      await caption(`Funded rounds go to auction on summoning days: Tuesdays and Thursdays, 10:00 New York time. Backers know when to come back.`);
+      await moveToSel(".tiles .tile:first-child");
+      await sleep(5200);
+      await caption("The ticket ends with what comes next, in the same place on every page: follow the stock, and My summons keeps it with the rounds you backed.");
+      await moveToSel(".ticket .keep");
+      await sleep(2400);
+      await click("Follow", 2600);
+      await caption("Or follow it on Telegram: the bot says when the round moves, and 15 minutes before its summoning.");
+      await moveToSel(".follow--tg");
+      await sleep(3600);
+      // the bot's own words for this round now, from the function the Worker sends them with
+      const now = await latestRound(stock);
+      const site = { SITE_URL: "https://summon.example" } as never;
+      const msgs = [
+        { me: true, text: `/start ${TICKER}` },
+        { me: false, text: `Following ${stock.symbol}. You'll hear when its round changes, and 15 minutes before a summoning that starts its auction.` },
+        ...(now ? [{ me: false, text: announce(site, now).split("\n")[0]! }] : []),
+        { me: false, text: announce(site, { ...stock, round: "0x", state: 2 }).split("\n")[0]! },
+        { me: false, text: announce(site, { ...stock, round: "0x", state: 3 }).split("\n")[0]! },
+      ];
+      const esc = (t: string) => t.replace(/[&<>]/g, (c) => `&#${c.charCodeAt(0)};`);
+      await page.evaluate((html) => {
+        const d = document.createElement("div");
+        d.id = "demo-alerts";
+        d.innerHTML = html;
+        document.body.append(d);
+      }, `<style>#demo-alerts{position:fixed;inset:0;z-index:97;display:grid;place-items:center;background:rgba(14,33,28,.55);animation:in 300ms ease-out}
+        @keyframes in{from{opacity:0}} .chat{width:420px;padding:22px;border-radius:22px;background:#ecf0ec;box-shadow:0 30px 80px rgba(0,0,0,.35);font:15px/1.45 Archivo,system-ui,sans-serif;color:#14211c}
+        .chat h3{margin:0 0 4px;font-size:15px;color:#0e4a3b}.chat small{display:block;margin-bottom:14px;color:#4d5f57}
+        .m{max-width:84%;margin:8px 0;padding:10px 13px;border-radius:14px;background:#fff;border:1px solid #c9d3cc;opacity:0;animation:msg 400ms ease-out forwards}
+        @keyframes msg{to{opacity:1}}
+        .m.me{margin-left:auto;background:#0e4a3b;color:#ecf0ec;border-color:#0e4a3b}</style>
+        <div class="chat"><h3>Summon alerts, a Telegram bot</h3><small>Its messages for ${esc(stock.symbol)}, as the Worker writes them</small>
+        ${msgs.map((m, i) => `<div class="m${m.me ? " me" : ""}" style="animation-delay:${400 + i * 1100}ms">${esc(m.text)}</div>`).join("")}</div>`);
+      await caption("");
+      await sleep(400 + msgs.length * 1100 + 4200);
+      await page.evaluate(() => document.getElementById("demo-alerts")?.remove());
+      await caption("And share it: a link to the stock shows its card and the live numbers on X, Farcaster or Telegram.");
+      await moveToSel(".ticket .share");
+      await sleep(3200);
+      const preview = await (await fetch(`${BASE}/s/${TICKER}`, { headers: { "user-agent": "Twitterbot/1.0" } })).text();
+      const line = /og:description" content="([^"]*)"/.exec(preview)?.[1]?.replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n))) ?? "";
+      await page.goto(`${BASE}/#/card/${TICKER}`, { waitUntil: "networkidle2" });
+      await page.waitForSelector(".card[data-ready]", { timeout: 60_000 });
+      await page.evaluate(() => document.fonts.ready);
+      // the card is 1200×630: centred on the 1440×900 frame, as a preview would sit
+      await page.evaluate(() => Object.assign(document.body.style, { display: "grid", placeItems: "center", minHeight: "100vh", margin: "0", background: "#d9e0da" }));
+      await overlay(page);
+      await caption(line);
+      await sleep(6000);
+    } else if (part === "me") {
+      // the follow from the wait part, which ran in another browser profile
+      await page.evaluateOnNewDocument((t) => localStorage.setItem("summon.follow", JSON.stringify([t])), TICKER);
+      await start(`${BASE}/#/me`, ".me");
+      await record();
+      // the list runs down the left: captions sit on the right here
+      await page.evaluate(() => Object.assign(document.getElementById("demo-cap")!.style, { left: "auto", right: "24px" }));
+      await connectAs("alice");
+      await page.waitForSelector(".me__list, .me__empty", { timeout: 90_000 });
+      await caption("My summons: every round Alice backed, and what each needs from her next: claim, take her pool share, a refund, or wait until when.");
+      await moveToSel(".me__list");
+      await sleep(5600);
+      const act = await page.$(".me__row--act");
+      if (act) {
+        await caption("A round where something waits for her is marked: one click to the page that does it.");
+        await moveTo(act);
+        await sleep(4200);
+      }
+      await caption("Her intents and the stocks she follows sit underneath, so a signature and a follow are not forgotten.");
+      await moveToSel(".me h2:last-of-type + *");
+      await sleep(4600);
     } else if (part === "pledge") {
       const round = await roundOf();
       await start(`${BASE}/#/round/${round}`, ".rp__stage");
@@ -342,7 +435,7 @@ try {
       const round = await roundOf();
       await start(`${BASE}/#/round/${round}`, ".rp__stage");
       await record();
-      await caption("Market hours. The guard confirms RIVN is open and not halted, and posts its price.");
+      await caption("Market hours. The guard confirms ${TICKER} is open and not halted, and posts its price.");
       await until(".tiles", /6 of 6/, 240_000);
       await moveToSel(".tiles .tile:nth-child(2)");
       await sleep(3000);
@@ -391,7 +484,7 @@ try {
       await click(`Buy s${TICKER}`, 800);
       await page.waitForFunction(() => /Buy|Sell/.test(document.querySelector(".ticket__trade")?.textContent ?? ""), { timeout: 60_000 });
       await sleep(6000);
-      await caption("If the listing exchange halts RIVN, the guard writes it, and the pool stops trading too.");
+      await caption(`If the listing exchange halts ${TICKER}, the guard writes it, and the pool stops trading too.`);
       const before = await pc.readContract({ address: dep.marketState, abi: marketAbi, functionName: "stateOf", args: [stock.address] });
       await sendAs("operator", dep.marketState, marketAbi, "setState", [stock.address, true, 5, 0n]);
       try {

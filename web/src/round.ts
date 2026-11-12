@@ -22,8 +22,7 @@ import { fillMoves, position as lpPosition, quoteSwap, wouldRevert } from "./quo
 import { h } from "./el";
 import { rosette, type Ink } from "./rosette";
 import { connect, current, onWallet, sendSteps, short } from "./wallet";
-import { alertLink, followButton } from "./me";
-import { shareLinks } from "./share";
+import { keepUp } from "./keep";
 import { nextSummoning, summoningLabel } from "../../ts/schedule";
 
 type Addr = `0x${string}`;
@@ -81,7 +80,7 @@ export async function renderRound(main: HTMLElement, round: Addr) {
   const found = demoAt(p.token);
   demo = { ticker: found?.ticker ?? "?", symbol: found?.symbol ?? "token" };
   const page = h("article", { class: "cert", "aria-busy": "true" }, h("p", { class: "cert__loading" }, "Reading this round from Base Sepolia…"));
-  main.append(h("p", { class: "back" }, h("a", { href: "#/" }, "The register")), page);
+  main.append(page);
 
   // the ticket's amount survives a redraw, so a chain read does not reset what someone is typing
   const keep = { pledge: 50, trade: 10, buying: true };
@@ -380,10 +379,9 @@ function head(v: View): HTMLElement {
     h(
       "div",
       {},
-      h("p", { class: "cert__ticker wide" }, demo.symbol, " ", followButton(demo.ticker), " ", alertLink(demo.ticker)),
+      h("p", { class: "cert__ticker wide" }, demo.symbol),
       h("p", { class: "cert__sub" }, `A round to bring ${demo.ticker} onto Base. Testnet: the stock token tracks ${demo.ticker} and has no value.`),
       h("p", { class: "cert__addr" }, "Round ", h("a", { href: explorer("address", v.round), target: "_blank", rel: "noopener" }, short(v.round)), " on Base Sepolia"),
-      shareLinks(demo.ticker, v.s.state === "Filled" ? `${demo.symbol} was summoned onto Base by its backers (testnet).` : `A round to bring ${demo.ticker} onto Base is ${v.s.state.toLowerCase()}: $${tusdc(v.s.pledged)} of $${tusdc(v.p.target)}.`),
     ),
     h(
       "ol",
@@ -673,12 +671,12 @@ function ticket(v: View): HTMLElement {
       ]);
     });
     paint();
-    box.append(h("h2", { class: "ticket__title wide" }, "Back this stock"), h("p", { class: "ticket__lede" }, `Pledge test USDC. When the round reaches $${tusdc(p.target)} and a holder fills it, you receive ${demo.symbol} and a share of its pool.`), amountView, presets, quote, go);
+    box.append(h("h2", { class: "ticket__title wide" }, "Back this stock"), h("p", { class: "ticket__lede" }, `Pledge test USDC. At the fill you get ${demo.symbol} and a share of its pool.`), amountView, presets, quote, go);
     if (fund) box.append(fund);
     if (me && s.mine!.pledge > 0n) {
       box.append(h("p", { class: "ticket__mine" }, `You pledged $${tusdc(s.mine!.pledge)}.`), btn("Take my pledge back", () => void run("Withdraw", [{ address: round, abi: roundAbi as Abi, functionName: "withdraw", args: [s.mine!.pledge] }])));
     }
-    box.append(h("p", { class: "act__note" }, "Approve, then pledge: your wallet asks twice. Until the target is reached you can take it back."));
+    box.append(h("p", { class: "act__note" }, "Approve, then pledge. You can take it back until the target is reached."));
   } else if (s.state === "Funded") {
     const hold = v.checks.every((c) => c.ok);
     const tooLate = now() + p.windowSeconds > Number(p.deadline);
@@ -738,7 +736,31 @@ function ticket(v: View): HTMLElement {
   }
   box.append(...[balance, msg].filter(Boolean) as HTMLElement[]);
   if (me && s.state !== "Open" && s.mine!.usdc === 0n && s.state === "Filled") box.append(faucet()!);
+  box.append(keep(v));
   return box;
+}
+
+/** The ticket's last block: what comes next for this round, and the ways to hear of it or pass it on. */
+function keep(v: View): HTMLElement {
+  const { s, p } = v;
+  const me = current();
+  const mine = !!me && s.mine!.pledge > 0n && s.state !== "Filled";
+  const next = summoningLabel(nextSummoning(now()));
+  const [title, lede] =
+    s.state === "Open"
+      ? [mine ? "You're in" : "Not ready to pledge? Follow it.", mine ? `$${tusdc(p.target - s.pledged)} to go. More backers fill it sooner.` : ""]
+      : s.state === "Funded"
+        ? [`Next summoning: ${next}`, mine ? "Your pledge is in. Hear when the auction starts." : "Hear when the auction starts."]
+        : s.state === "Auction"
+          ? ["The auction is live", "It fills once the spread covers a holder."]
+          : s.state === "Filled"
+            ? ["Summoned", "Tell people it is here."]
+            : ["Expired", "Every pledge goes back."];
+  return keepUp(demo.ticker, {
+    title,
+    lede: mine ? h("span", {}, lede, " ", h("a", { href: "#/me" }, "My summons")) : lede || undefined,
+    share: s.state === "Filled" ? `${demo.symbol} was summoned onto Base by its backers (testnet).` : `A round to bring ${demo.ticker} onto Base is ${s.state.toLowerCase()}: $${tusdc(s.pledged)} of $${tusdc(p.target)}.`,
+  });
 }
 
 /** Filled: buy or sell the summoned stock, with what the hook will do shown before signing. */

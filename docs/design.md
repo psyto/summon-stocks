@@ -105,6 +105,13 @@ something happened, and the demo had to be told in a terminal. Now:
 - Still Summon's: paper, ink and seal red, the rosette at the centre. Not another of our pages' dark trading look,
   so the two do not read as one product.
 
+## One frame (2026-11-12, late)
+Set beside another of our pages again, the page read as scattered: the demo moved through seven layouts, the new
+features sat as small pills by the title, and pages jumped. Now the tabs (Register, Rounds, My summons,
+How it works) stay at the top; the register fits one screen under a one-line intro (the pitch moved to
+How it works); follow, alerts and share are one "keep up" block at the foot of the panel or ticket, headed
+by what comes next.
+
 ## Bringing people back (2026-11-12)
 A round takes days: intents, then pledges, then a summoning. People who signed once need a reason and a
 time to come back.

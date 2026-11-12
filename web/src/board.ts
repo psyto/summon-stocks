@@ -5,8 +5,7 @@ import { loadTotals, signIntent, type Totals } from "./intents";
 import { client, D, DEMOS, DEMO_ROUND, demoAt, demoFor, factoryAbi, OPEN_AT_INTENT_USD, roundAbi, STATES } from "./chain";
 import { verifyTypedData, type Abi, type Hex } from "viem";
 import { connect, current, sendSteps, short } from "./wallet";
-import { alertLink, followButton } from "./me";
-import { shareLinks } from "./share";
+import { keepUp } from "./keep";
 import { nextSummoning, summoningLabel } from "../../ts/schedule";
 
 type Filter = "all" | Ink;
@@ -20,12 +19,36 @@ const FILTER_LABEL: Record<Filter, string> = {
 
 const ORDER: Record<Ink, number> = { never: 0, issued: 1, trading: 2 };
 
+/** The register: one screen, a line of what it is, then every stock and the chosen one's panel. */
 export async function renderBoard(main: HTMLElement, pick?: string) {
   const [snap, totals, away] = await Promise.all([loadSnapshot(), loadTotals(), loadElsewhere()]);
-  const reg = register(snap, totals, away, pick);
-  main.append(hero(snap), rounds(), reg, how(), foot(snap));
-  // a shared link (#/s/TICKER) opens on that stock
-  if (pick) requestAnimationFrame(() => reg.scrollIntoView({ block: "start" }));
+  main.append(intro(snap), register(snap, totals, away, pick));
+}
+
+/** Every round on Base Sepolia. */
+export function renderRounds(main: HTMLElement) {
+  main.append(rounds());
+}
+
+/** The pitch, the steps and the fine print. */
+export async function renderHow(main: HTMLElement) {
+  const snap = await loadSnapshot();
+  main.append(hero(snap), how(), foot(snap));
+}
+
+function intro(s: Snapshot): HTMLElement {
+  return h(
+    "section",
+    { class: "intro" },
+    h("h1", { class: "wide" }, "Registered on Base. Never issued."),
+    h(
+      "p",
+      {},
+      h("strong", {}, `${s.summary.never} of ${s.registered}`),
+      ` tokenized stocks on Base have no supply. Sign for the ones you want; back a round to bring one on. `,
+      h("a", { href: "#/how" }, "How it works"),
+    ),
+  );
 }
 
 function hero(s: Snapshot): HTMLElement {
@@ -168,12 +191,9 @@ function register(s: Snapshot, totals: Totals, away: Elsewhere, pick?: string): 
         totals[x.ticker] = r;
         draw();
         detail();
-        // the panel is drawn anew: say it there, with the way to pass it on
+        // the panel is drawn anew: say it there; the keep-up block under it passes it on
         const done = detailBox.querySelector(".intent__msg");
-        done?.replaceChildren(
-          `Signed. ${x.ticker} now has ${usd(r.usd)} from ${r.backers} ${r.backers === 1 ? "backer" : "backers"}. Bring others: `,
-          shareLinks(x.ticker, `I signed an intent to bring ${x.ticker} onto Base. ${usd(r.usd)} from ${r.backers} ${r.backers === 1 ? "backer" : "backers"} so far.`),
-        );
+        done?.replaceChildren(`Signed. ${x.ticker} now has ${usd(r.usd)} from ${r.backers} ${r.backers === 1 ? "backer" : "backers"}. Share it below to bring others.`);
       } catch (e) {
         msg.textContent = (e as Error).message.split("\n")[0] ?? "Signing failed.";
         sign.removeAttribute("disabled");
@@ -199,14 +219,17 @@ function register(s: Snapshot, totals: Totals, away: Elsewhere, pick?: string): 
     const proof = t.backers > 0 ? signatures(x.ticker, t.backers) : null;
     detailBox.replaceChildren(
       rosette(x.ticker, { detail: "detail", ink: x.status, label: `${x.ticker} seal` }),
-      h("p", { class: "detail__ticker wide" }, x.ticker, " ", followButton(x.ticker), " ", alertLink(x.ticker)),
+      h("p", { class: "detail__ticker wide" }, x.ticker),
       h("p", { class: "detail__name" }, x.name),
       h("p", { class: "detail__status" }, statusLine[x.status]),
-      facts,
       intent,
-      shareLinks(x.ticker, x.status === "trading" ? `${x.ticker} trades on Base.` : `Bring ${x.ticker} onto Base: ${usd(t.usd)} of intents so far. A signature is free.`),
-      ...(proof ? [proof] : []),
       ...(demoBox ? [demoBox] : []),
+      keepUp(x.ticker, {
+        title: `Keep up with ${x.ticker}`,
+        share: x.status === "trading" ? `${x.ticker} trades on Base.` : `Bring ${x.ticker} onto Base: ${usd(t.usd)} of intents so far. A signature is free.`,
+      }),
+      h("details", { class: "facts__box" }, h("summary", {}, `Where ${x.ticker} trades now`), facts),
+      ...(proof ? [proof] : []),
     );
   }
 
@@ -355,7 +378,7 @@ function rounds(): HTMLElement {
         }),
       );
       if (rows.length === 0) {
-        list.replaceChildren(h("p", { class: "rounds__empty" }, "No round is open yet. Sign intents for a demo stock below; at $250 it can open one."));
+        list.replaceChildren(h("p", { class: "rounds__empty" }, "No round is open yet. Sign intents for a demo stock on the register; at $250 it can open one."));
         return;
       }
       list.replaceChildren(

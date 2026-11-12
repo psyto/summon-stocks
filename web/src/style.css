@@ -1703,3 +1703,149 @@ body.card-body {
   display: inline-flex;
   margin: 0;
 }
+
+/* ------------------------------------------------------------ one frame on every page (2026-11-12)
+   The bar and its tabs stay put; each page fits under it; a stock's "keep up" block is always the last
+   thing in its panel or ticket. */
+.top {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule);
+}
+.top .bar {
+  border-bottom: 0;
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-left: 28px;
+}
+.tabs a {
+  padding: 7px 14px;
+  border-radius: 999px;
+  color: var(--ink-2);
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+}
+.tabs a:hover {
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+}
+.tabs a[aria-current="page"] {
+  background: var(--ink);
+  color: var(--paper);
+}
+.intro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 24px;
+  padding: 20px 0 14px;
+}
+.intro h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.intro p {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 15px;
+}
+.intro a {
+  color: var(--ink);
+  font-weight: 600;
+}
+/* the register fits the screen: its cells and the panel scroll inside, the page does not */
+.intro + .register {
+  padding: 14px 0 24px;
+}
+.intro + .register .register__head {
+  margin-bottom: 14px;
+}
+.intro + .register .register__head h2 {
+  font-size: 24px;
+}
+.intro + .register .cells,
+.intro + .register .detail {
+  max-height: calc(100vh - 262px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.intro + .register .detail {
+  top: 84px;
+}
+.rounds:only-child {
+  padding-top: 28px;
+}
+.keep {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rule);
+}
+.keep__title {
+  margin: 0;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--ink);
+}
+.keep__lede {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.keep__lede a {
+  color: var(--ink);
+  font-weight: 600;
+}
+.keep__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.keep .share {
+  margin-top: 10px;
+}
+.facts__box {
+  margin-top: 14px;
+  font-size: 14px;
+}
+.facts__box summary {
+  cursor: pointer;
+  color: var(--ink);
+  font-weight: 600;
+}
+.facts__box .facts {
+  margin-top: 10px;
+}
+/* room for the keep-up block at the foot of the ticket, still on one screen */
+.rp {
+  grid-template-columns: 1fr 420px;
+  padding-top: 14px;
+}
+.cert:has(.rp) {
+  margin-top: 0;
+  padding-top: 18px;
+}
+.preset {
+  white-space: nowrap;
+}
+.top .bar {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+.ticket .act__note {
+  margin-top: 8px;
+}
+.cert:has(.rp) {
+  margin-top: 8px;
+}
+.rounds:only-child {
+  border-top: 0;
+}

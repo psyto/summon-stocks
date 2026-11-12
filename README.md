@@ -240,8 +240,9 @@ anyone can mint; `DemoOracleRegistry`, which stands in for Coinbase's mainnet or
 
 ## Web
 
-`web/` is the page and a Cloudflare Worker. The page shows the register of all 298 stocks, each with
-its own guilloché seal, and a round page that fits one screen: a dial that fills with pledges, runs with
+`web/` is the page and a Cloudflare Worker. Four tabs stay at the top of every page: the register of all
+298 stocks, each with its own guilloché seal (one screen: the cells and the chosen stock's panel scroll
+inside it), the rounds, My summons, and how it works. A round page fits one screen: a dial that fills with pledges, runs with
 the auction's spread and shows the pool's fee, and a ticket that shows what an order gets before it is
 signed. Its numbers come from the chain: a swap is quoted through the pool and its hook (Uniswap's
 V4Quoter), pledges and fills use the round's own integer math, and every transaction is simulated before
@@ -250,7 +251,9 @@ it has earned against what they pledged. The Worker stores signed intents and ex
 `/api/demand`, with signatures, so an issuer can verify the totals itself; the register's "Check every
 signature" does that in the browser. "My summons" (`#/me`) lists every round a wallet backed with what it
 can do next (claim, take the pool share, refund, or wait and until when), its intents and the stocks it
-follows. Each stock has a share link, `/s/TICKER`: its preview shows the stock's card (made at build time by
+follows. Following, Telegram alerts and sharing are one "keep up" block, always the last thing in a
+stock's panel or round ticket, headed by what comes next (the next summoning, "You're in", "Summoned").
+Each stock has a share link, `/s/TICKER`: its preview shows the stock's card (made at build time by
 `npm run og`, 1200×630) and the live numbers (intents, backers, the demo round's state). Link-preview
 fetchers may read that page and its card from anywhere, since X's runs from the US; the site itself stays
 closed to US visitors. `/api/elsewhere` gives the register its Hyperliquid marks. It checks each EIP-712 signature. An intent names the stock by ticker and by its B20
