@@ -1387,3 +1387,46 @@ details.checks[open] summary {
   color: var(--seal);
   font-weight: 800;
 }
+
+/* every signed intent, verified in the browser */
+.sigs {
+  margin-top: 10px;
+  font-size: 13px;
+}
+.sigs summary {
+  cursor: pointer;
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.sigs__list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  max-height: 180px;
+  overflow: auto;
+}
+.sigs__list li {
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
+  gap: 6px 8px;
+  padding: 4px 0;
+  border-top: 1px solid var(--rule);
+}
+.sigs__list li.sigs__note {
+  display: block;
+}
+.sigs__note {
+  grid-column: 2 / -1;
+  color: var(--muted);
+  font-size: 12px;
+}
+.sigs__ok .sigs__mark {
+  color: var(--ink);
+  font-weight: 800;
+}
+.sigs__bad .sigs__mark,
+.sigs__bad {
+  color: var(--seal);
+}

@@ -2,9 +2,12 @@
  * The summoned pool of a demo stock, shared by `npm run swap` and `npm run demo`: find it, buy from it
  * through SummonSwap, and name the hook rule that refused a swap.
  */
-import { BaseError, decodeErrorResult, decodeEventLog, parseAbi, type Hex } from "viem";
+import { decodeEventLog, parseAbi, type Hex } from "viem";
 import { erc20Abi } from "./abi.js";
 import { account, deployment, publicClient, wallet, type ROLES } from "./env.js";
+import { refusal } from "./errors.js";
+
+export { refusal };
 
 export type Demo = { ticker: string; symbol: string; address: Hex; priceId: Hex };
 
@@ -17,17 +20,6 @@ export const swapAbi = parseAbi([
 const pmAbi = parseAbi([
   "event Swap(bytes32 indexed id, address indexed sender, int128 amount0, int128 amount1, uint160 sqrtPriceX96, uint128 liquidity, int24 tick, uint24 fee)",
 ]);
-/** The hook's refusals (src/SummonHook.sol), and v4's wrapper around a hook's revert. */
-const refusalAbi = parseAbi([
-  "error WrappedError(address target, bytes4 selector, bytes reason, bytes details)",
-  "error CorporateActionWindow(uint256 effectiveAt)",
-  "error StaleMultiplier(uint256 pool, uint256 token)",
-  "error MarketHalted(uint8 reason)",
-  "error IssuerPaused()",
-  "error MultiplierMismatch(uint256 registry, uint256 token)",
-  "error TooLittleReceived()",
-]);
-
 export function demoStock(ticker = process.env.TICKER ?? "GME"): Demo {
   const d = deployment() as ReturnType<typeof deployment> & { demoStocks?: Demo[] };
   const s = (d.demoStocks ?? [{ ticker: "GME", symbol: "sGME", address: d.stock, priceId: d.priceId }]).find((x) => x.ticker === ticker);
@@ -47,19 +39,6 @@ export async function pool(stock: Demo) {
   // raw price of currency1 in currency0 is (sqrtP / 2^96)^2; tokens out per USDC in, before fee and impact
   const p10 = Number(sqrtP) ** 2 / 2 ** 192;
   return { round, key, usdcIs0, perUsdc: usdcIs0 ? p10 : 1 / p10 };
-}
-
-/** The hook rule behind a refused swap, e.g. `MarketHalted(5)`; the raw message when it is not one. */
-export function refusal(e: unknown): string {
-  const data = e instanceof BaseError ? (e.walk((x) => typeof (x as { data?: unknown }).data === "string") as { data?: Hex } | null)?.data : undefined;
-  if (!data) return (e as Error).message.split("\n")[0]!;
-  try {
-    let r = decodeErrorResult({ abi: refusalAbi, data });
-    if (r.errorName === "WrappedError") r = decodeErrorResult({ abi: refusalAbi, data: (r.args as readonly unknown[])[2] as Hex });
-    return `${r.errorName}(${(r.args ?? []).join(", ")})`;
-  } catch {
-    return `revert ${data.slice(0, 10)}`;
-  }
 }
 
 /** Simulates a buy of `amount` tUSDC (6 decimals) as `who`: the fee it would pay, or the rule that refuses it. */

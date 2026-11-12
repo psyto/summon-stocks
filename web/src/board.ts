@@ -3,7 +3,8 @@ import { ELSEWHERE_MARK_USD, loadElsewhere, loadSnapshot, statusLine, usd, type 
 import { rosette, type Ink } from "./rosette";
 import { loadTotals, signIntent, type Totals } from "./intents";
 import { client, D, DEMOS, DEMO_ROUND, demoAt, demoFor, factoryAbi, OPEN_AT_INTENT_USD, roundAbi, STATES } from "./chain";
-import { connect, current, walletClient } from "./wallet";
+import { verifyTypedData, type Hex } from "viem";
+import { connect, current, short, walletClient } from "./wallet";
 
 type Filter = "all" | Ink;
 
@@ -183,6 +184,7 @@ function register(s: Snapshot, totals: Totals, away: Elsewhere): HTMLElement {
       msg,
     );
     const demoBox = demoBlock(x.ticker, t.usd);
+    const proof = t.backers > 0 ? signatures(x.ticker, t.backers) : null;
     detailBox.replaceChildren(
       rosette(x.ticker, { detail: "detail", ink: x.status, label: `${x.ticker} seal` }),
       h("p", { class: "detail__ticker wide" }, x.ticker),
@@ -190,6 +192,7 @@ function register(s: Snapshot, totals: Totals, away: Elsewhere): HTMLElement {
       h("p", { class: "detail__status" }, statusLine[x.status]),
       facts,
       intent,
+      ...(proof ? [proof] : []),
       ...(demoBox ? [demoBox] : []),
     );
   }
@@ -202,6 +205,53 @@ function register(s: Snapshot, totals: Totals, away: Elsewhere): HTMLElement {
     h("div", { class: "register__head" }, h("h2", { class: "wide", id: "register-h" }, "The register"), h("div", { class: "filters" }, ...filterBtns), search),
     h("div", { class: "register__body" }, cells, detailBox),
   );
+}
+
+/**
+ * Every signed intent behind a stock's total, from the same export issuers read (/api/demand), each
+ * signature checked here in the browser against its wallet: the board's numbers are not taken on trust.
+ */
+function signatures(ticker: string, backers: number): HTMLElement {
+  const list = h("ul", { class: "sigs__list" });
+  const box = h("details", { class: "sigs" }, h("summary", {}, `Check every signature (${backers})`), list);
+  let loaded = false;
+  box.addEventListener("toggle", async () => {
+    if (!box.open || loaded) return;
+    loaded = true;
+    list.replaceChildren(h("li", {}, "Reading the signatures…"));
+    try {
+      const r = (await (await fetch(`/api/demand?ticker=${encodeURIComponent(ticker)}`)).json()) as {
+        domain: { name: string; version: string; chainId: number };
+        types: Record<string, { name: string; type: string }[]>;
+        intents: { ticker: string; token: Hex; address: Hex; usd: number; expiry: number; nonce: number; signature: Hex }[];
+      };
+      const rows = await Promise.all(
+        r.intents.map(async (i) => {
+          const ok = await verifyTypedData({
+            address: i.address,
+            domain: r.domain,
+            types: r.types,
+            primaryType: "Intent",
+            message: { ticker: i.ticker, token: i.token, usd: BigInt(i.usd), expiry: BigInt(i.expiry), nonce: BigInt(i.nonce) },
+            signature: i.signature,
+          }).catch(() => false);
+          return h(
+            "li",
+            { class: ok ? "sigs__ok" : "sigs__bad" },
+            h("span", { class: "sigs__mark", "aria-hidden": "true" }, ok ? "✓" : "✕"),
+            h("span", {}, short(i.address)),
+            h("span", {}, usd(i.usd)),
+            h("span", { class: "sigs__note" }, ok ? `signed, until ${new Date(i.expiry * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : "does not verify"),
+          );
+        }),
+      );
+      list.replaceChildren(...(rows.length ? rows : [h("li", {}, "No live signatures.")]), h("li", { class: "sigs__note" }, "Each one verified in this browser (EIP-712) against its wallet."));
+    } catch {
+      loaded = false;
+      list.replaceChildren(h("li", {}, "Could not read the signatures just now."));
+    }
+  });
+  return box;
 }
 
 /**

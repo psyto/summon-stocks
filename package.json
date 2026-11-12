@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "fund": "tsx ts/fund.ts",
     "swap": "tsx ts/swap.ts",
-    "demo": "tsx ts/demo.ts"
+    "demo": "tsx ts/demo.ts",
+    "keeper": "tsx ts/keeper.ts"
   },
   "dependencies": {
     "@fabrknt/market-state": "github:fabrknt/market-state#v0.4.0",
