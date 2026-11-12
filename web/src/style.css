@@ -1849,3 +1849,140 @@ body.card-body {
 .rounds:only-child {
   border-top: 0;
 }
+/* ------------------------------------------------------------ now: the first screen */
+.now__strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0 2px;
+}
+.now__label {
+  margin-right: 6px;
+  color: var(--seal);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.now__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px 5px 6px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.now__chip svg {
+  width: 22px;
+  height: 22px;
+}
+.now__chip[aria-pressed="true"] {
+  border-color: var(--ink);
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+}
+.now__state {
+  font-weight: 500;
+  color: var(--muted);
+  font-size: 13px;
+}
+.now__round .cert:has(.rp) {
+  margin-top: 8px;
+}
+.now__next {
+  padding: 40px 0 72px;
+}
+.now__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 24px;
+  margin-bottom: 18px;
+}
+.now__head h2 {
+  margin: 0;
+  font-size: 31px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.now__head p {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 15px;
+}
+.now__head a {
+  color: var(--ink);
+  font-weight: 600;
+}
+.now__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--rule);
+}
+.now__list a {
+  display: grid;
+  grid-template-columns: 36px 52px minmax(160px, 1.3fr) 2fr 200px 60px;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--rule);
+  color: var(--ink-2);
+  text-decoration: none;
+}
+.now__list a:hover {
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+}
+.now__rank {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--ink);
+  text-align: right;
+}
+.now__seal svg {
+  width: 48px;
+  height: 48px;
+  display: block;
+}
+.now__t {
+  display: flex;
+  flex-direction: column;
+}
+.now__t strong {
+  color: var(--ink);
+  font-size: 18px;
+}
+.now__t small {
+  font-size: 13px;
+  color: var(--muted);
+}
+.now__bar {
+  height: 8px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+  overflow: hidden;
+}
+.now__bar span {
+  display: block;
+  height: 100%;
+  background: var(--ink);
+}
+.now__amt {
+  font-size: 14px;
+  text-align: right;
+}
+.now__go {
+  justify-self: end;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--seal);
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+}

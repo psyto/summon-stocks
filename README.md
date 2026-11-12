@@ -240,9 +240,12 @@ anyone can mint; `DemoOracleRegistry`, which stands in for Coinbase's mainnet or
 
 ## Web
 
-`web/` is the page and a Cloudflare Worker. Four tabs stay at the top of every page: the register of all
-298 stocks, each with its own guilloché seal (one screen: the cells and the chosen stock's panel scroll
-inside it), the rounds, My summons, and how it works. A round page fits one screen: a dial that fills with pledges, runs with
+`web/` is the page and a Cloudflare Worker. Five tabs stay at the top of every page. The first screen,
+Now, shows the liveliest round as its round page (an auction first, then funded rounds, the newest among
+equals; the other live rounds a click away) and, under it, "Which stock next?": stocks ranked by signed
+intents, then by what already trades on Hyperliquid. Then the register of all 298 stocks, each with its own
+guilloché seal (one screen: the cells and the chosen stock's panel scroll inside it), the rounds, My
+summons, and how it works. A round page fits one screen: a dial that fills with pledges, runs with
 the auction's spread and shows the pool's fee, and a ticket that shows what an order gets before it is
 signed. Its numbers come from the chain: a swap is quoted through the pool and its hook (Uniswap's
 V4Quoter), pledges and fills use the round's own integer math, and every transaction is simulated before

@@ -111,6 +111,9 @@ features sat as small pills by the title, and pages jumped. Now the tabs (Regist
 How it works) stay at the top; the register fits one screen under a one-line intro (the pitch moved to
 How it works); follow, alerts and share are one "keep up" block at the foot of the panel or ticket, headed
 by what comes next.
+- The first screen is Now, not the register: another of our pages opens on one name and one action, while the
+  register opened on 298 faint seals in alphabetical order with GME selected at $0. Now shows the liveliest
+  round in the round page's own frame, then "Which stock next?" ranked by signed intents.
 
 ## Bringing people back (2026-11-12)
 A round takes days: intents, then pledges, then a summoning. People who signed once need a reason and a

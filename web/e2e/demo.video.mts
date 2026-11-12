@@ -5,6 +5,7 @@
  * (testnet only), or a throwaway key for the intent, which the local Worker stores (never the live board).
  *
  *   title    <out.mp4> <line> [<sub>]   a card between parts
+ *   now      <out.mp4>   the first screen: the liveliest round, then "Which stock next?"
  *   register <out.mp4>   the register: 227 stocks never issued; a signed intent takes the stock past $250; that wallet opens its round
  *   trust    <out.mp4>   anyone checks every intent's signature in the browser; the wallet picker offers Base Account, no ETH needed
  *   pledge   <out.mp4>   alice pledges on the round page; bob and carol fill it; the round waits for the market
@@ -29,7 +30,7 @@ import { latestRound } from "../worker/rounds";
 const BASE = process.env.BASE_URL ?? "http://localhost:8790";
 const RPC = process.env.BASE_SEPOLIA_RPC ?? "https://sepolia.base.org";
 const [part, out = "", ...rest] = process.argv.slice(2);
-if (!part) throw new Error("usage: demo.video.mts <title|register|trust|pledge|wait|auction|trade|unwind|me|join> <out.mp4> ...");
+if (!part) throw new Error("usage: demo.video.mts <title|now|register|trust|pledge|wait|auction|trade|unwind|me|join> <out.mp4> ...");
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 if (part === "join") {
@@ -264,6 +265,20 @@ try {
         document.getAnimations().forEach((a) => (a.currentTime = 0));
       });
       await sleep(3000);
+    } else if (part === "now") {
+      await start(`${BASE}/`, ".rp__stage");
+      await record();
+      await caption("Summon: backers bring a tokenized stock onto Base. The first screen is what is live now: a round, its dial, and what anyone can do in it.");
+      await sleep(5600);
+      await caption("Every live round is one click away.");
+      await moveToSel(".now__chip:nth-of-type(2)");
+      await sleep(3200);
+      // a cut to what comes next, not a scroll
+      await page.evaluate(() => document.querySelector(".now__next")!.scrollIntoView({ block: "start", behavior: "instant" }));
+      await page.evaluate(() => window.scrollBy(0, -90));
+      await caption("And which stock comes next: ranked by signed intents, then by what already trades elsewhere.");
+      await moveToSel(".now__list li:first-child");
+      await sleep(5200);
     } else if (part === "register") {
       if (!/^http:\/\/(localhost|127\.0\.0\.1)/.test(BASE)) throw new Error("the register part writes intents: run it against a local Worker");
       // the wallet that signs on camera also opens the round, so it needs a little gas
@@ -273,7 +288,7 @@ try {
       const board = (await (await fetch(`${BASE}/api/intents`)).json()) as Record<string, { usd: number }>;
       const have = board[TICKER]?.usd ?? 0;
       if (have < 160) await seedIntents([Math.min(100, 160 - have), ...(160 - have > 100 ? [160 - have - 100] : [])]);
-      await start(`${BASE}/`, ".register");
+      await start(`${BASE}/#/register`, ".register");
       await record();
       await caption("Coinbase has registered 298 tokenized US stocks on Base. 227 of them have never been issued: nobody can hold one.");
       await sleep(5200);

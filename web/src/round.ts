@@ -69,12 +69,13 @@ const toks = (n: number) => `${n.toLocaleString("en-US", { maximumFractionDigits
 /** Things on the page that move between chain reads: the auction's spread, countdowns. Reset on each draw. */
 let live: (() => void)[] = [];
 
-export async function renderRound(main: HTMLElement, round: Addr) {
+/** `folded`: the fill conditions start closed (the first screen, where the ranking follows the round). */
+export async function renderRound(main: HTMLElement, round: Addr, o: { folded?: boolean } = {}) {
   let p: Params;
   try {
     p = await readParams(round);
   } catch {
-    main.append(h("p", { class: "round-missing" }, "No Summon round at this address on Base Sepolia. ", h("a", { href: "#/" }, "Back to the register")));
+    main.append(h("p", { class: "round-missing" }, "No Summon round at this address on Base Sepolia. ", h("a", { href: "#/register" }, "Back to the register")));
     return;
   }
   const found = demoAt(p.token);
@@ -96,7 +97,7 @@ export async function renderRound(main: HTMLElement, round: Addr) {
       live = [];
       settled = s.state === "Expired" || (s.state === "Filled" && s.unwound);
       const v: View = { round, p, s, checks: read.checks, ref: read.ref, refFrom: read.refFrom, pool: pl, keep, redraw: draw, setBusy: (b) => (busy = b) };
-      page.replaceChildren(head(v), h("div", { class: "rp" }, stage(v), ticket(v)), conditions(v));
+      page.replaceChildren(head(v), h("div", { class: "rp" }, stage(v), ticket(v)), conditions(v, o.folded));
       page.removeAttribute("aria-busy");
       tick();
     } catch {
@@ -897,9 +898,9 @@ function position(v: View, run: (label: string, steps: { address: Addr; abi: Abi
 }
 
 /** Every fill condition this page can read, with its source: open while they decide what happens next. */
-function conditions(v: View): HTMLElement {
+function conditions(v: View, folded = false): HTMLElement {
   const passing = v.checks.filter((c) => c.ok).length;
-  const open = v.s.state === "Funded" || v.s.state === "Auction";
+  const open = !folded && (v.s.state === "Funded" || v.s.state === "Auction");
   return h(
     "details",
     { class: "checks", open },

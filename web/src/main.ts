@@ -3,6 +3,7 @@ import { renderBoard, renderHow, renderRounds } from "./board";
 import { renderRound } from "./round";
 import { renderMe } from "./me";
 import { renderCard } from "./card";
+import { renderNow } from "./now";
 import { h } from "./el";
 import { rosette } from "./rosette";
 import { walletButton } from "./wallet";
@@ -11,7 +12,8 @@ const app = document.getElementById("app")!;
 
 /** The page's sections, always in the same place: where a person is and where else they can go. */
 const TABS = [
-  { href: "#/", label: "Register", on: (x: string) => x === "" || x === "#/" || x.startsWith("#/s/") },
+  { href: "#/", label: "Now", on: (x: string) => x === "" || x === "#/" },
+  { href: "#/register", label: "Register", on: (x: string) => x === "#/register" || x.startsWith("#/s/") },
   { href: "#/rounds", label: "Rounds", on: (x: string) => x === "#/rounds" || x.startsWith("#/round/") },
   { href: "#/me", label: "My summons", on: (x: string) => x === "#/me" },
   { href: "#/how", label: "How it works", on: (x: string) => x === "#/how" },
@@ -37,6 +39,7 @@ async function route() {
   else if (location.hash === "#/me") await renderMe(main);
   else if (location.hash === "#/rounds") renderRounds(main);
   else if (location.hash === "#/how") await renderHow(main);
+  else if (location.hash === "" || location.hash === "#/") await renderNow(main);
   else await renderBoard(main, /^#\/s\/([A-Za-z0-9.]+)$/.exec(location.hash)?.[1]?.toUpperCase());
   window.scrollTo(0, 0);
 }
