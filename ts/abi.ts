@@ -23,6 +23,7 @@ export const erc20Abi = parseAbi([
   "function mint(address to, uint256 amount)",
   "function approve(address spender, uint256 amount) returns (bool)",
   "function balanceOf(address) view returns (uint256)",
+  "function allowance(address owner, address spender) view returns (uint256)",
 ]);
 
 export const marketAbi = parseAbi([

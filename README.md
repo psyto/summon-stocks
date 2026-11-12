@@ -74,6 +74,25 @@ Docs:
 - [docs/reviews/](docs/reviews): the reviews (Codex r1-r8 with each request, and what changed after each)
 - [docs/design.md](docs/design.md): the web design
 
+## The full flow on Base Sepolia
+
+Every step of the spec's flow has run on Base Sepolia (2026-11-11 and 11-12 ET). `npm run e2e`, `npm run swap`
+and `npm run demo -- <step>` print each transaction. The halt and the split are simulated: the demo operator
+holds the guard key, the demo token's `OPERATOR_ROLE` and the testnet stand-in for the issuer's oracle
+registry. Intents went to a local Worker with throwaway wallets, so the live board counts no signatures of ours.
+
+| # | Step | On chain |
+|---|---|---|
+| 1 | The register shows a stock that was never minted | the page (`web/`, not public yet) |
+| 2-3 | Signed intents reach $250 (3 signers, $260); a round opens from the board | `demo intents`: [openRound RIVN](https://sepolia.basescan.org/tx/0xad68483b8461e7844c11bec0a95d0c2ebc38b93b2c524c250f537d857666fdc5) |
+| 4 | Backers pledge; one withdraws part while the round is Open | `e2e` (sGME, 300 tUSDC); `demo expire`: [carol withdraws 20](https://sepolia.basescan.org/tx/0x55e7ff8c734b882fce0b00cf99c9e0b2e77d8ec635893f36999d1e9b9f9cd739) |
+| 5 | startAuction, fill at the reference less the spread, claims | `e2e`: [fill sGME](https://sepolia.basescan.org/tx/0xf46f8fa76f4306ab0bd1eae738b26c4d5e13cc65b9f44ef65ce9990602c52e9a) at $25.445, 6 bp |
+| 6 | A trade in the backers' pool: 0.30% in session, 1.00% after the close | `swap`: [0.30%](https://sepolia.basescan.org/tx/0x973b9bcb0b1f11fdf94de03e9219c4c6e1fc6fe98e535c7ff46179a193c510cd), [1.00%](https://sepolia.basescan.org/tx/0x524cf5d54318c305b6e4d14bf354647f82c2bc16b8a76b3e45e8afd539b8e946) |
+| 7 | A halt stops the pool | `demo halt`: [halt (manual)](https://sepolia.basescan.org/tx/0xc9753d0fe4c92c32a9697e9271d5a092252424a335256851560d6e75ecaac6fc) → swap refused `MarketHalted(5)` → [restored](https://sepolia.basescan.org/tx/0x4c3e0a84b1f0aae379246f71762060ac34e2d165180be2b57af0cebcddd08d78) → swaps again |
+| 8 | A 2:1 split: no swaps in the window, none on the stale multiplier, then `realign` | `demo split`: [split scheduled](https://sepolia.basescan.org/tx/0xaa9a18690d660d893b7b2dbc24492073e771a52296a38a17e556e141c9197ff3) → `CorporateActionWindow` → `StaleMultiplier(1, 2)` → [registry](https://sepolia.basescan.org/tx/0xa799108b9f618657c4caf33caab8849b0587699a32e43725b5deef8fbd9019f9), [realign](https://sepolia.basescan.org/tx/0xaced708d6d025acf6d3802a21a9c493eeb5ee6144747a72c34fa0ee8aa12ef15) → [swap](https://sepolia.basescan.org/tx/0x926816218cf20303cc1107133a9d50ea64bd7781f283ee7603dc1a48494af3c9) |
+| 9 | After the LP lock: `unwindLP`, each backer's `claimLP` (50/30/20) | `demo unwind`: [unwindLP](https://sepolia.basescan.org/tx/0xfd5dd63d11f30cfd87dee1bc7d6106ec7383dff83c7125e24a674030c5474e30), [alice](https://sepolia.basescan.org/tx/0xb50f04697c3aa589493cf7d270e711de61cfb25806811e966643860f9d2ba3b4), [bob](https://sepolia.basescan.org/tx/0xa024b9df9a1298930140c0b6bf74f3562b739711112ba8e5aad8917067c60f78), [carol](https://sepolia.basescan.org/tx/0xb3ad814d8a11ac80e3f4a57f2d83a228ed737757cd4cd7ac32a79d5c0b63cbad) |
+| 10 | A round no one fills expires; refunds sum to what was pledged | `demo expire` (sAMC): [openRound](https://sepolia.basescan.org/tx/0x99fc2863994e06db61a8fe68ef9bca7cbbf7689c914fa77158d693e14ed07ad2), [bob 100](https://sepolia.basescan.org/tx/0x7344a02f630c9929f083e280688539890c6b878cccb64cbb82717714879af843), [carol 40](https://sepolia.basescan.org/tx/0xd7f1edc2474992c020519175f87b829d99b6e4afc09db3b38c184811e48d50c0) |
+
 ## Open question: who fills
 
 Summon gives issuers a demand signal. It does not prove they will act on it. Stocks may sit unissued for
@@ -154,6 +173,11 @@ STOCK_TOKEN=0x… PRICE_ID=0x6f9cd89ef1b7fd39f667101a91ad578b6c6ace4579d5f7f285a
 npm run guard                                  # keep running: session, halts (and, for guard pricing, the quote)
 npm run e2e                                    # trading days 09:45-15:35 ET (12:35 on early closes)
 npm run swap                                   # one trade in the filled pool; prints the fee the hook charged
+npm run demo -- intents                        # signed intents reach $250 on a local Worker; a round opens
+npm run demo -- halt                           # a halt stops the pool (stop the guard first)
+npm run demo -- split                          # a 2:1 split: window, stale multiplier, realign (run again after 1 h)
+npm run demo -- unwind                         # after the LP lock: unwindLP and each backer's claimLP
+npm run demo -- expire                         # AMC: a round no one fills, a withdrawal, refunds (run again after 1 h)
 ```
 
 **Price source.** Each listed token is bound to one feed, chosen by the factory owner:

@@ -8,7 +8,8 @@
     "e2e": "tsx ts/e2e.ts",
     "typecheck": "tsc --noEmit",
     "fund": "tsx ts/fund.ts",
-    "swap": "tsx ts/swap.ts"
+    "swap": "tsx ts/swap.ts",
+    "demo": "tsx ts/demo.ts"
   },
   "dependencies": {
     "@fabrknt/market-state": "github:fabrknt/market-state#v0.4.0",
