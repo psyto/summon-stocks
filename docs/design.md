@@ -104,6 +104,10 @@ something happened, and the demo had to be told in a terminal. Now:
   number counts up. The fill conditions fold below the screen.
 - Still Summon's: paper, ink and seal red, the rosette at the centre. Not another of our pages' dark trading look,
   so the two do not read as one product.
+- Filmed end to end on 11-12 (ET) for the demo video. One thing came out of it: after the unwind, the
+  position dropped a backer's pool share once it was claimed, so it read as a loss. It now values the
+  share from what the round took out of the pool, claimed or not. Times on the page follow the viewer's
+  clock; the video is recorded on New York time, the market's own.
 
 ## One frame (2026-11-12, late)
 Set beside another of our pages again, the page read as scattered: the demo moved through seven layouts, the new
