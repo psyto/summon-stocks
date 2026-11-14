@@ -7,6 +7,7 @@ import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
 import {PoolKey} from "v4-core/src/types/PoolKey.sol";
 import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
 import {Hooks} from "v4-core/src/libraries/Hooks.sol";
+import {CustomRevert} from "v4-core/src/libraries/CustomRevert.sol";
 import {PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
 import {StateLibrary} from "v4-core/src/libraries/StateLibrary.sol";
 import {MockPyth} from "@pythnetwork/pyth-sdk-solidity/MockPyth.sol";
@@ -176,6 +177,21 @@ contract SummonRoundTest is Test {
         bytes[] memory u = _fresh();
         vm.prank(ap);
         round.fill{value: 1}(u);
+    }
+
+    /// The PoolManager (v4-core v4.0.0) wraps a hook's revert: WrappedError(hook, callback, reason, HookCallFailed).
+    function _hookError(bytes4 callback, bytes memory reason) internal view returns (bytes memory) {
+        return abi.encodeWithSelector(
+            CustomRevert.WrappedError.selector,
+            address(hook),
+            callback,
+            reason,
+            abi.encodeWithSelector(Hooks.HookCallFailed.selector)
+        );
+    }
+
+    function _expectSwapRevert(bytes memory reason) internal {
+        vm.expectRevert(_hookError(IHooks.beforeSwap.selector, reason));
     }
 
     function _expectFillRevert(bytes memory err) internal {
@@ -584,7 +600,7 @@ contract SummonRoundTest is Test {
         (SummonSwap router, PoolKey memory key, bool usdcIs0) = _summoned();
         oracle.set(1e18, true);
         vm.prank(alice);
-        vm.expectRevert(); // the PoolManager wraps the hook's IssuerPaused
+        _expectSwapRevert(abi.encodeWithSelector(SummonHook.IssuerPaused.selector));
         router.swapExactIn(key, usdcIs0, 100e6, 1, alice);
         oracle.set(1e18, false);
         assertGt(_buy(router, key, usdcIs0), 0);
@@ -656,7 +672,11 @@ contract SummonRoundTest is Test {
 
     function test_onlyTheRoundInitializesItsPool() public {
         PoolKey memory key = round.poolKey();
-        vm.expectRevert(); // the PoolManager wraps the hook's NotTheRound
+        vm.expectRevert(
+            _hookError(
+                IHooks.beforeInitialize.selector, abi.encodeWithSelector(SummonHook.NotTheRound.selector, address(this))
+            )
+        );
         pm.initialize(key, 79228162514264337593543950336);
     }
 
@@ -925,14 +945,15 @@ contract SummonRoundTest is Test {
 
     function test_swapStopsWhileHalted() public {
         (SummonSwap router, PoolKey memory key, bool usdcIs0) = _summoned();
-        market.setState(address(token), true, market.REASON_PRIMARY_HALT(), 0);
+        uint8 halt = market.REASON_PRIMARY_HALT();
+        market.setState(address(token), true, halt, 0);
         vm.prank(alice);
-        vm.expectRevert(); // the PoolManager wraps the hook's MarketHalted
+        _expectSwapRevert(abi.encodeWithSelector(SummonHook.MarketHalted.selector, halt));
         router.swapExactIn(key, usdcIs0, 100e6, 1, alice);
         // resumed, but not before resumeAfter
         market.setState(address(token), false, 0, uint64(vm.getBlockTimestamp() + 120));
         vm.prank(alice);
-        vm.expectRevert();
+        _expectSwapRevert(abi.encodeWithSelector(SummonHook.MarketHalted.selector, uint8(0)));
         router.swapExactIn(key, usdcIs0, 100e6, 1, alice);
         vm.warp(vm.getBlockTimestamp() + 120);
         _heartbeat();
@@ -943,8 +964,23 @@ contract SummonRoundTest is Test {
         (SummonSwap router, PoolKey memory key, bool usdcIs0) = _summoned();
         token.setEffectiveAt(vm.getBlockTimestamp() + 1800); // inside the 3600 s cooldown
         vm.prank(alice);
-        vm.expectRevert();
+        _expectSwapRevert(
+            abi.encodeWithSelector(SummonHook.CorporateActionWindow.selector, vm.getBlockTimestamp() + 1800)
+        );
         router.swapExactIn(key, usdcIs0, 100e6, 1, alice);
+    }
+
+    /// The token still carries the multiplier the pool was priced at, but the issuer's registry says another:
+    /// swaps stop, as fills do, until the two agree.
+    function test_swapStopsWhileTheRegistryDisagrees() public {
+        (SummonSwap router, PoolKey memory key, bool usdcIs0) = _summoned();
+        assertEq(token.multiplier(), round.poolMultiplier());
+        oracle.set(1.02e18, false);
+        vm.prank(alice);
+        _expectSwapRevert(abi.encodeWithSelector(SummonHook.MultiplierMismatch.selector, 1.02e18, 1e18));
+        router.swapExactIn(key, usdcIs0, 100e6, 1, alice);
+        oracle.set(1e18, false);
+        assertGt(_buy(router, key, usdcIs0), 0);
     }
 
     function test_realignAfterMultiplierChange() public {
@@ -956,7 +992,7 @@ contract SummonRoundTest is Test {
         token.setMultiplier(2e18);
         oracle.set(2e18, false);
         vm.prank(alice);
-        vm.expectRevert(); // StaleMultiplier
+        _expectSwapRevert(abi.encodeWithSelector(SummonHook.StaleMultiplier.selector, 1e18, 2e18));
         router.swapExactIn(key, usdcIs0, 100e6, 1, alice);
 
         // not while the action window is open, and not while the issuer's registry disagrees
@@ -1004,7 +1040,11 @@ contract SummonRoundTest is Test {
         token.mint(address(this), 100e8);
         usdc.approve(address(lp), type(uint256).max);
         token.approve(address(lp), type(uint256).max);
-        vm.expectRevert(); // the PoolManager wraps the hook's NotTheRound
+        vm.expectRevert(
+            _hookError(
+                IHooks.beforeAddLiquidity.selector, abi.encodeWithSelector(SummonHook.NotTheRound.selector, address(lp))
+            )
+        );
         lp.modifyLiquidity(key, IPoolManager.ModifyLiquidityParams(-887220, 887220, 1e9, 0), "");
     }
 
