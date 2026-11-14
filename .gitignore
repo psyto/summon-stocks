@@ -6,3 +6,7 @@ node_modules/
 broadcast/*/*/dry-run/
 cache/
 .uitest-signer.mjs
+.env.*
+.dev.vars
+*.pem
+*.key
