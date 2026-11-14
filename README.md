@@ -2,6 +2,12 @@
 
 **Backers bring a stock onto Base.**
 
+> **Status:** testnet only (Base Sepolia), unaudited, not for real funds. Contracts deployed on Base Sepolia
+> 2026-11-11 and exercised end to end there (fills, trades, halt, split, unwind, refunds; links below). Every
+> testnet fill so far was priced by the demo guard's feed; the Pyth path is covered by unit tests only. The web
+> page and Worker run locally and are not hosted yet; the Telegram bot is not created. An entry to Base's
+> Stocks Maxxing quest (2026-11-05 to 12-05); not affiliated with or endorsed by Base or Coinbase.
+
 Coinbase has registered 298 tokenized stocks (B20) on Base. 227 of them have never been minted, and some
 that were minted (DJT, AMC, GME) have no pool to trade in.
 
@@ -45,8 +51,8 @@ session is closed.
 - **For backers:** the worst price is shown before you commit (at most 1% over the reference). If the
   round does not fill, every pledge is refunded.
 
-Built for Base's [Stocks Maxxing](https://www.base.org/stocksmaxxing) season (Programmable Stock Markets
-track). **Testnet only (Base Sepolia).** Mainnet data is only read and shown.
+Built as an entry to Base's [Stocks Maxxing](https://www.base.org/stocksmaxxing) quest (Programmable Stock
+Markets track). Participation only: not affiliated with or endorsed by Base or Coinbase. **Testnet only (Base Sepolia).** Mainnet data is only read and shown.
 
 **Demo video (6 min): [docs/demo/summon-demo.mp4](docs/demo/summon-demo.mp4).** Recorded from the page on
 2026-11-12 (ET), every transaction real on Base Sepolia: a signed intent opens a round, backers pledge, the
@@ -147,6 +153,10 @@ Reproduce them with `python3 scripts/count_b20.py`. It reads public APIs and nee
 | with a Pyth US equity feed | 213 |
 | never minted, with a Pyth feed (Summon can open a round) | 154 |
 
+The register keeps growing: the same script on 2026-11-14 read 358 registered, 72 minted, 286 never minted,
+237 with a Pyth feed and 177 never minted with one. The page's snapshot (`web/public/b20.json`) is from
+2026-11-07; `python3 scripts/snapshot.py` refreshes it.
+
 The same stocks elsewhere (read 2026-11-08 from public sources, no keys). Of the 227 never minted on B20:
 - 80 are stock tokens on Robinhood Chain (212 tokens from its `StockFactory`
   `0x4783C67b63dE2B358Ac5951a7D41F47A38F3C046`, chain 4663), including JPM, V, DIS, CRM and UBER;
@@ -167,9 +177,11 @@ underlying share price, and a B20 token is worth underlying × `multiplier()`.
 ## Quickstart
 
 ```sh
-git clone --recursive <this repo>
+git clone --recursive https://github.com/psyto/summon-stocks
 cd summon-stocks
-forge test
+forge test                                  # 57 tests, no keys, no network after the clone
+npm install && npm run typecheck            # the TypeScript scripts
+cd web && npm install && npm run test:worker   # the Worker's 27 tests, no keys
 ```
 
 Requires [Foundry](https://getfoundry.sh). It builds with `via_ir` (foundry.toml): without it the factory,
@@ -300,6 +312,7 @@ only links to the site, which stays closed there.
 ```sh
 python3 scripts/snapshot.py        # refresh web/public/b20.json (the Coinbase API has no CORS)
 cd web && npm install
+printf 'GEO_BLOCK=off\n' > .dev.vars   # locally: wrangler's mock location may read as the US, which the Worker blocks
 npm run build && npx wrangler dev  # page and Worker on http://localhost:8787
 npx wrangler secret put CDP_PAYMASTER_URL   # optional: https://api.developer.coinbase.com/rpc/v1/base-sepolia/<key>
                                    # locally, the same line in web/.dev.vars
@@ -343,8 +356,11 @@ check covers only the halts.
 
 ## Built during the season
 
-Everything in this repository was written during the Stocks Maxxing season (from 2026-11-07). The parts
-listed above existed before it.
+Everything in this repository was written during the Stocks Maxxing quest (first commit 2026-11-07; the git
+history is kept as the record). hl-price-guard existed before it (from 2026-10-17); market-state was
+extracted from an earlier project of ours on 2026-11-07, the day Summon started. The versions of both that
+Summon pins (`PythRef.readFresh` and `readFirstAfter`, holidays, `core-hours`, the unknown-session fix) were
+added during the quest, for Summon.
 
 ## Notes
 

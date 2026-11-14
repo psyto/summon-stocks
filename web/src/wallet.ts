@@ -41,7 +41,7 @@ let chosen: Provider | undefined;
  * sponsored through the Worker's /api/paymaster when the deployment has a CDP key, so it needs no ETH.
  */
 const BASE_ACCOUNT = "org.base.account";
-const BASE_ICON = "data:image/svg+xml;base64," + btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28"><rect width="28" height="28" rx="6" fill="#0000ff"/><rect x="8" y="8" width="12" height="12" rx="1.5" fill="#fff"/></svg>');
+const BASE_ICON = "data:image/svg+xml;base64," + btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28"><rect width="28" height="28" rx="6" fill="#0e4a3b"/><rect x="8" y="8" width="12" height="12" rx="1.5" fill="#fff"/></svg>');
 let base: Provider | undefined;
 async function baseAccount(): Promise<Provider> {
   const { createBaseAccountSDK } = await import("@base-org/account");
@@ -95,7 +95,7 @@ async function pick(): Promise<Provider | undefined> {
   if (inWalletApp()) return window.ethereum;
   const free = await sponsored();
   const all: (Announced & { lazy?: () => Promise<Provider>; note?: string })[] = [...announced.values()];
-  if (all.length === 0 && window.ethereum) all.push({ info: { uuid: "injected", name: "Browser wallet", icon: BASE_ICON.replace("#0000ff", "#0e4a3b"), rdns: "injected" }, provider: window.ethereum });
+  if (all.length === 0 && window.ethereum) all.push({ info: { uuid: "injected", name: "Browser wallet", icon: BASE_ICON, rdns: "injected" }, provider: window.ethereum });
   all.push({ info: { uuid: BASE_ACCOUNT, name: "Base Account", icon: BASE_ICON, rdns: BASE_ACCOUNT }, provider: undefined as never, lazy: baseAccount, note: free ? "no extension, no ETH: Summon pays testnet gas" : "no extension needed" });
   let last: string | null = null;
   try {

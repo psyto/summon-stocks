@@ -285,10 +285,10 @@ the 1% spread cap, Codex r8 #3), and `U_f = P − U_lp`. `Qlp` must be at least 
   updates for a real ticker, mapped to the demo token.
 
 ## 8. Own parts used (dogfooding)
-- market-state (`fabrknt/market-state` v0.3.0, public): `MarketStateRegistry`, `MarketStateCheck.requireOpen`
+- market-state (`fabrknt/market-state` v0.4.0, public): `MarketStateRegistry`, `MarketStateCheck.requireOpen`
   (5.2-2), and the TypeScript guard for Nasdaq halts. Extracted from an earlier private project on
   2026-11-07, so that a judge's fresh clone builds. Copying the code into Summon was not an option.
-- hl-price-guard (`fabrknt/hl-price-guard` v0.3.2, public): `PythRef.readFresh` (added for Summon), `JumpLatch` with an anchor (5.2-8), and the
+- hl-price-guard (`fabrknt/hl-price-guard` v0.4.0, public): `PythRef.readFresh` and `PythRef.readFirstAfter` (both added for Summon), `JumpLatch` with an anchor (5.2-8), and the
   independent-price check (5.1). These are pinned by git rev. If either needs changes to accept Pyth or
   Chainlink shapes, the fix goes into hl-price-guard first.
 
