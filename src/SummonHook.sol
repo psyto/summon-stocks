@@ -3,6 +3,7 @@ pragma solidity 0.8.26;
 
 import {PoolKey} from "v4-core/src/types/PoolKey.sol";
 import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
+import {Hooks} from "v4-core/src/libraries/Hooks.sol";
 import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
 import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "v4-core/src/types/BeforeSwapDelta.sol";
 import {LPFeeLibrary} from "v4-core/src/libraries/LPFeeLibrary.sol";
@@ -39,6 +40,16 @@ contract SummonHook {
     constructor(address poolManager_, address deployer_) {
         poolManager = poolManager_;
         deployer = deployer_;
+        // The PoolManager calls only the callbacks whose bits are set in this address. Refuse to exist at an
+        // address that would skip one of ours (a hook deployed without BEFORE_SWAP would never stop a swap).
+        Hooks.validateHookPermissions(IHooks(address(this)), getHookPermissions());
+    }
+
+    /// The callbacks this hook implements; its address must carry exactly these bits.
+    function getHookPermissions() public pure returns (Hooks.Permissions memory p) {
+        p.beforeInitialize = true;
+        p.beforeAddLiquidity = true;
+        p.beforeSwap = true;
     }
 
     /// One-time wiring; the factory needs the hook's address and the hook needs the factory's.

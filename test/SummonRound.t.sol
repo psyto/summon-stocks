@@ -6,6 +6,7 @@ import {PoolManager} from "v4-core/src/PoolManager.sol";
 import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
 import {PoolKey} from "v4-core/src/types/PoolKey.sol";
 import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
+import {Hooks} from "v4-core/src/libraries/Hooks.sol";
 import {PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
 import {StateLibrary} from "v4-core/src/libraries/StateLibrary.sol";
 import {MockPyth} from "@pythnetwork/pyth-sdk-solidity/MockPyth.sol";
@@ -642,6 +643,16 @@ contract SummonRoundTest is Test {
     }
 
     // ------------------------------------------------------------------ A7 and the factory
+
+    /// The PoolManager calls a hook only for the bits set in its address. A hook at an address missing one of
+    /// its bits (here: an ordinary CREATE address) must refuse to deploy, not run with a callback skipped.
+    function test_hookRefusesAnAddressWithoutItsPermissionBits() public {
+        try new SummonHook(address(pm), address(this)) returns (SummonHook h) {
+            revert(string.concat("deployed at ", vm.toString(address(h))));
+        } catch (bytes memory err) {
+            assertEq(bytes4(err), Hooks.HookAddressNotValid.selector);
+        }
+    }
 
     function test_onlyTheRoundInitializesItsPool() public {
         PoolKey memory key = round.poolKey();
