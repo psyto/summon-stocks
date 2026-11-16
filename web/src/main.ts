@@ -24,7 +24,9 @@ function bar(): HTMLElement {
   mark.append(rosette("SUMMON", { detail: "mark", ink: "trading" }), "Summon");
   const here = location.hash;
   const tabs = h("nav", { class: "tabs", "aria-label": "Sections" }, ...TABS.map((t) => h("a", { href: t.href, "aria-current": t.on(here) ? "page" : undefined }, t.label)));
-  return h("header", { class: "top" }, h("div", { class: "shell bar" }, mark, tabs, h("span", { class: "bar__net" }, "Base Sepolia testnet"), walletButton()));
+  // on every page and every width, above the bar: nothing here is real money or a real offering
+  const net = h("p", { class: "net" }, h("strong", {}, "Testnet"), " · Base Sepolia. Test USDC and demo stocks; nothing here has value.");
+  return h("header", { class: "top" }, net, h("div", { class: "shell bar" }, mark, tabs, walletButton()));
 }
 
 async function route() {

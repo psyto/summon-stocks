@@ -101,10 +101,17 @@ a {
   width: 26px;
   height: 26px;
 }
-.bar__net {
-  margin-left: auto;
-  color: var(--muted);
+.net {
+  margin: 0;
+  padding: 5px 16px;
+  background: var(--ink);
+  color: var(--paper);
   font-size: 13px;
+  text-align: center;
+}
+.net strong {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .btn {
@@ -594,9 +601,6 @@ a {
   }
   .steps {
     grid-template-columns: 1fr;
-  }
-  .bar__net {
-    display: none;
   }
 }
 
@@ -1524,9 +1528,6 @@ details.checks[open] summary {
   font-weight: 600;
   font-size: 15px;
 }
-.bar__me + .bar__net {
-  margin-left: 0;
-}
 .me {
   margin: 12px 0 72px;
 }
@@ -1713,6 +1714,9 @@ body.card-body {
   z-index: 20;
   background: var(--paper);
   border-bottom: 1px solid var(--rule);
+}
+.top .wallet {
+  margin-left: auto;
 }
 .top .bar {
   border-bottom: 0;
