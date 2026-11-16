@@ -1,6 +1,10 @@
 name = "summon-stocks"
 main = "worker/index.ts"
 compatibility_date = "2024-11-01"
+# served only on its own subdomain; the workers.dev host stays off. Top-level keys: below a
+# [table] header they would belong to that table and be ignored.
+workers_dev = false
+routes = [{ pattern = "summon.fabrknt.com", custom_domain = true }]
 
 [assets]
 directory = "./dist"
@@ -14,7 +18,7 @@ run_worker_first = true
 GEO_BLOCK = "on"
 # the alerts bot's username (no @) and the site's origin for the links in its messages; empty = no links
 # TELEGRAM_BOT_NAME = ""
-# SITE_URL = ""
+SITE_URL = "https://summon.fabrknt.com"
 
 # every intent goes through one Durable Object, so nonce checks, limits and totals are exact (Codex r2 #3, #9).
 # SQLite-backed, which the free plan allows.
