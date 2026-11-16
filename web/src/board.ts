@@ -79,7 +79,7 @@ function hero(s: Snapshot): HTMLElement {
       h(
         "p",
         { class: "hero__lede" },
-        `${s.summary.never} of the ${s.registered} tokenized stocks Coinbase has registered on Base have no supply at all. Back one with USDC. When its round reaches the target, any holder fills it at the live price, and the stock arrives with a pool its backers own.`,
+        `${s.summary.never} of the ${s.registered} tokenized stocks Coinbase has registered on Base have no supply at all. Back one with USDC (here, test USDC on Base Sepolia). When its round reaches the target, any holder fills it at the live price, and the stock arrives with a pool its backers own.`,
       ),
       facts,
       h("p", { class: "hero__source" }, `Coinbase Tokenized Stocks API, Pyth and GeckoTerminal, read ${when(s.generatedAt)}.`),
