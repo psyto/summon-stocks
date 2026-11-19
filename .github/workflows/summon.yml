@@ -1,0 +1,86 @@
+# The testnet summoning on Base Sepolia, with no one at a keyboard: on Tuesdays and Thursdays one demo
+# stock gets a new round, the demo backers pledge it to its target, the auction starts at 10:00 New York
+# time (ts/schedule.ts) and the demo filler fills it (npm run e2e), with the guard posting market state and
+# prices for the whole run. Every wallet is a project demo wallet; nothing here has value.
+#
+# GitHub's schedule is no clock for a set minute (a run once fired nine hours late), so the schedule only
+# wakes the job early, twice in case one is late, and the job waits for 10:00 New York (either side of
+# daylight saving). e2e itself (SCHEDULED=1) reads the chain before any write: inside the window, and no round
+# filled in the last 12 h, so a second wake-up or a rerun cannot summon twice. A start after 10:30 does nothing.
+# A run started by hand with "now" skips the wait (the market still has to be open).
+name: summon
+
+on:
+  schedule:
+    - cron: "30 12 * * 2,4"
+    - cron: "30 13 * * 2,4"
+  workflow_dispatch:
+    inputs:
+      ticker:
+        description: "demo stock (GME, SOFI, RDDT, RIVN); empty = by date"
+        default: ""
+      now:
+        description: "skip the wait for 10:00 New York"
+        type: boolean
+        default: false
+
+concurrency:
+  group: summon
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  summon:
+    runs-on: ubuntu-latest
+    # up to 2 h 30 min of waiting (12:30 UTC to 10:00 New York in winter), then the run
+    timeout-minutes: 240
+    env:
+      DEMO_MNEMONIC: ${{ secrets.DEMO_MNEMONIC }}
+    steps:
+      - name: Wait for 10:00 New York
+        id: wait
+        if: github.event_name == 'schedule' || !inputs.now
+        run: |
+          at=$(TZ=America/New_York date -d "09:58" +%s)
+          end=$(TZ=America/New_York date -d "10:30" +%s)
+          now=$(date +%s)
+          if [ "$now" -ge "$end" ]; then
+            echo "::warning::started after the 10:30 New York window; no summoning"
+            echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if [ "$now" -lt "$at" ]; then echo "waiting $(( at - now )) s"; sleep $(( at - now )); fi
+      - uses: actions/checkout@v4
+        if: steps.wait.outputs.skip != 'true'
+      - uses: actions/setup-node@v4
+        if: steps.wait.outputs.skip != 'true'
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install
+        if: steps.wait.outputs.skip != 'true'
+        run: npm ci
+      - name: Gas for the demo wallets that are low
+        if: steps.wait.outputs.skip != 'true'
+        run: AMOUNT=0.00003 BELOW=0.00001 npm run fund
+      - name: Guard (in the background for the rest of the job)
+        if: steps.wait.outputs.skip != 'true'
+        run: nohup npm run guard > guard.log 2>&1 &
+      - name: Summon
+        if: steps.wait.outputs.skip != 'true'
+        run: |
+          tickers=(GME SOFI RDDT RIVN)
+          t="${{ inputs.ticker }}"
+          [ -n "$t" ] || t=${tickers[$(( 10#$(date -u +%j) % 4 ))]}
+          echo "ticker $t"
+          if [ "${{ github.event_name }}" = schedule ] || [ "${{ inputs.now }}" != true ]; then
+            at=$(TZ=America/New_York date -d "10:00" +%s); now=$(date +%s)
+            [ "$now" -ge "$at" ] || sleep $(( at - now ))
+            # e2e checks the window and that nothing filled in the last 12 h, on the chain, before any write
+            export SCHEDULED=1
+          fi
+          TICKER=$t npm run e2e
+      - name: Guard log
+        if: always() && steps.wait.outputs.skip != 'true'
+        run: tail -40 guard.log || true
