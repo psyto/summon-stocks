@@ -6,6 +6,7 @@
  *
  *   npm run e2e                 # GME; target 300 tUSDC, fill after 120 s
  *   TICKER=AMC npm run e2e       # another demo stock
+ *   TICKER=next npm run e2e      # the first demo stock not yet summoned that the guard can price
  *   WAIT_SECONDS=900 npm run e2e
  *   SCHEDULED=1 npm run e2e      # the summon workflow: only in a summoning window, at most one fill in 12 h
  */
@@ -13,6 +14,7 @@ import { decodeEventLog, parseAbi, parseUnits, type Abi, type Hex } from "viem";
 import { STATES, b20Abi, erc20Abi, guardFeedAbi, pythAbi, roundAbi, summonFactoryAbi } from "./abi.js";
 import { account, deployment, publicClient, wallet, type ROLES } from "./env.js";
 import { updateAt } from "./hermes.js";
+import { hip3Markets } from "./hip3.js";
 import { inSummoning } from "./schedule.js";
 
 /** The settlement window of a pull listing; Deploy.s.sol lists Pyth with 10. */
@@ -20,12 +22,33 @@ const PYTH_WINDOW_SECONDS = 10;
 
 const pc = publicClient();
 const d0 = deployment() as ReturnType<typeof deployment> & { demoStocks?: { ticker: string; symbol: string; address: Hex; priceId: Hex }[] };
-// TICKER=AMC picks a demo stock (default GME); every other address comes from the deployment
-const found = (d0.demoStocks ?? [{ ticker: "GME", symbol: "sGME", address: d0.stock, priceId: d0.priceId }]).find(
-  (x) => x.ticker === (process.env.TICKER ?? "GME"),
-);
+const demos = d0.demoStocks ?? [{ ticker: "GME", symbol: "sGME", address: d0.stock, priceId: d0.priceId }];
+
+/**
+ * TICKER=next: the first demo stock, in the deployment's order, that has never filled and that the guard can
+ * price (a HIP-3 market). A filled stock is live and the factory opens no second round for it (TokenLive), so
+ * each summoning day takes the next stock that has not been summoned; undefined when none is left.
+ */
+async function nextDemo() {
+  const hl = await hip3Markets();
+  for (const s of demos) {
+    if (!hl.has(s.ticker)) continue;
+    const r = await pc.readContract({ address: d0.factory, abi: summonFactoryAbi, functionName: "latestRound", args: [s.address] });
+    if (r === "0x0000000000000000000000000000000000000000") return s;
+    if (STATES[await pc.readContract({ address: r, abi: roundAbi, functionName: "state" })] !== "Filled") return s;
+  }
+  return undefined;
+}
+
+// TICKER=AMC picks a demo stock (default GME), TICKER=next the next one not summoned; every other address comes from the deployment
+const found = process.env.TICKER === "next" ? await nextDemo() : demos.find((x) => x.ticker === (process.env.TICKER ?? "GME"));
+if (!found && process.env.TICKER === "next") {
+  console.log("no summoning: every demo stock the guard can price has filled; add more with ts/add-demo-stocks.ts");
+  process.exit(0);
+}
 if (!found) throw new Error(`No demo stock for TICKER=${process.env.TICKER}`);
 const demo = found;
+console.log("ticker", demo.ticker);
 const d = { ...d0, stock: demo.address, priceId: demo.priceId };
 const log = (step: string, hash: Hex) => console.log(`${step.padEnd(28)} https://sepolia.basescan.org/tx/${hash}`);
 

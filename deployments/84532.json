@@ -41,6 +41,30 @@
       "symbol": "sRDDT",
       "address": "0xb200000000000000000000Ba2c05b1Ca0D438CF8",
       "priceId": "0xc0ece6b9254797f4384bda1ba3f2c33259f552c7849a86b3029e811be5ea9227"
+    },
+    {
+      "ticker": "ZM",
+      "symbol": "sZM",
+      "address": "0xb20000000000000000000040FB5A8b3eC837Db59",
+      "priceId": "0xc9a4605e75ebd30b016e1ca23cc95b221c6b81be301ab100d6c4c623232b36e8"
+    },
+    {
+      "ticker": "DELL",
+      "symbol": "sDELL",
+      "address": "0xb2000000000000000000004a0Aa77D3c41CF9EaF",
+      "priceId": "0xa2950270a22ce39a22cb3488ba91e60474cd93c6d01da2ecc5a97c1dd40f4995"
+    },
+    {
+      "ticker": "EBAY",
+      "symbol": "sEBAY",
+      "address": "0xb200000000000000000000097830Cbdc2A930a25",
+      "priceId": "0x6264a259e2cc90dfd3207f5831949eced2da6bf53965834c9160e4ceb9240947"
+    },
+    {
+      "ticker": "SMCI",
+      "symbol": "sSMCI",
+      "address": "0xb200000000000000000000C2E81e49048b298E5B",
+      "priceId": "0x8f34132a42f8bb7a47568d77a910f97174a30719e16904e9f2915d5b2c6c2d52"
     }
   ]
 }

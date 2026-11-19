@@ -1,5 +1,5 @@
 # The testnet summoning on Base Sepolia, with no one at a keyboard: on Tuesdays and Thursdays one demo
-# stock gets a new round, the demo backers pledge it to its target, the auction starts at 10:00 New York
+# stock not yet summoned gets a round, the demo backers pledge it to its target, the auction starts at 10:00 New York
 # time (ts/schedule.ts) and the demo filler fills it (npm run e2e), with the guard posting market state and
 # prices for the whole run. Every wallet is a project demo wallet; nothing here has value.
 #
@@ -17,7 +17,7 @@ on:
   workflow_dispatch:
     inputs:
       ticker:
-        description: "demo stock (GME, SOFI, RDDT, RIVN); empty = by date"
+        description: "demo stock ticker; empty = the next one not yet summoned"
         default: ""
       now:
         description: "skip the wait for 10:00 New York"
@@ -70,10 +70,9 @@ jobs:
       - name: Summon
         if: steps.wait.outputs.skip != 'true'
         run: |
-          tickers=(GME SOFI RDDT RIVN)
+          # empty = the first demo stock not yet summoned (a filled stock is live; the factory opens no second round)
           t="${{ inputs.ticker }}"
-          [ -n "$t" ] || t=${tickers[$(( 10#$(date -u +%j) % 4 ))]}
-          echo "ticker $t"
+          t=${t:-next}
           if [ "${{ github.event_name }}" = schedule ] || [ "${{ inputs.now }}" != true ]; then
             at=$(TZ=America/New_York date -d "10:00" +%s); now=$(date +%s)
             [ "$now" -ge "$at" ] || sleep $(( at - now ))
