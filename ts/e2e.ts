@@ -15,6 +15,7 @@ import { STATES, b20Abi, erc20Abi, guardFeedAbi, pythAbi, roundAbi, summonFactor
 import { account, deployment, publicClient, wallet, type ROLES } from "./env.js";
 import { updateAt } from "./hermes.js";
 import { hip3Markets } from "./hip3.js";
+import { regularSession } from "@fabrknt/market-state";
 import { inSummoning } from "./schedule.js";
 
 /** The settlement window of a pull listing; Deploy.s.sol lists Pyth with 10. */
@@ -146,13 +147,16 @@ const scanAbi = parseAbi([
 
 /**
  * SCHEDULED=1, read from the chain just before the first write: the run is inside a summoning window with
- * at least 5 minutes left (ts/schedule.ts), and no round on the factory filled in the last 12 hours, so a
+ * at least 5 minutes left (ts/schedule.ts) on a trading day, and no round on the factory filled in the last 12 hours, so a
  * second wake-up of the workflow, or a run after a failed one, cannot summon a second round that day.
  */
 async function scheduledGate() {
   const now = Math.floor(Date.now() / 1000);
   const w = inSummoning(now);
   if (!w || now > w.end - 300) return `not inside a summoning window (with 5 min left) at ${new Date(now * 1000).toISOString()}`;
+  // an exchange holiday (Thanksgiving falls on a Thursday): the round would take pledges and then refuse to start
+  const session = regularSession(now, true);
+  if (!session.open) return `the market is closed (${session.detail})`;
   const n = await pc.readContract({ address: d.factory, abi: scanAbi, functionName: "roundCount" });
   for (let i = n; i > 0n; i--) {
     const r = await pc.readContract({ address: d.factory, abi: scanAbi, functionName: "rounds", args: [i - 1n] });

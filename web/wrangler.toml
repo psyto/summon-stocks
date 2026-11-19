@@ -19,6 +19,9 @@ GEO_BLOCK = "on"
 # the alerts bot's username (no @) and the site's origin for the links in its messages; empty = no links
 # TELEGRAM_BOT_NAME = ""
 SITE_URL = "https://summon.fabrknt.com"
+# the repository whose summon workflow the cron starts before each summoning (worker/dispatch.ts); off until
+# the GITHUB_DISPATCH_TOKEN secret is set
+SUMMON_REPO = "psyto/summon-stocks"
 
 # every intent goes through one Durable Object, so nonce checks, limits and totals are exact (Codex r2 #3, #9).
 # SQLite-backed, which the free plan allows.
@@ -39,6 +42,7 @@ class_name = "AlertStore"
 tag = "v2"
 new_sqlite_classes = ["AlertStore"]
 
-# reads the demo rounds and sends what changed; does nothing until TELEGRAM_BOT_TOKEN is set
+# reads the demo rounds and sends what changed (until TELEGRAM_BOT_TOKEN is set, nothing), and starts the summon
+# workflow before each summoning (until GITHUB_DISPATCH_TOKEN is set, nothing)
 [triggers]
 crons = ["* * * * *"]

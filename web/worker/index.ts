@@ -25,10 +25,11 @@ import { elsewhere } from "./elsewhere";
 import { paymaster } from "./paymaster";
 import { PREVIEW_BOTS, sharePage } from "./share";
 import { AlertStore, alertsInfo, telegram, tick, type AlertEnv } from "./alerts";
+import { dispatchSummon, type DispatchEnv } from "./dispatch";
 
 export { IntentStore, AlertStore };
 
-interface Env extends AlertEnv {
+interface Env extends AlertEnv, DispatchEnv {
   ASSETS: Fetcher;
   INTENTS: DurableObjectNamespace;
   GEO_BLOCK?: string;
@@ -186,5 +187,6 @@ export default {
   },
   async scheduled(_c: ScheduledController, env: Env, ctx: ExecutionContext) {
     ctx.waitUntil(tick(env).then(() => undefined));
+    ctx.waitUntil(dispatchSummon(env).then(() => undefined, (e) => console.log("summon dispatch failed", e)));
   },
 } satisfies ExportedHandler<Env>;

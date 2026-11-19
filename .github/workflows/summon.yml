@@ -8,6 +8,9 @@
 # daylight saving). e2e itself (SCHEDULED=1) reads the chain before any write: inside the window, and no round
 # filled in the last 12 h, so a second wake-up or a rerun cannot summon twice. A start after 10:30 does nothing.
 # A run started by hand with "now" skips the wait (the market still has to be open).
+# Since that schedule fired nine hours late on 2026-11-19 too, the site's Worker also starts this workflow 15 and 10
+# minutes before each summoning (web/worker/dispatch.ts); the same gate makes the extra runs harmless, and on an
+# exchange holiday e2e summons nothing.
 name: summon
 
 on:

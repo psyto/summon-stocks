@@ -13,6 +13,7 @@ import worker, { IntentStore } from "./index";
 import { resetElsewhere } from "./elsewhere";
 import { MAX_LIVE, MAX_NONCES } from "./store";
 import { AlertStore, tick } from "./alerts";
+import { dispatchSummon } from "./dispatch";
 import { nextSummoning } from "../../ts/schedule";
 
 /** The Durable Object namespace, with IntentStore over an in-memory node:sqlite database. */
@@ -643,6 +644,33 @@ const tests: [string, () => Promise<void>][] = [
       } finally {
         globalThis.fetch = real;
       }
+    },
+  ],
+  [
+    "summon dispatch: off without the token; 15 and 10 minutes before a summoning, once each, to the workflow on main",
+    async () => {
+      const calls: { url: string; init: RequestInit }[] = [];
+      const f = (async (url: string, init: RequestInit) => {
+        calls.push({ url, init });
+        return new Response(null, { status: 204 });
+      }) as unknown as typeof fetch;
+      // Tuesday 2026-11-24, 10:00 New York = 15:00 UTC
+      const at = Date.parse("2026-11-24T15:00:00Z") / 1000;
+      assert.equal(nextSummoning(at - 3600), at);
+      const on = { GITHUB_DISPATCH_TOKEN: "t0k", SUMMON_REPO: "o/r" };
+      assert.equal(await dispatchSummon({ SUMMON_REPO: "o/r" }, f, at - 900), undefined);
+      // the cron fires a few seconds into each minute
+      const due = [];
+      for (let t = at - 3600 + 3; t < at + 3600; t += 60) if ((await dispatchSummon(on, f, t)) !== undefined) due.push((at - t + 3) / 60);
+      assert.deepEqual(due, [15, 10]);
+      assert.equal(calls.length, 2);
+      assert.equal(calls[0]!.url, "https://api.github.com/repos/o/r/actions/workflows/summon.yml/dispatches");
+      assert.equal((calls[0]!.init.headers as Record<string, string>).authorization, "Bearer t0k");
+      assert.deepEqual(JSON.parse(calls[0]!.init.body as string), { ref: "main", inputs: { now: "false" } });
+      // Wednesday: nothing
+      calls.length = 0;
+      for (let t = at + 86_400 - 3600; t < at + 86_400; t += 60) await dispatchSummon(on, f, t);
+      assert.equal(calls.length, 0);
     },
   ],
 ];
