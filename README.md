@@ -19,16 +19,17 @@ backers call it onchain like this:
 
 1. Backers commit USDC to a ticker, up to a target.
 2. When the target is reached and the market is open, anyone holding the stock token fills the round at a
-   live reference price, through a capped spread auction (at most 1%, shown before anyone commits). The
-   price comes from Pyth. On testnet it can instead come from a quote the guard posts (see "Price source").
+   live reference price, through a capped spread auction (at most 1%, shown before anyone commits). On
+   testnet the price is a quote the guard posts; on mainnet it would come from an equity oracle (see
+   "Price source").
 3. Part of the round seeds a Uniswap v4 pool. The pool can only be created by the round, and the backers
    own the LP position together.
 4. A public board ranks which ticker comes next. It uses signed, non-binding intents, and no funds move.
 
 A round fills only when every condition below holds:
 - the market is open, outside the first 15 and last 25 minutes of the session, and the stock is not halted;
-- the price is fresh (on a Pyth listing, the first print after a time the block sets; a guard price, under
-  60 s old), its confidence interval is narrow, and it has not jumped since the auction started;
+- the price is fresh (a guard price under 60 s old), its confidence interval is narrow, and it has not
+  jumped since the auction started;
 - no corporate action is pending, i.e. no multiplier change near the fill;
 - neither the token nor its issuer's registry is paused;
 - every transfer policy allows the transfer.
@@ -170,8 +171,10 @@ GME shows the gap on Base itself. Coinbase's GMEc is minted but has no pool, and
 Base ([`0x7212…2323`](https://basescan.org/address/0x7212088a11b4d8f6fc90fbb3dfe793b45dd72323)) has a
 total supply of 0, while bNVDA has about 7,063.
 
-Base's Chainlink equity feeds cover 10 liquid tickers, so Summon prices from Pyth. Pyth gives the
-underlying share price, and a B20 token is worth underlying × `multiplier()`.
+Summon reads the underlying share price through one feed interface, and a B20 token is worth underlying ×
+`multiplier()`. Which oracle backs it on mainnet is still open: Base's Chainlink equity feeds cover 10 liquid
+tickers, and Stork and RedStone were asked about single-stock feeds on 2026-11-21. The register marks a
+stock "can open a round" when a US equity feed exists for it (counted from Pyth's public list).
 [`SummonPrice`](src/SummonPrice.sol) applies the multiplier exactly once.
 
 ## Quickstart
@@ -196,8 +199,7 @@ tracks GME's Pyth price, and it has no value.
 
 ```sh
 npm install
-# .env: DEMO_MNEMONIC (testnet wallets: 0 operator, 1-3 backers, 4 filler); PYTH_API_KEY only for
-#       PRICE_SOURCE=pyth (Pyth Terminal, app.pyth.com: Hermes needs a key since 2026-08-26)
+# .env: DEMO_MNEMONIC (testnet wallets: 0 operator, 1-3 backers, 4 filler)
 set -a; . ./.env; set +a                       # so forge sees DEMO_MNEMONIC
 npm run fund                                   # operator -> demo wallets, for gas
 DRY_RUN=1 npm run create-stock                 # simulate; needs no funds
@@ -216,9 +218,7 @@ npm run keeper                                 # keep running: start, fill and e
 ```
 
 **Price source.** Each listed token is bound to one feed, chosen by the factory owner:
-- `PRICE_SOURCE=pyth`: Pyth Core, with update data from Hermes. This is the design Summon is built for.
-  Since 2026-08-26 Hermes needs an API key, which must stay on a server.
-- `PRICE_SOURCE=guard` (the default on testnet): `GuardPriceFeed`, which has Pyth's read interface. The
+- `PRICE_SOURCE=guard` (what this deployment uses): `GuardPriceFeed`. The
   demo guard posts a stock's price there while it is open and not halted, and only while its round is
   Funded or in its auction. The price is the HIP-3 oracle price of the stock's perp on Hyperliquid
   (GME, RIVN and RDDT on `xyz`, SOFI on `para`; AMC has none, so sAMC cannot fill with guard pricing).
@@ -230,9 +230,11 @@ npm run keeper                                 # keep running: start, fill and e
     this use (they forbid altering the feed), read at most once a minute as its page asks.
 
   The guard key already decides whether the market is open. With guard pricing, it also sets the price.
+- `PRICE_SOURCE=pyth`: a Pyth Core path (`GuardPriceFeed` has the same read interface). It is kept in the
+  code and its tests, but this project does not use it.
 
-Both sources go through the same checks in the round: the price is fresh (a guard price at most 60 s old;
-a Pyth price, the first print after the time the block sets), its confidence is within 50 bp, and it has
+Either source goes through the same checks in the round: the price is fresh (a guard price at most 60 s
+old; on the Pyth path, the first print after the time the block sets), its confidence is within 50 bp, and it has
 not jumped more than 3% since the auction started. A guard that stops posting therefore stops fills.
 
 **Deployed on Base Sepolia** (2026-11-11, with the stock-aware pool; priced from the guard feed; addresses

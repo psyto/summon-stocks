@@ -139,8 +139,7 @@ time to come back.
 - Quiet, like everything but the rosette: a hairline tick in the cell, with the amount and its source and
   read time in the cell's detail (principle 4). No coloured badges (principle 2).
 - The framing is "stocks with proven demand come to Base first", not "Base is behind".
-- Hyperliquid prices are shown for reference only. A HIP-3 deployer sets its own oracle, so fills keep
-  pricing from Pyth.
+- Hyperliquid open interest and volume are shown as demand only; they never set a fill price.
 - Built (Hyperliquid): the Worker's `/api/elsewhere` reads every HIP-3 dex at most once per 5 minutes
   (`ts/hip3.ts`, shared with the guard) and keeps the last read if Hyperliquid fails. A cell not yet trading
   on Base gets a 10 px hairline tick at its top right when open interest or 24 h volume is $100K or more:

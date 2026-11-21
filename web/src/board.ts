@@ -160,11 +160,11 @@ function register(s: Snapshot, totals: Totals, away: Elsewhere, pick?: string): 
     row("Issued supply", x.supply > 0 ? `${x.supply.toLocaleString("en-US", { maximumFractionDigits: 2 })} ${x.symbol}` : "none");
     row("Base pools", x.liquidityUsd > 0 ? usd(x.liquidityUsd) : "none");
     row("24h volume", x.volume24hUsd > 0 ? usd(x.volume24hUsd) : "none");
-    row("Price feed", x.pythFeed ? "Pyth, can open a round" : "none yet, cannot open a round");
+    row("Price feed", x.pythFeed ? "equity feed listed, can open a round" : "none yet, cannot open a round");
     const m = away.markets[x.ticker];
     row(
       "Hyperliquid perp",
-      m ? `${usd(m.oiUsd)} open interest, ${usd(m.volume24hUsd)} 24h volume (HIP-3 ${m.dex}, matched by ticker, read ${when(away.readAt!)}). Reference only: fills price from Pyth.` : away.readAt ? "none" : "not read",
+      m ? `${usd(m.oiUsd)} open interest, ${usd(m.volume24hUsd)} 24h volume (HIP-3 ${m.dex}, matched by ticker, read ${when(away.readAt!)}). Demand only: open interest and volume do not set the fill price.` : away.readAt ? "none" : "not read",
     );
 
     const amount = h("input", { type: "number", min: "1", step: "1", value: "100", inputmode: "decimal", "aria-label": "Amount in USD" });
