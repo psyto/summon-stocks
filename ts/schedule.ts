@@ -2,9 +2,11 @@
  * Summoning days: funded rounds have their auctions started at a set time, so backers know when to come
  * back and watch theirs fill. Shared by the keeper (which starts auctions only in the window) and the page
  * (which says when the next one is). Testnet: Tuesdays and Thursdays at 10:00 New York time, 15 minutes
- * after the open, when fills are allowed. An exchange holiday is skipped by the round itself: it refuses
- * to start while the market is closed.
+ * after the open, when fills are allowed. An exchange holiday (from market-state's calendar) is not a
+ * summoning day, so the page and the reminders skip it; the round would refuse to start then anyway.
  */
+import { regularSession } from "@fabrknt/market-state";
+
 export const SUMMON_DAYS = [2, 4] as const; // Tuesday, Thursday (New York weekday, Sunday = 0)
 export const SUMMON_AT = { hour: 10, minute: 0 } as const; // New York time
 /** How long after the hour the keeper still starts auctions (the auction itself then runs 60 min). */
@@ -28,11 +30,15 @@ function nyInstant(y: number, m: number, d: number, h: number, min: number): num
   return Date.UTC(y, m - 1, d, h + 5, min) / 1000;
 }
 
+/** Whether the market is in its core session at a summoning's start: false on an exchange holiday. */
+const tradingAt = (t: number) => regularSession(t, true).open;
+
 /** The summoning window containing `now`, or undefined. */
 export function inSummoning(now: number): { start: number; end: number } | undefined {
   const f = ny(now);
   if (!(SUMMON_DAYS as readonly number[]).includes(f.wd)) return undefined;
   const start = nyInstant(f.y, f.m, f.d, SUMMON_AT.hour, SUMMON_AT.minute);
+  if (!tradingAt(start)) return undefined;
   return now >= start && now < start + SUMMON_WINDOW_SECONDS ? { start, end: start + SUMMON_WINDOW_SECONDS } : undefined;
 }
 
@@ -40,11 +46,11 @@ export function inSummoning(now: number): { start: number; end: number } | undef
 export function nextSummoning(now: number): number {
   const open = inSummoning(now);
   if (open) return open.start;
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 15; i++) {
     const f = ny(now + i * 86_400);
     if (!(SUMMON_DAYS as readonly number[]).includes(f.wd)) continue;
     const start = nyInstant(f.y, f.m, f.d, SUMMON_AT.hour, SUMMON_AT.minute);
-    if (start >= now) return start;
+    if (start >= now && tradingAt(start)) return start;
   }
   return now;
 }

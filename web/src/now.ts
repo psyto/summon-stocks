@@ -1,7 +1,8 @@
 /**
- * The first screen: what is happening now. The liveliest round, shown as its own round page (the dial on
- * the left, what a person can do on the right), with the other live rounds one click away; under it, the
- * stocks people are asking for, ranked by signed intents. The full register is a tab of its own.
+ * The first screen, for someone who has never heard of Summon: one line on the gap (stocks registered on
+ * Base and never issued) and the ask (sign for the one you want next), then the stocks people are asking
+ * for with a Sign on each, then the next summoning. Live rounds are chips under it; a round's full page
+ * opens only when one is picked. The full register is a tab of its own.
  */
 import { ELSEWHERE_MARK_USD, loadElsewhere, loadSnapshot, usd } from "./data";
 import { client, D, DEMOS, factoryAbi, OPEN_AT_INTENT_USD, roundAbi, STATES, type RoundState } from "./chain";
@@ -9,6 +10,7 @@ import { h } from "./el";
 import { loadTotals } from "./intents";
 import { renderRound } from "./round";
 import { rosette, type Ink } from "./rosette";
+import { nextSummoning, summoningLabel } from "../../ts/schedule";
 
 type Addr = `0x${string}`;
 interface Live {
@@ -46,11 +48,20 @@ async function liveRounds(): Promise<Live[]> {
 const inkFor = (s: RoundState): Ink => (s === "Filled" ? "trading" : "issued");
 
 export async function renderNow(main: HTMLElement) {
+  const hero = h("header", { class: "now__hero" });
+  const next = h("div", { class: "now__next" });
+  const card = h("div", { class: "now__summon" });
   const strip = h("nav", { class: "now__strip", "aria-label": "Live rounds" }, h("span", { class: "now__label" }, "Reading Base Sepolia…"));
   const stage = h("div", { class: "now__round" });
-  main.append(strip, stage, h("div", { class: "now__next" }));
-  const next = main.querySelector(".now__next") as HTMLElement;
+  main.append(hero, next, card, strip, stage);
+  void loadSnapshot().then((snap) =>
+    hero.replaceChildren(
+      h("h1", { class: "wide" }, `${snap.summary.never} of the ${snap.registered} stocks registered on Base have never been issued.`),
+      h("p", {}, `Sign for the one you want next. A signature is free: no gas, and no funds move. When a stock's signatures reach ${usd(OPEN_AT_INTENT_USD)}, its round can open, and twice a week one is summoned at the live price, with a pool its backers own. `, h("a", { href: "#/how" }, "How it works")),
+    ),
+  );
   void nextUp(next);
+  void summonCard(card);
 
   let rounds: Live[] = [];
   try {
@@ -60,17 +71,19 @@ export async function renderNow(main: HTMLElement) {
     return;
   }
   if (!rounds.length) {
-    strip.replaceChildren(h("span", { class: "now__label" }, "No round is live. The stocks below are the next ones people are asking for."));
+    strip.replaceChildren(h("span", { class: "now__label" }, "No round is live right now."));
     return;
   }
   const show = async (r: Live) => {
-    for (const c of strip.querySelectorAll(".now__chip")) c.setAttribute("aria-pressed", String(c.getAttribute("data-round") === r.round));
+    const again = strip.querySelector(`.now__chip[data-round="${r.round}"]`)?.getAttribute("aria-pressed") === "true";
+    for (const c of strip.querySelectorAll(".now__chip")) c.setAttribute("aria-pressed", String(!again && c.getAttribute("data-round") === r.round));
+    if (again) return void stage.replaceChildren();
     const box = h("div", {});
     stage.replaceChildren(box);
     await renderRound(box, r.round, { folded: true });
   };
   strip.replaceChildren(
-    h("span", { class: "now__label" }, rounds.length === 1 ? "Live now" : `Live now · ${rounds.length} rounds`),
+    h("span", { class: "now__label" }, rounds.length === 1 ? "Demo round" : `Demo rounds · ${rounds.length}`),
     ...rounds.map((r) => {
       const b = h("button", { class: "now__chip", type: "button", "data-round": r.round, "aria-pressed": "false" });
       b.append(rosette(r.ticker, { detail: "mark", ink: inkFor(r.state) }), h("span", { class: "wide" }, r.symbol), h("span", { class: "now__state" }, r.state));
@@ -78,7 +91,45 @@ export async function renderNow(main: HTMLElement) {
       return b;
     }),
   );
-  await show(rounds[0]!);
+}
+
+/** The next demo stock the summoning job will take: the first, in the deployment's order, that has never
+ * filled and has a HIP-3 market for the guard's price (the same rule as `TICKER=next` in ts/e2e.ts). */
+async function summonCard(box: HTMLElement) {
+  try {
+    const away = await loadElsewhere();
+    for (const d of DEMOS) {
+      if (!away.markets[d.ticker]) continue;
+      const round = await client.readContract({ address: D.factory!, abi: factoryAbi, functionName: "latestRound", args: [d.address] });
+      const none = round === "0x0000000000000000000000000000000000000000";
+      const st = none ? undefined : (STATES[await client.readContract({ address: round, abi: roundAbi, functionName: "state" })] as RoundState);
+      if (st === "Filled") continue;
+      const at = nextSummoning(Math.floor(Date.now() / 1000));
+      const seal = h("span", { class: "now__seal" });
+      seal.append(rosette(d.ticker, { detail: "cell", ink: "issued" }));
+      const left = h("small", {});
+      const tick = () => {
+        const s = Math.max(0, at - Math.floor(Date.now() / 1000));
+        const dd = Math.floor(s / 86_400), hh = Math.floor((s % 86_400) / 3600), mm = Math.floor((s % 3600) / 60);
+        left.textContent = s === 0 ? "now" : `in ${dd ? `${dd} d ` : ""}${hh} h ${mm} min`;
+      };
+      tick();
+      const timer = setInterval(() => (box.isConnected ? tick() : clearInterval(timer)), 30_000);
+      box.replaceChildren(
+        h(
+          "a",
+          { href: none ? `#/s/${d.ticker}` : `#/round/${round}`, class: "now__card" },
+          seal,
+          h("span", { class: "now__t" }, h("small", {}, "Next summoning"), h("strong", { class: "wide" }, `${d.symbol} · ${summoningLabel(at)}`), left),
+          h("span", { class: "now__cardtext" }, none ? `A demo stock that tracks ${d.ticker}. Its round opens on the day and fills at the live price, 10:00 New York.` : `A demo stock that tracks ${d.ticker}. Back it with test USDC and watch it fill at 10:00 New York.`),
+          h("span", { class: "now__go" }, none ? "See it" : "Back it"),
+        ),
+      );
+      return;
+    }
+  } catch {
+    /* the card is optional: the ask above stands without it */
+  }
 }
 
 /** "Which stock next?": stocks not yet trading on Base, by signed intents; then the ones already trading
@@ -92,7 +143,7 @@ async function nextUp(box: HTMLElement) {
   const list = [...asked, ...proven].slice(0, 8);
   const top = Math.max(OPEN_AT_INTENT_USD, ...asked.map((x) => totals[x.ticker]!.usd));
   box.replaceChildren(
-    h("div", { class: "now__head" }, h("h2", { class: "wide" }, "Which stock next?"), h("p", {}, `Signed intents, ranked. A signature is free and binds no one; a demo stock's round opens at ${usd(OPEN_AT_INTENT_USD)}. `, h("a", { href: "#/register" }, `All ${snap.registered} stocks`))),
+    h("div", { class: "now__head" }, h("h2", { class: "wide" }, "Which stock next?"), h("p", {}, "Ranked by signed intents, then by what already trades on Hyperliquid. ", h("a", { href: "#/register" }, `All ${snap.registered} stocks`))),
     h(
       "ol",
       { class: "now__list" },

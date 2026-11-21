@@ -14,7 +14,7 @@ import { resetElsewhere } from "./elsewhere";
 import { MAX_LIVE, MAX_NONCES } from "./store";
 import { AlertStore, tick } from "./alerts";
 import { dispatchSummon } from "./dispatch";
-import { nextSummoning } from "../../ts/schedule";
+import { inSummoning, nextSummoning } from "../../ts/schedule";
 
 /** The Durable Object namespace, with IntentStore over an in-memory node:sqlite database. */
 function memStore() {
@@ -657,6 +657,9 @@ const tests: [string, () => Promise<void>][] = [
       // Tuesday 2026-11-24, 10:00 New York = 15:00 UTC
       const at = Date.parse("2026-11-24T15:00:00Z") / 1000;
       assert.equal(nextSummoning(at - 3600), at);
+      // Thursday 11-26 is Thanksgiving: the next summoning after Tuesday's is Tuesday 12-01
+      assert.equal(nextSummoning(at + 3600), Date.parse("2026-12-01T15:00:00Z") / 1000);
+      assert.equal(inSummoning(Date.parse("2026-11-26T15:05:00Z") / 1000), undefined);
       const on = { GITHUB_DISPATCH_TOKEN: "t0k", SUMMON_REPO: "o/r" };
       assert.equal(await dispatchSummon({ SUMMON_REPO: "o/r" }, f, at - 900), undefined);
       // the cron fires a few seconds into each minute
