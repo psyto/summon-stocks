@@ -1,7 +1,7 @@
 /**
  * The first screen: what is happening now. The liveliest round, shown as its own round page (the dial on
  * the left, what a person can do on the right), with the other live rounds one click away; under it, the
- * stocks people are asking for, ranked by signed intents. The 298-stock register is a tab of its own.
+ * stocks people are asking for, ranked by signed intents. The full register is a tab of its own.
  */
 import { ELSEWHERE_MARK_USD, loadElsewhere, loadSnapshot, usd } from "./data";
 import { client, D, DEMOS, factoryAbi, OPEN_AT_INTENT_USD, roundAbi, STATES, type RoundState } from "./chain";

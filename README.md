@@ -2,13 +2,7 @@
 
 **Backers bring a stock onto Base.**
 
-> **Status:** testnet only (Base Sepolia), unaudited, not for real funds. Contracts deployed on Base Sepolia
-> 2026-11-11 and exercised end to end there (fills, trades, halt, split, unwind, refunds; links below). Every
-> testnet fill so far was priced by the demo guard's feed; the Pyth path is covered by unit tests only. The web
-> page and Worker run locally and are not hosted yet; the Telegram bot is not created. An entry to Base's
-> Stocks Maxxing quest (2026-11-05 to 12-05); not affiliated with or endorsed by Base or Coinbase.
-
-Coinbase has registered 298 tokenized stocks (B20) on Base. 227 of them have never been minted, and some
+Coinbase has registered 415 tokenized stocks (B20) on Base. 325 of them have never been minted (2026-11-21), and some
 that were minted (DJT, AMC, GME) have no pool to trade in.
 
 Summon is a primary-market primitive for tokenized stocks. Committed demand becomes a fill and a pool only
@@ -40,7 +34,7 @@ session is closed.
 
 ## Why it matters
 
-- **For issuers:** 227 registered stocks have no supply. A funded Summon round is a demand signal any
+- **For issuers:** 325 registered stocks have no supply. A funded Summon round is a demand signal any
   issuer can read: these backers have committed this much USDC to this ticker, and they are waiting for a
   fill.
 - **For Base:** stocks reach Base in order of demand. Each one arrives with a pool, and its backers are
@@ -52,8 +46,8 @@ session is closed.
 - **For backers:** the worst price is shown before you commit (at most 1% over the reference). If the
   round does not fill, every pledge is refunded.
 
-Built as an entry to Base's [Stocks Maxxing](https://www.base.org/stocksmaxxing) quest (Programmable Stock
-Markets track). Participation only: not affiliated with or endorsed by Base or Coinbase. **Testnet only (Base Sepolia).** Mainnet data is only read and shown.
+Built for Base's [Stocks Maxxing](https://www.base.org/stocksmaxxing) season (Programmable Stock Markets
+track). **Testnet only (Base Sepolia).** Mainnet data is only read and shown.
 
 **Demo video (6 min): [docs/demo/summon-demo.mp4](docs/demo/summon-demo.mp4).** Recorded from the page on
 2026-11-12 (ET), every transaction real on Base Sepolia: a signed intent opens a round, backers pledge, the
@@ -66,13 +60,13 @@ and is taken apart for its backers.
 |---|---|
 | Spec ([docs/specs/001-summon.md](docs/specs/001-summon.md)) | r5. Reviewed by Codex (a different model) over eight rounds of spec and code on 2026-11-10 and 11-11, every finding fixed or answered, ending in **APPROVE** at [r8](docs/reviews/codex-r8.md). Each round's findings and what changed are in [docs/reviews](docs/reviews) ([what changed, r1-r8](docs/reviews/codex-r1-response.md)), after one independent review of r1 |
 | Price math (`src/SummonPrice.sol`, spec 5.1) | done, with tests: split invariance, dividend multiplier, fuzzed rounding |
-| Round, factory, pool hook, swap (`src/SummonRound.sol`, `SummonFactory.sol`, `SummonHook.sol`, `SummonSwap.sol`) | done, 53 tests: the hook refusing an address without its permission bits, each fill condition failing alone, pledge cap, target bounds (10 to 10^9 USDC), a pool seed of at least 10^4 token units, no auction past the deadline, withdraw rules, expiry and refunds, claims under transfer policies, LP unwind, pool initialization and liquidity restricted to the round, a fill's price published after the auction started, on a Pyth listing the first print after a time the block sets, round terms of at most 30 days with a round behind pace replaceable (and cancelled) after a day, swaps stopped while the issuer pauses or its registry disagrees with the token on the multiplier, the router trading only Summon pools, the guard price feed, trading the summoned pool, and the pool that knows the stock's market (below). Removing any of 8 fill checks, or any of the hook's 6 rules, makes a test fail |
+| Round, factory, pool hook, swap (`src/SummonRound.sol`, `SummonFactory.sol`, `SummonHook.sol`, `SummonSwap.sol`) | done, 51 tests: each fill condition failing alone, pledge cap, target bounds (10 to 10^9 USDC), a pool seed of at least 10^4 token units, no auction past the deadline, withdraw rules, expiry and refunds, claims under transfer policies, LP unwind, pool initialization and liquidity restricted to the round, a fill's price published after the auction started, on a Pyth listing the first print after a time the block sets, round terms of at most 30 days with a round behind pace replaceable (and cancelled) after a day, swaps stopped while the issuer pauses, the router trading only Summon pools, the guard price feed, trading the summoned pool, and the pool that knows the stock's market (below). Removing any of 8 fill checks, or any of the hook's 6 rules, makes a test fail |
 | Stock-aware pool (`SummonHook`, `SummonRound.realign`, spec 5.5 and 5.5a, r4) | built 2026-11-08, deployed 2026-11-11, **first trade 2026-11-11 (ET)**: alice bought sGME with 1 tUSDC in the summoned pool and the hook charged 0.30%, the open-session fee ([swap](https://sepolia.basescan.org/tx/0x973b9bcb0b1f11fdf94de03e9219c4c6e1fc6fe98e535c7ff46179a193c510cd), `npm run swap`); after the close it charged 1.00% ([swap](https://sepolia.basescan.org/tx/0x524cf5d54318c305b6e4d14bf354647f82c2bc16b8a76b3e45e8afd539b8e946)). The rules: no swaps in a corporate action window, while the multiplier differs from the one the pool was priced at, or while the listing exchange has the stock halted; a 1.00% fee instead of 0.30% while the session is closed or the guard is quiet; after a split or a dividend in shares, anyone can `realign` the backers' pool to the new multiplier, so the first trader cannot take the difference. No fills in the first 15 and last 25 minutes of the session, while US LULD bands are doubled (market-state `core-hours`). Holidays and 13:00 early closes from market-state `v0.2.0`; from `v0.4.0` a session name it does not know reads closed |
 | Base Sepolia deployment | **redeployed 2026-11-11 with the stock-aware pool** (Codex r8 approved): factory, hook, swap router, registries, and the five B20 demo stocks listed again (see below). Rounds on it: sGME filled 11-11, then went through a 2:1 split, `realign` and the LP unwind (11-12); sAMC's first round expired and was refunded, and a second was opened and pledged to by a smart wallet with no ETH (sponsored, 11-12); sRDDT, sSOFI and sRIVN filled at the 11-12 summoning (for the demo video: sRDDT traded, halted and unwound; sSOFI split 2:1 and realigned; sRIVN traded after the close and unwound) |
 | Guard (`ts/guard.ts`) | done: Nasdaq Trader halts (once a minute) and, for guard pricing, the HIP-3 oracle price from Hyperliquid's chain. At the close it records each stock as closed once, then writes nothing until the open. It refuses to start if the installed market-state does not read a weekend and the first 15 minutes as closed (a stale v0.2.0 build once read the session as always open, so swaps after the close paid 0.30%). `npm run guard -- --quote GME` prints the price it would post and writes nothing |
 | End-to-end fill on Base Sepolia (`ts/e2e.ts`) | **first fill done 2026-11-10 (ET), sGME**: three demo backers pledged 300 tUSDC, the auction started, and the demo filler filled at a $25.115 reference (the HIP-3 oracle price the guard posted), 6 bp under it; the Uniswap v4 pool was seeded and every backer claimed. [pledge](https://sepolia.basescan.org/tx/0x3dbe7c7ad11fdd223ddeab48fbc05393fa85a334a9a2b7ed7054433b7cd7a60c) · [auction start](https://sepolia.basescan.org/tx/0x4b5831f2ca5fc62b8695315ca29670eb433421307826bad32aef927df572bb9a) · [fill](https://sepolia.basescan.org/tx/0xb71b8eb7f4cf16fd1bb060b11247b29741a0caf7151036d79965f09497ffb9eb) · [claim](https://sepolia.basescan.org/tx/0xda9dddb16b677e784f2d4bd6868c5e01fefbd6b699f63f7cc8d36d9e75b3b5dc). **Second fill 2026-11-11 (ET), on the redeployed contracts**: sGME again, at a $25.445 reference, 6 bp under it ([open](https://sepolia.basescan.org/tx/0x6f720a4b1dcc759878dcdcdd3e38674a4757bcaa4be5a94abe04fa2d9737f14f) · [auction start](https://sepolia.basescan.org/tx/0x0f3abf7c6f71df87c76b856317ea030481742736ba3772a5ea1d80c3fc745206) · [fill](https://sepolia.basescan.org/tx/0xf46f8fa76f4306ab0bd1eae738b26c4d5e13cc65b9f44ef65ce9990602c52e9a) · [claim](https://sepolia.basescan.org/tx/0xa03085d3b475d0f69be5a66fb3b4e1e99303fbf2f1e102f61f5a8db875196f94)). It picks up the stock's open round wherever it stands, so pledges made from the web page count. On a Pyth listing it moves to a later price band only when Pyth printed nothing in the one it tried. Weekdays 09:45–15:35 ET |
 | Web (`web/`) | built 2026-11-07, round page redone 2026-11-12 (one screen: a dial that fills with pledges, runs with the auction's spread and shows the pool's fee; quotes from the chain, the backer's position, every transaction simulated first; a wallet picker and Base Account; every intent signature checkable in the browser): the register of all 298 stocks; live round pages; signed intents, with a round opening from the register once a demo stock's intents reach $250; trading a summoned pool; a demand export issuers can verify; the US block and per-network limits (27 Worker tests, intents in one Durable Object so nonce checks and limits are exact, with totals kept per token (named by the current snapshot) and live intents and nonces capped: totals count only unexpired intents, a replay sent with its replacement loses, expired intents are swept, the demand export is paged, an intent lasts at most 31 days, an older signature cannot restore a replaced intent, a nonce far ahead is refused, and a request with no country is refused). Runs locally. Not public yet: the code review is done, and the author decides when |
-| Keeper (`ts/keeper.ts`) | built 2026-11-12, **first summoning 11-12 (ET)**: at 10:00 it started sRIVN's and sSOFI's auctions and filled both at 25 bp 8 minutes in (sRIVN [start](https://sepolia.basescan.org/tx/0xe659c4baf954d06f2daa29b9eff4e2f0802f2a8b72904729a837ecd4d55765d0) · [fill](https://sepolia.basescan.org/tx/0x8be20e5e760f2b204f921f0ca16aa6933ad5f135b83127fa411a14af6f9e5c1d); sSOFI [start](https://sepolia.basescan.org/tx/0x05b3ac41ede7070b1e2b91afbf970617be7f707ecf8f95dd06d395c74d4ba4e6) · [fill](https://sepolia.basescan.org/tx/0xa2f249c1d0f9c55a403eeb06bc956059f120afa8c1d15b1de63739ea34a105be)). It on **summoning days** (`ts/schedule.ts`: Tuesdays and Thursdays, 10:00 New York time; the page shows the next one on every funded round) starts an auction once the round accepts it, fills at a set spread (default 25 bp) or in the last 2 minutes, ends an auction nobody filled, and with `UNWIND=1` unwinds after the lock. Each call is simulated first, so a waiting round says why (`MarketHalted(3)` after hours). A reference for "who fills": any holder can run it |
+| Keeper (`ts/keeper.ts`) | built 2026-11-12, **first summoning 11-12 (ET)**: at 10:00 it started sRIVN's and sSOFI's auctions and filled both at 25 bp 8 minutes in (sRIVN [start](https://sepolia.basescan.org/tx/e659c4baf954d06f2daa29b9eff4e2f0802f2a8b72904729a837ecd4d55765d0) · [fill](https://sepolia.basescan.org/tx/8be20e5e760f2b204f921f0ca16aa6933ad5f135b83127fa411a14af6f9e5c1d); sSOFI [start](https://sepolia.basescan.org/tx/05b3ac41ede7070b1e2b91afbf970617be7f707ecf8f95dd06d395c74d4ba4e6) · [fill](https://sepolia.basescan.org/tx/a2f249c1d0f9c55a403eeb06bc956059f120afa8c1d15b1de63739ea34a105be)). It on **summoning days** (`ts/schedule.ts`: Tuesdays and Thursdays, 10:00 New York time; the page shows the next one on every funded round) starts an auction once the round accepts it, fills at a set spread (default 25 bp) or in the last 2 minutes, ends an auction nobody filled, and with `UNWIND=1` unwinds after the lock. Each call is simulated first, so a waiting round says why (`MarketHalted(3)` after hours). A reference for "who fills": any holder can run it |
 | Telegram alerts (`web/worker/alerts.ts`) | built 2026-11-12: follow a demo stock with the bot, hear when its round changes and 15 minutes before its summoning. Checked against a local Worker reading Base Sepolia (`/start RDDT` answered with the funded sRDDT round) and in the Worker tests with a stand-in Telegram. Off until a bot token is set: the bot is not created yet |
 | Gas sponsorship (`web/worker/paymaster.ts`) | built 2026-11-12: Base Account's transactions are sponsored through the CDP Paymaster, so a visitor needs no testnet ETH, and an order's steps go as one batch. The proxy sponsors only calls to Summon's contracts or the factory's rounds. Checked on Base Sepolia with a Coinbase Smart Wallet holding 0 ETH: it opened an sAMC round and pledged in one batch ([open](https://sepolia.basescan.org/tx/0xe33e3be943e08100020a980022382d7e3d772c91ff1c0c60ee56feca35e754d2), [pledge](https://sepolia.basescan.org/tx/0x434eb7b3b4ef76bf1e7a40fa052e6684aa498115bdb4209442fa74a425ee2e21); `web/e2e/sponsored.e2e.mts`). The passkey sign-in itself is the visitor's |
 | Demo video (`web/e2e/demo.video.mts`) | recorder built 2026-11-12: Chromium through puppeteer against the page, every transaction real, a wallet whose demo keys sign in Node, captions and chapter cards, no scrolling on camera. **Recorded 2026-11-12 (ET), 6 min: [docs/demo/summon-demo.mp4](docs/demo/summon-demo.mp4)**. Now, the register (an intent opens sRDDT's round), checking a signature and choosing a wallet, the pledges, the summoning with follow, Telegram and share, sRDDT's auction and fill, trading and a halt, sSOFI's 2:1 split (`CorporateActionWindow`, then `StaleMultiplier` and `realign`), sRIVN after the close at 1.00%, the LP unwind and My summons |
@@ -84,11 +78,11 @@ register then offered a round, they opened it, got test USDC, pledged 50 and too
 shows 0 pledged). One fix came out of it: the round page now makes the step you can take the primary
 button (get test USDC first, then pledge). The first fill ran from the script on 2026-11-10 (above).
 
-From the page (2026-11-12 ET, filmed for the video): a fill of sRDDT ([fill](https://sepolia.basescan.org/tx/0xd0ff3d9c293f45f73781418e22221d00ebdb818523c361e27b84e4b8de01058b)), a trade at 0.30%
-([buy](https://sepolia.basescan.org/tx/0xfc08d46d8b088abdc6790b33d827d90f9c1b08b55ea1993fa70cfda45910bea1)), sSOFI's `realign` after a 2:1 split
-([realign](https://sepolia.basescan.org/tx/0x86a1b26ee928a2068f46e2a01d10a91f378634900f51e8d4c6d733bd98472912)), a trade at 1.00% after the close
-([buy sRIVN](https://sepolia.basescan.org/tx/0xc3c047ed1455adfbf19341b1dc0e4b857abe25a9c5d7901543bb7df9e1e43be4)) and an unwind with a pool share
-claimed ([unwindLP](https://sepolia.basescan.org/tx/0x9934c4ca8feb5882c05c479d6328fffeb36defe6d8f09045cdedde11045f1629) · [claimLP](https://sepolia.basescan.org/tx/0x6b5cd0f6371404610457a3503bb655f37dbc2020c650647ab84566b2accb8fc7)). One fix
+From the page (2026-11-12 ET, filmed for the video): a fill of sRDDT ([fill](https://sepolia.basescan.org/tx/d0ff3d9c293f45f73781418e22221d00ebdb818523c361e27b84e4b8de01058b)), a trade at 0.30%
+([buy](https://sepolia.basescan.org/tx/fc08d46d8b088abdc6790b33d827d90f9c1b08b55ea1993fa70cfda45910bea1)), sSOFI's `realign` after a 2:1 split
+([realign](https://sepolia.basescan.org/tx/86a1b26ee928a2068f46e2a01d10a91f378634900f51e8d4c6d733bd98472912)), a trade at 1.00% after the close
+([buy sRIVN](https://sepolia.basescan.org/tx/c3c047ed1455adfbf19341b1dc0e4b857abe25a9c5d7901543bb7df9e1e43be4)) and an unwind with a pool share
+claimed ([unwindLP](https://sepolia.basescan.org/tx/9934c4ca8feb5882c05c479d6328fffeb36defe6d8f09045cdedde11045f1629) · [claimLP](https://sepolia.basescan.org/tx/6b5cd0f6371404610457a3503bb655f37dbc2020c650647ab84566b2accb8fc7)). One fix
 came out of it: after the unwind, a backer's position dropped the pool share once it was claimed; it now
 counts what the round took out of the pool.
 
@@ -96,6 +90,9 @@ Docs:
 - [docs/specs/001-summon.md](docs/specs/001-summon.md): the spec (r5)
 - [docs/reviews/](docs/reviews): the reviews (Codex r1-r8 with each request, and what changed after each)
 - [docs/design.md](docs/design.md): the web design
+- [docs/plan-to-submission.md](docs/plan-to-submission.md): the plan to submission (in Japanese)
+- [docs/x-drafts.md](docs/x-drafts.md): drafts of the milestone posts on X
+- [docs/telegram-drafts.md](docs/telegram-drafts.md): questions for the Base, BaseStonk and Bankr support groups
 
 ## The full flow on Base Sepolia
 
@@ -146,19 +143,15 @@ checks these policies before every fill and claim.
 
 Reproduce them with `python3 scripts/count_b20.py`. It reads public APIs and needs no keys.
 
-| | 2026-11-07 |
-|---|---|
-| B20 tokenized stocks registered | 298 |
-| minted (supply > 0) | 71 |
-| never minted | 227 |
-| with a Pyth US equity feed | 213 |
-| never minted, with a Pyth feed (Summon can open a round) | 154 |
+| | 2026-11-07 | 2026-11-21 |
+|---|---|---|
+| B20 tokenized stocks registered | 298 | 415 |
+| minted (supply > 0) | 71 | 90 |
+| never minted | 227 | 325 |
+| with a Pyth US equity feed | 213 | 252 |
+| never minted, with a Pyth feed (Summon can open a round) | 154 | 175 |
 
-The register keeps growing: the same script on 2026-11-14 read 358 registered, 72 minted, 286 never minted,
-237 with a Pyth feed and 177 never minted with one. The page's snapshot (`web/public/b20.json`) is from
-2026-11-07; `python3 scripts/snapshot.py` refreshes it.
-
-The same stocks elsewhere (read 2026-11-08 from public sources, no keys). Of the 227 never minted on B20:
+The same stocks elsewhere (read 2026-11-08 from public sources, no keys). Of the 227 never minted on B20 then:
 - 80 are stock tokens on Robinhood Chain (212 tokens from its `StockFactory`
   `0x4783C67b63dE2B358Ac5951a7D41F47A38F3C046`, chain 4663), including JPM, V, DIS, CRM and UBER;
 - 24 trade as perps on Hyperliquid's HIP-3 markets, led by DELL (about $6.3M open interest; $5.9M on
@@ -180,11 +173,9 @@ stock "can open a round" when a US equity feed exists for it (counted from Pyth'
 ## Quickstart
 
 ```sh
-git clone --recursive https://github.com/psyto/summon-stocks
+git clone --recursive <this repo>
 cd summon-stocks
-forge test                                  # 59 tests, no keys, no network after the clone
-npm install && npm run typecheck            # the TypeScript scripts
-cd web && npm install && npm run test:worker   # the Worker's 27 tests, no keys
+forge test
 ```
 
 Requires [Foundry](https://getfoundry.sh). It builds with `via_ir` (foundry.toml): without it the factory,
@@ -269,7 +260,7 @@ anyone can mint; `DemoOracleRegistry`, which stands in for Coinbase's mainnet or
 `web/` is the page and a Cloudflare Worker. Five tabs stay at the top of every page. The first screen,
 Now, shows the liveliest round as its round page (an auction first, then funded rounds, the newest among
 equals; the other live rounds a click away) and, under it, "Which stock next?": stocks ranked by signed
-intents, then by what already trades on Hyperliquid. Then the register of all 298 stocks, each with its own
+intents, then by what already trades on Hyperliquid. Then the register of every registered stock, each with its own
 guilloché seal (one screen: the cells and the chosen stock's panel scroll inside it), the rounds, My
 summons, and how it works. A round page fits one screen: a dial that fills with pledges, runs with
 the auction's spread and shows the pool's fee, and a ticket that shows what an order gets before it is
@@ -314,7 +305,6 @@ only links to the site, which stays closed there.
 ```sh
 python3 scripts/snapshot.py        # refresh web/public/b20.json (the Coinbase API has no CORS)
 cd web && npm install
-printf 'GEO_BLOCK=off\n' > .dev.vars   # locally: wrangler's mock location may read as the US, which the Worker blocks
 npm run build && npx wrangler dev  # page and Worker on http://localhost:8787
 npx wrangler secret put CDP_PAYMASTER_URL   # optional: https://api.developer.coinbase.com/rpc/v1/base-sepolia/<key>
                                    # locally, the same line in web/.dev.vars
@@ -343,16 +333,14 @@ check covers only the halts.
   check, so it was added upstream first (`PythRef.readFresh`, `v0.3.2`), not worked around here. Codex r3
   then showed a filler could still pick among fresh prints, so `PythRef.readFirstAfter` (the first print
   after a set time) was added upstream in `v0.4.0` and Pyth listings settle through it.
-- [market-state](https://github.com/fabrknt/market-state) (pinned at `v0.4.1`): `MarketStateCheck.requireOpen`
+- [market-state](https://github.com/fabrknt/market-state) (pinned at `v0.4.0`): `MarketStateCheck.requireOpen`
   on every auction start and fill, and the Nasdaq Trader halts guard. Using it here showed the guard did
   not know exchange holidays (Thanksgiving read as open), so `v0.2.0` added NYSE's 2026-2028 holidays and
   13:00 early closes upstream first, and `v0.3.0` the `core-hours` session (no fills while US LULD bands
   are doubled). After a stale `node_modules` read `core-hours` as always open (the hook charged the
   open-session fee after the close), `v0.4.0` made an unknown session name read closed
-  ([#1](https://github.com/fabrknt/market-state/issues/1)), and `v0.4.1` made `setState` emit only when
-  the stored state changes (a cleared halt with a leftover reason emitted on every call). The registry fails closed when the
-  updater goes quiet. Swaps are not stopped then: they pay 1.00% (`CLOSED_FEE`) while fills revert with
-  `MarketStateStale`. It was extracted from another of our projects as a public part, so that Summon could
+  ([#1](https://github.com/fabrknt/market-state/issues/1)). The registry fails closed when the
+  updater goes quiet. It was extracted from another of our projects as a public part, so that Summon could
   depend on it through a tag. That project now depends on the same tag.
 - [Uniswap v4-core](https://github.com/Uniswap/v4-core) v4.0.0,
   [pyth-sdk-solidity](https://github.com/pyth-network/pyth-sdk-solidity) v2.2.0,
@@ -360,11 +348,8 @@ check covers only the halts.
 
 ## Built during the season
 
-Everything in this repository was written during the Stocks Maxxing quest (first commit 2026-11-07; the git
-history is kept as the record). hl-price-guard existed before it (from 2026-10-17); market-state was
-extracted from an earlier project of ours on 2026-11-07, the day Summon started. The versions of both that
-Summon pins (`PythRef.readFresh` and `readFirstAfter`, holidays, `core-hours`, the unknown-session fix) were
-added during the quest, for Summon.
+Everything in this repository was written during the Stocks Maxxing season (from 2026-11-07). The parts
+listed above existed before it.
 
 ## Notes
 

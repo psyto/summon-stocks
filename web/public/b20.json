@@ -1,13 +1,1003 @@
 {
- "generatedAt": "2026-11-07T07:48:12Z",
- "registered": 298,
+ "generatedAt": "2026-11-21T08:20:56Z",
+ "registered": 415,
  "summary": {
-  "never": 227,
-  "issued": 26,
-  "trading": 45
+  "never": 325,
+  "issued": 38,
+  "trading": 52
  },
- "neverWithPythFeed": 154,
+ "neverWithPythFeed": 175,
  "stocks": [
+  {
+   "symbol": "APPc",
+   "ticker": "APP",
+   "name": "AppLovin Corporation",
+   "address": "0xb20000000000000000000006f910a0e7BBD3c168",
+   "supply": 66.01157522,
+   "liquidityUsd": 1,
+   "volume24hUsd": 0,
+   "pythFeed": "0x54f128939505878cf4412abc5a533255ce07e85833849170deb67deff0533aa7",
+   "status": "issued"
+  },
+  {
+   "symbol": "AMDc",
+   "ticker": "AMD",
+   "name": "Advanced Micro Devices, Inc.",
+   "address": "0xB2000000000000000000000d8Ce462E99ee7A47B",
+   "supply": 1414.16918337,
+   "liquidityUsd": 210718,
+   "volume24hUsd": 5025131,
+   "pythFeed": "0x3622e381dbca2efd1859253763b1adc63f7f9abb8e76da1aa8e638a57ccde93e",
+   "status": "trading"
+  },
+  {
+   "symbol": "ANTc",
+   "ticker": "ANT",
+   "name": "Anthropic, PBC",
+   "address": "0xb20000000000000000000016e38FD364d271Ba28",
+   "supply": 14935.96406155,
+   "liquidityUsd": 599031,
+   "volume24hUsd": 13112578,
+   "pythFeed": "0xe9b31c413010c75b80d2307f5164e7ca86b6f1f4d1df092f4f44053d355e226f",
+   "status": "trading"
+  },
+  {
+   "symbol": "BEc",
+   "ticker": "BE",
+   "name": "Bloom Energy Corporation",
+   "address": "0xb20000000000000000000016f9dfe862feBA122b",
+   "supply": 1630.98802313,
+   "liquidityUsd": 119293,
+   "volume24hUsd": 132073,
+   "pythFeed": "0xa955f59cec6006d55ac21ab009c92662f2d9250bc22b86fcce16e7962c129c4f",
+   "status": "trading"
+  },
+  {
+   "symbol": "SANc",
+   "ticker": "SAN",
+   "name": "Banco Santander, S.A.",
+   "address": "0xB20000000000000000000017BB66E9301E913A99",
+   "supply": 2491.0,
+   "liquidityUsd": 32691,
+   "volume24hUsd": 257,
+   "pythFeed": null,
+   "status": "trading"
+  },
+  {
+   "symbol": "SKHYc",
+   "ticker": "SKHY",
+   "name": "SK hynix Inc.",
+   "address": "0xb200000000000000000000187f7071D6E321a7d2",
+   "supply": 2698.7041319,
+   "liquidityUsd": 65081,
+   "volume24hUsd": 296045,
+   "pythFeed": "0xe5725db9661fa7df89131c9d7fd85c30122523a1e864d03986911342a43cd47c",
+   "status": "trading"
+  },
+  {
+   "symbol": "PFEc",
+   "ticker": "PFE",
+   "name": "Pfizer Inc",
+   "address": "0xB20000000000000000000018FE7eC7d6DfeeB528",
+   "supply": 9.86627835,
+   "liquidityUsd": 176,
+   "volume24hUsd": 0,
+   "pythFeed": "0x0704ad7547b3dfee329266ee53276349d48e4587cb08264a2818288f356efd1d",
+   "status": "issued"
+  },
+  {
+   "symbol": "CRCLc",
+   "ticker": "CRCL",
+   "name": "Circle Internet Group Inc.",
+   "address": "0xB20000000000000000000019f6E7C675b73C2e4D",
+   "supply": 3215.89041742,
+   "liquidityUsd": 127493,
+   "volume24hUsd": 116080,
+   "pythFeed": "0x92b8527aabe59ea2b12230f7b532769b133ffb118dfbd48ff676f14b273f1365",
+   "status": "trading"
+  },
+  {
+   "symbol": "TSLAc",
+   "ticker": "TSLA",
+   "name": "Tesla Inc.",
+   "address": "0xb2000000000000000000001e800a7f5189430cD0",
+   "supply": 6527.32389899,
+   "liquidityUsd": 324311,
+   "volume24hUsd": 6911197,
+   "pythFeed": "0x16dad506d7db8da01c87581c87ca897a012a153557d4d578c3b9c9e1bc0632f1",
+   "status": "trading"
+  },
+  {
+   "symbol": "SOUNc",
+   "ticker": "SOUN",
+   "name": "SoundHound AI, Inc.",
+   "address": "0xB2000000000000000000002137743D4a01Fe4e88",
+   "supply": 3.93243255,
+   "liquidityUsd": 85,
+   "volume24hUsd": 0,
+   "pythFeed": "0x88232bfe2ca44449224f24fc862d4b4fed9144e53f6cf9f0a939f88b82b4f8cd",
+   "status": "issued"
+  },
+  {
+   "symbol": "BRK.Bc",
+   "ticker": "BRK.B",
+   "name": "Berkshire Hathaway Inc. Class B",
+   "address": "0xb20000000000000000000024170488e788CBbCb4",
+   "supply": 250.16992071,
+   "liquidityUsd": 104876,
+   "volume24hUsd": 88,
+   "pythFeed": null,
+   "status": "trading"
+  },
+  {
+   "symbol": "MRKc",
+   "ticker": "MRK",
+   "name": "Merck & Co., Inc.",
+   "address": "0xb200000000000000000000241fe94fe97FcBf034",
+   "supply": 190.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0xc81114e16ec3cbcdf20197ac974aed5a254b941773971260ce09e7caebd6af46",
+   "status": "issued"
+  },
+  {
+   "symbol": "HTZc",
+   "ticker": "HTZ",
+   "name": "Hertz Global Holdings, Inc.",
+   "address": "0xb2000000000000000000002601C5C94F435da168",
+   "supply": 225.71941499,
+   "liquidityUsd": 57,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "issued"
+  },
+  {
+   "symbol": "ARMc",
+   "ticker": "ARM",
+   "name": "Arm Holdings plc",
+   "address": "0xB20000000000000000000026215D755356E5043f",
+   "supply": 231.49890308,
+   "liquidityUsd": 28088,
+   "volume24hUsd": 23327,
+   "pythFeed": "0x957bf692b35cc62f222dbf4dc6929130df42fe17c9f03373f44c01f78b05391e",
+   "status": "trading"
+  },
+  {
+   "symbol": "GOOGLc",
+   "ticker": "GOOGL",
+   "name": "Alphabet Inc.",
+   "address": "0xb2000000000000000000002D0BA3164cc74f58B7",
+   "supply": 37248.30223607,
+   "liquidityUsd": 965334,
+   "volume24hUsd": 12041157,
+   "pythFeed": "0x5a48c03e9b9cb337801073ed9d166817473697efff0d138874e0f6a33d6d5aa6",
+   "status": "trading"
+  },
+  {
+   "symbol": "NIOc",
+   "ticker": "NIO",
+   "name": "NIO Inc.",
+   "address": "0xb2000000000000000000002D2B5dc53c61f1bA06",
+   "supply": 15319.0,
+   "liquidityUsd": 31236,
+   "volume24hUsd": 7,
+   "pythFeed": "0xc8916a12ca17ed0883e37a10c8962370fbd2878a35bb70f6902a0f52be73338c",
+   "status": "trading"
+  },
+  {
+   "symbol": "SEc",
+   "ticker": "SE",
+   "name": "Sea Limited",
+   "address": "0xB2000000000000000000003088798F6d0722AaAC",
+   "supply": 447.0,
+   "liquidityUsd": 18297,
+   "volume24hUsd": 125,
+   "pythFeed": null,
+   "status": "trading"
+  },
+  {
+   "symbol": "ORCLc",
+   "ticker": "ORCL",
+   "name": "Oracle Corporation",
+   "address": "0xb200000000000000000000347AFbA223D7B6b63C",
+   "supply": 3382.32766471,
+   "liquidityUsd": 173593,
+   "volume24hUsd": 3057177,
+   "pythFeed": "0xe47ff732eaeb6b4163902bdee61572659ddf326511917b1423bae93fcdf3153c",
+   "status": "trading"
+  },
+  {
+   "symbol": "LRCXc",
+   "ticker": "LRCX",
+   "name": "Lam Research Corporation",
+   "address": "0xB20000000000000000000034975347FF1848AAb9",
+   "supply": 133.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0x01a67883f58bd0f0e9cf8f52f21d7cf78c144d7e7ae32ce9256420834b33fb75",
+   "status": "issued"
+  },
+  {
+   "symbol": "ULc",
+   "ticker": "UL",
+   "name": "Unilever Plc",
+   "address": "0xB200000000000000000000349ef3Aa93a0897476",
+   "supply": 564.0,
+   "liquidityUsd": 26032,
+   "volume24hUsd": 6,
+   "pythFeed": null,
+   "status": "trading"
+  },
+  {
+   "symbol": "MPc",
+   "ticker": "MP",
+   "name": "MP Materials Corp.",
+   "address": "0xB2000000000000000000003958003d801724F9d3",
+   "supply": 750.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0x92e03dac647ec6733f61f208a89115ecee4442653736a66008032f4ae588f304",
+   "status": "issued"
+  },
+  {
+   "symbol": "SNDKc",
+   "ticker": "SNDK",
+   "name": "Sandisk Corporation",
+   "address": "0xb200000000000000000000397293Cb8cda9a10c5",
+   "supply": 3330.03853669,
+   "liquidityUsd": 1102955,
+   "volume24hUsd": 21150334,
+   "pythFeed": "0xc86a1f20cd7d5d07932baea30bcd8e479b775c4f51f82526bf1de6dc79fa3f76",
+   "status": "trading"
+  },
+  {
+   "symbol": "RIVNc",
+   "ticker": "RIVN",
+   "name": "Rivian Automotive, Inc.",
+   "address": "0xB2000000000000000000003e4249C65bd6c037d9",
+   "supply": 2232.42655743,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0x1e59e3164331ce560683eae0c69efe9650ff1bc834225772ddb330aa808f72f0",
+   "status": "issued"
+  },
+  {
+   "symbol": "SOFIc",
+   "ticker": "SOFI",
+   "name": "SoFi Technologies, Inc.",
+   "address": "0xB2000000000000000000003eF37a7c863DC1482A",
+   "supply": 1950.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0x72fae0e0683c186f5ce9444afac9909cf5d60b499f4f9569dd75442f19c625c8",
+   "status": "issued"
+  },
+  {
+   "symbol": "DJTc",
+   "ticker": "DJT",
+   "name": "Trump Media & Technology Group Corp.",
+   "address": "0xb200000000000000000000428E3a3eebBb20692B",
+   "supply": 9780.91291285,
+   "liquidityUsd": 100,
+   "volume24hUsd": 0,
+   "pythFeed": "0xcabf6dfb723b12ac8a67e919379d177903580f8d3ae2fad3897198dc07a5a861",
+   "status": "issued"
+  },
+  {
+   "symbol": "HIMSc",
+   "ticker": "HIMS",
+   "name": "Hims & Hers Health, Inc.",
+   "address": "0xB20000000000000000000043a599976181Bcf336",
+   "supply": 22944.74060202,
+   "liquidityUsd": 137778,
+   "volume24hUsd": 1889516,
+   "pythFeed": "0x2132cbc333161e94b91da745ed73b1450410fdc870f2235bf628c28da358b652",
+   "status": "trading"
+  },
+  {
+   "symbol": "WENc",
+   "ticker": "WEN",
+   "name": "Wendy's Co",
+   "address": "0xB20000000000000000000044E3CD7a0E1028E57a",
+   "supply": 241.76558697,
+   "liquidityUsd": 84,
+   "volume24hUsd": 0,
+   "pythFeed": "0xc6101ee4f14af5581a3995438bf0e80a574dd28fd497685988b526ae9ba34749",
+   "status": "issued"
+  },
+  {
+   "symbol": "PYPLc",
+   "ticker": "PYPL",
+   "name": "PayPal Holdings, Inc.",
+   "address": "0xb200000000000000000000450ad3abE5d4846c6E",
+   "supply": 615.06274496,
+   "liquidityUsd": 608,
+   "volume24hUsd": 1,
+   "pythFeed": "0x773c3b11f6be58e8151966a9f5832696d8cd08884ccc43ac8965a7ebea911533",
+   "status": "issued"
+  },
+  {
+   "symbol": "MSTRc",
+   "ticker": "MSTR",
+   "name": "Strategy Inc.",
+   "address": "0xb2000000000000000000004884b426556b92883d",
+   "supply": 25253.97804302,
+   "liquidityUsd": 646055,
+   "volume24hUsd": 20507340,
+   "pythFeed": "0xe1e80251e5f5184f2195008382538e847fafc36f751896889dd3d1b1f6111f09",
+   "status": "trading"
+  },
+  {
+   "symbol": "INTCc",
+   "ticker": "INTC",
+   "name": "Intel Corporation",
+   "address": "0xB2000000000000000000004AFF16039bA04bdFBc",
+   "supply": 2990.3600078,
+   "liquidityUsd": 121459,
+   "volume24hUsd": 318854,
+   "pythFeed": "0xc1751e085ee292b8b3b9dd122a135614485a201c35dfc653553f0e28c1baf3ff",
+   "status": "trading"
+  },
+  {
+   "symbol": "BIRDc",
+   "ticker": "BIRD",
+   "name": "Smartbird, Inc.",
+   "address": "0xB200000000000000000000535fE96f18204BFD96",
+   "supply": 1.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0xc0f43f5c4282957c3cab84d1c882e79d600efdaf1817299859a09809e31b3988",
+   "status": "issued"
+  },
+  {
+   "symbol": "QCOMc",
+   "ticker": "QCOM",
+   "name": "Qualcomm Incorporated",
+   "address": "0xB2000000000000000000005672D78eFF30D24665",
+   "supply": 160.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0x54350ebf587c3f14857efcfec50e5c4f6e10220770c2266e9fe85bd5e42e4022",
+   "status": "issued"
+  },
+  {
+   "symbol": "NFLXc",
+   "ticker": "NFLX",
+   "name": "Netflix Inc",
+   "address": "0xb20000000000000000000058B8c947e44011dFE6",
+   "supply": 8692.98804665,
+   "liquidityUsd": 184309,
+   "volume24hUsd": 2632595,
+   "pythFeed": "0x8376cfd7ca8bcdf372ced05307b24dced1f15b1afafdeff715664598f15a3dd2",
+   "status": "trading"
+  },
+  {
+   "symbol": "NOKc",
+   "ticker": "NOK",
+   "name": "Nokia Corporation",
+   "address": "0xB2000000000000000000005ac674f707E357409c",
+   "supply": 6175.26255704,
+   "liquidityUsd": 27587,
+   "volume24hUsd": 13644,
+   "pythFeed": "0xff1717bc1de364c8473f9c1928dad930a9ecc952d91f26133a7f94eb03166316",
+   "status": "trading"
+  },
+  {
+   "symbol": "RBLXc",
+   "ticker": "RBLX",
+   "name": "Roblox Corporation",
+   "address": "0xB2000000000000000000005bd7AE89b9E6189Bb5",
+   "supply": 73.40046308,
+   "liquidityUsd": 279,
+   "volume24hUsd": 12,
+   "pythFeed": "0xd62134a195739141d0649991f11fe0f9cd9eb83fd890bc3ba41dfdd18c1a49f4",
+   "status": "issued"
+  },
+  {
+   "symbol": "VALEc",
+   "ticker": "VALE",
+   "name": "Vale S.A.",
+   "address": "0xB20000000000000000000063376b142C0764B489",
+   "supply": 3503.0,
+   "liquidityUsd": 20582,
+   "volume24hUsd": 3,
+   "pythFeed": "0x89dd5fb5c30324f3cb11920e3e5ca7de7732abf3889f93bf3757f9509715a89f",
+   "status": "trading"
+  },
+  {
+   "symbol": "CRMc",
+   "ticker": "CRM",
+   "name": "Salesforce, Inc.",
+   "address": "0xB2000000000000000000006432a3a7991e718DBB",
+   "supply": 140.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0xfeff234600320f4d6bb5a01d02570a9725c1e424977f2b823f7231e6857bdae8",
+   "status": "issued"
+  },
+  {
+   "symbol": "RDDTc",
+   "ticker": "RDDT",
+   "name": "Reddit, Inc.",
+   "address": "0xb20000000000000000000066242d4067724cB7A1",
+   "supply": 651.79872126,
+   "liquidityUsd": 325,
+   "volume24hUsd": 0,
+   "pythFeed": "0xc0ece6b9254797f4384bda1ba3f2c33259f552c7849a86b3029e811be5ea9227",
+   "status": "issued"
+  },
+  {
+   "symbol": "HOODc",
+   "ticker": "HOOD",
+   "name": "Robinhood Markets, Inc.",
+   "address": "0xb2000000000000000000006F944897540579D3f2",
+   "supply": 2689.41396228,
+   "liquidityUsd": 113168,
+   "volume24hUsd": 1340033,
+   "pythFeed": "0x306736a4035846ba15a3496eed57225b64cc19230a50d14f3ed20fd7219b7849",
+   "status": "trading"
+  },
+  {
+   "symbol": "CBRSc",
+   "ticker": "CBRS",
+   "name": "Cerebras Systems Inc.",
+   "address": "0xb200000000000000000000720133EeDF525f93E2",
+   "supply": 2.9058763,
+   "liquidityUsd": 62,
+   "volume24hUsd": 0,
+   "pythFeed": "0x7b6809a00a53228f74622e4909750c0d86a2081032955e02c8e3503b1b93829a",
+   "status": "issued"
+  },
+  {
+   "symbol": "GMEc",
+   "ticker": "GME",
+   "name": "GameStop Corp.",
+   "address": "0xb2000000000000000000007790ed6E48e06eD935",
+   "supply": 1990.00732968,
+   "liquidityUsd": 49,
+   "volume24hUsd": 347,
+   "pythFeed": "0x6f9cd89ef1b7fd39f667101a91ad578b6c6ace4579d5f7f285a4b06aa4504be6",
+   "status": "issued"
+  },
+  {
+   "symbol": "NVDAc",
+   "ticker": "NVDA",
+   "name": "NVIDIA Corporation",
+   "address": "0xb20000000000000000000078ee7ce2fE4908108C",
+   "supply": 62019.73777574,
+   "liquidityUsd": 1310323,
+   "volume24hUsd": 20002462,
+   "pythFeed": "0xb1073854ed24cbc755dc527418f52b7d271f6cc967bbf8d8129112b18860a593",
+   "status": "trading"
+  },
+  {
+   "symbol": "VSTc",
+   "ticker": "VST",
+   "name": "Vistra Corp.",
+   "address": "0xB20000000000000000000079DC24fe2FBD09110f",
+   "supply": 215.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0x665d46c8142ca4486ebcdcfc0bbb913dee5255e0be63b6f971933620a7f69045",
+   "status": "issued"
+  },
+  {
+   "symbol": "SPCXc",
+   "ticker": "SPCX",
+   "name": "Space Exploration Technologies Corp.",
+   "address": "0xb2000000000000000000007b9fcbd005511aCBd5",
+   "supply": 30116.60889535,
+   "liquidityUsd": 849105,
+   "volume24hUsd": 12558392,
+   "pythFeed": "0x8a593d6edde7a3095213c88116d8840d01e93c2ddeb800bc891772eb8b93bb94",
+   "status": "trading"
+  },
+  {
+   "symbol": "PLTRc",
+   "ticker": "PLTR",
+   "name": "Palantir Technologies Inc.",
+   "address": "0xb2000000000000000000007d16372840dF4dAbbe",
+   "supply": 3062.21515138,
+   "liquidityUsd": 239631,
+   "volume24hUsd": 1921296,
+   "pythFeed": "0x11a70634863ddffb71f2b11f2cff29f73f3db8f6d0b78c49f2b5f4ad36e885f0",
+   "status": "trading"
+  },
+  {
+   "symbol": "METAc",
+   "ticker": "META",
+   "name": "Meta Platforms Inc.",
+   "address": "0xb2000000000000000000008bC8786B856E61707C",
+   "supply": 9037.50744454,
+   "liquidityUsd": 600001,
+   "volume24hUsd": 10138777,
+   "pythFeed": "0x78a3e3b8e676a8f73c439f5d749737034b139bbbe899ba5775216fba596607fe",
+   "status": "trading"
+  },
+  {
+   "symbol": "NVOc",
+   "ticker": "NVO",
+   "name": "Novo Nordisk A/S",
+   "address": "0xb2000000000000000000008D5328e9208773dC58",
+   "supply": 818.0,
+   "liquidityUsd": 25818,
+   "volume24hUsd": 148,
+   "pythFeed": "0x8dde322496e031d942b9eee8ca769d618cd2e69b18196644369379f5a1e7c23d",
+   "status": "trading"
+  },
+  {
+   "symbol": "PMc",
+   "ticker": "PM",
+   "name": "Philip Morris International Inc.",
+   "address": "0xB2000000000000000000008FC2A8C23cf5937b66",
+   "supply": 0.2513925,
+   "liquidityUsd": 160,
+   "volume24hUsd": 0,
+   "pythFeed": "0xa32f875eb39e23f087ea0db141b00857630c2c5011bfbe53a2a4d186f37cb583",
+   "status": "issued"
+  },
+  {
+   "symbol": "WDCc",
+   "ticker": "WDC",
+   "name": "Western Digital Corporation",
+   "address": "0xb2000000000000000000008fde21a1F5c69FeC0b",
+   "supply": 500.02604587,
+   "liquidityUsd": 105327,
+   "volume24hUsd": 838,
+   "pythFeed": "0x37a782cf9bb6061d4cca34a419fb1ae5a8edf71ae8843206ea88b4ba696d4706",
+   "status": "trading"
+  },
+  {
+   "symbol": "JNJc",
+   "ticker": "JNJ",
+   "name": "Johnson & Johnson",
+   "address": "0xb20000000000000000000090658e3f9b29E2f5C2",
+   "supply": 92.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0x12848738d5db3aef52f51d78d98fc8b8b8450ffb19fb3aeeb67d38f8c147ff63",
+   "status": "issued"
+  },
+  {
+   "symbol": "PTONc",
+   "ticker": "PTON",
+   "name": "Peloton Interactive, Inc.",
+   "address": "0xB2000000000000000000009272A491812842Aa84",
+   "supply": 17.83166189,
+   "liquidityUsd": 55,
+   "volume24hUsd": 2,
+   "pythFeed": null,
+   "status": "issued"
+  },
+  {
+   "symbol": "LULUc",
+   "ticker": "LULU",
+   "name": "lululemon athletica inc.",
+   "address": "0xB200000000000000000000989dc22D3656717734",
+   "supply": 250.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0x13a19eb6a936a8c7020fe675687979b44e991efbfb4d3d2ca91425ce57b9e6f8",
+   "status": "issued"
+  },
+  {
+   "symbol": "SONYc",
+   "ticker": "SONY",
+   "name": "Sony Group Corporation",
+   "address": "0xb200000000000000000000a26326a922FFA87f6C",
+   "supply": 1836.0,
+   "liquidityUsd": 31985,
+   "volume24hUsd": 6380,
+   "pythFeed": "0xb4e9d5fc0e0dbf10b138cbbdcb0c211dd6a56676bcf16d09760be7967bd204f9",
+   "status": "trading"
+  },
+  {
+   "symbol": "DUOLc",
+   "ticker": "DUOL",
+   "name": "Duolingo, Inc.",
+   "address": "0xb200000000000000000000A613D12dEAfBBb1Db7",
+   "supply": 11.201144,
+   "liquidityUsd": 110,
+   "volume24hUsd": 3,
+   "pythFeed": null,
+   "status": "issued"
+  },
+  {
+   "symbol": "MSFTc",
+   "ticker": "MSFT",
+   "name": "Microsoft Corporation",
+   "address": "0xB200000000000000000000Ab99cFa739E253872B",
+   "supply": 2702.70741505,
+   "liquidityUsd": 336291,
+   "volume24hUsd": 5368840,
+   "pythFeed": "0xd0ca23c1cc005e004ccf1db5bf76aeb6a49218f43dac3d4b275e92de12ded4d1",
+   "status": "trading"
+  },
+  {
+   "symbol": "ASTSc",
+   "ticker": "ASTS",
+   "name": "AST SpaceMobile, Inc.",
+   "address": "0xB200000000000000000000B1a29cF17A1819288a",
+   "supply": 42.17148914,
+   "liquidityUsd": 92,
+   "volume24hUsd": 2,
+   "pythFeed": "0x17f979e1f6b7c429e4b9ecee96633dbecdc5378566ddfd3d220b0ef8d874e4bd",
+   "status": "issued"
+  },
+  {
+   "symbol": "VRTc",
+   "ticker": "VRT",
+   "name": "Vertiv Holdings Co",
+   "address": "0xB200000000000000000000b2E8dBA585B1ffB158",
+   "supply": 151.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0x84dad6b760396a7904d04a3d83039a3fc18f10819fd97d023ac5535997d70108",
+   "status": "issued"
+  },
+  {
+   "symbol": "AAPLc",
+   "ticker": "AAPL",
+   "name": "Apple Inc.",
+   "address": "0xb200000000000000000000C2e324d24d7eEcd1fb",
+   "supply": 6103.12108319,
+   "liquidityUsd": 382042,
+   "volume24hUsd": 7116714,
+   "pythFeed": "0x49f6b65cb1de6b10eaf75e7c03ca029c306d0357e91b5311b175084a5ad55688",
+   "status": "trading"
+  },
+  {
+   "symbol": "UNHc",
+   "ticker": "UNH",
+   "name": "UnitedHealth Group Incorporated",
+   "address": "0xb200000000000000000000c367d37d07150182A2",
+   "supply": 70.02456844,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0x05380f8817eb1316c0b35ac19c3caa92c9aa9ea6be1555986c46dce97fed6afd",
+   "status": "issued"
+  },
+  {
+   "symbol": "BUDc",
+   "ticker": "BUD",
+   "name": "Anheuser-Busch InBev SA/NV",
+   "address": "0xB200000000000000000000c36ce081Dd09e86cA2",
+   "supply": 418.0,
+   "liquidityUsd": 25695,
+   "volume24hUsd": 13,
+   "pythFeed": null,
+   "status": "trading"
+  },
+  {
+   "symbol": "NVAXc",
+   "ticker": "NVAX",
+   "name": "Novavax Inc",
+   "address": "0xB200000000000000000000C597c476FCf9Aed3a8",
+   "supply": 2.26930751,
+   "liquidityUsd": 107,
+   "volume24hUsd": 1,
+   "pythFeed": null,
+   "status": "issued"
+  },
+  {
+   "symbol": "PDDc",
+   "ticker": "PDD",
+   "name": "PDD Holdings Inc.",
+   "address": "0xB200000000000000000000c8A7223510467D8563",
+   "supply": 400.0,
+   "liquidityUsd": 22621,
+   "volume24hUsd": 1314,
+   "pythFeed": "0xae69f62081eb15ae4f077397871a1cf29cacf75e7b1db740aed9074c1efd3fa4",
+   "status": "trading"
+  },
+  {
+   "symbol": "QUBTc",
+   "ticker": "QUBT",
+   "name": "Quantum Computing Inc.",
+   "address": "0xb200000000000000000000CA425ab42e07C35bC3",
+   "supply": 287.21009592,
+   "liquidityUsd": 191,
+   "volume24hUsd": 15,
+   "pythFeed": "0x35df6acc91ade17065f757233443edee7b5046a4cd65748641f48d1c78e031b3",
+   "status": "issued"
+  },
+  {
+   "symbol": "BILIc",
+   "ticker": "BILI",
+   "name": "Bilibili Inc.",
+   "address": "0xb200000000000000000000ca7C6D1438e7245eb6",
+   "supply": 2350.0,
+   "liquidityUsd": 22630,
+   "volume24hUsd": 185,
+   "pythFeed": "0x006d336e4cd222530a057ed307c619af1379a4dedfc4839dcbab413df956fbaa",
+   "status": "trading"
+  },
+  {
+   "symbol": "AMCc",
+   "ticker": "AMC",
+   "name": "AMC Entertainment Holdings, Inc.",
+   "address": "0xB200000000000000000000CD7e6b8042cb7c2BB5",
+   "supply": 9299.84104696,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0x5b1703d7eb9dc8662a61556a2ca2f9861747c3fc803e01ba5a8ce35cb50a13a1",
+   "status": "issued"
+  },
+  {
+   "symbol": "AAOIc",
+   "ticker": "AAOI",
+   "name": "Applied Optoelectronics Inc",
+   "address": "0xb200000000000000000000cf36D05963A3E2205c",
+   "supply": 3613.29547207,
+   "liquidityUsd": 101169,
+   "volume24hUsd": 2822,
+   "pythFeed": "0xff68be691d07c6513247fd4e93a6d52b31e0ef7e4899acc43e59cb5c95b3fa76",
+   "status": "trading"
+  },
+  {
+   "symbol": "BIDUc",
+   "ticker": "BIDU",
+   "name": "Baidu, Inc.",
+   "address": "0xb200000000000000000000d2b7D9aeE52F6C6BEf",
+   "supply": 405.0,
+   "liquidityUsd": 20807,
+   "volume24hUsd": 549,
+   "pythFeed": "0x9bdee8cb689424d01f6eaf7217adfcff65b51a30774a77fff8006c21c7059350",
+   "status": "trading"
+  },
+  {
+   "symbol": "MCDc",
+   "ticker": "MCD",
+   "name": "McDonald's Corporation",
+   "address": "0xb200000000000000000000d2f4cf2f7DEBB244BB",
+   "supply": 500.54975261,
+   "liquidityUsd": 104560,
+   "volume24hUsd": 34966,
+   "pythFeed": "0xd3178156b7c0f6ce10d6da7d347952a672467b51708baaf1a57ffe1fb005824a",
+   "status": "trading"
+  },
+  {
+   "symbol": "LIc",
+   "ticker": "LI",
+   "name": "Li Auto Inc.",
+   "address": "0xb200000000000000000000D61eFD9F54A23ef9eB",
+   "supply": 2852.0,
+   "liquidityUsd": 25550,
+   "volume24hUsd": 9,
+   "pythFeed": "0xb10d624c07226d795e9211c9ac95baf43b4a4234ac89cd319e3c72b20de92f99",
+   "status": "trading"
+  },
+  {
+   "symbol": "AMZNc",
+   "ticker": "AMZN",
+   "name": "Amazon.com Inc.",
+   "address": "0xb200000000000000000000d9192b6B456483C2E8",
+   "supply": 10411.50295316,
+   "liquidityUsd": 1174021,
+   "volume24hUsd": 15733285,
+   "pythFeed": "0xb5d0e0fa58a1f8b81498ae670ce93c872d14434b72c364885d4fa1b257cbb07a",
+   "status": "trading"
+  },
+  {
+   "symbol": "SAPc",
+   "ticker": "SAP",
+   "name": "SAP SE",
+   "address": "0xb200000000000000000000da6F64c306234127E0",
+   "supply": 148.0,
+   "liquidityUsd": 25796,
+   "volume24hUsd": 3,
+   "pythFeed": "0x0ee2e3f1c7689e1abf957009f747228a30b47678c8e5844cb033cbcf790fa20b",
+   "status": "trading"
+  },
+  {
+   "symbol": "GTLBc",
+   "ticker": "GTLB",
+   "name": "GitLab Inc.",
+   "address": "0xb200000000000000000000df14B76C292A32982d",
+   "supply": 575.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0xf8d023d26b597738c7d97b5fa0e9141334766e76fb9e4374c1610a4b2978ab35",
+   "status": "issued"
+  },
+  {
+   "symbol": "MRNAc",
+   "ticker": "MRNA",
+   "name": "Moderna, Inc.",
+   "address": "0xB200000000000000000000e215e9B76ecBA02468",
+   "supply": 697.38826891,
+   "liquidityUsd": 116986,
+   "volume24hUsd": 84224,
+   "pythFeed": "0x4083b0b1471123cf4d3e8edee7890940cafad866f06cadae638c23e555a1f4fc",
+   "status": "trading"
+  },
+  {
+   "symbol": "BACc",
+   "ticker": "BAC",
+   "name": "Bank of America Corporation",
+   "address": "0xB200000000000000000000E3e784CDF88Df2959d",
+   "supply": 520.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0x21debc1718a4b76ff74dadf801c261d76c46afaafb74d9645b65e00b80f5ee3e",
+   "status": "issued"
+  },
+  {
+   "symbol": "CMGc",
+   "ticker": "CMG",
+   "name": "Chipotle Mexican Grill, Inc.",
+   "address": "0xB200000000000000000000E4A60215E10D6D8c2b",
+   "supply": 715.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0xc1046358a2b78d92a2ad45b9d3c271350ab9335b478df21a390b8924cad91563",
+   "status": "issued"
+  },
+  {
+   "symbol": "ANETc",
+   "ticker": "ANET",
+   "name": "Arista Networks, Inc.",
+   "address": "0xB200000000000000000000E71D4E45D1421251cb",
+   "supply": 150.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0x31cc7558642dc348a3e2894146a998031438de8ccc56b7af2171bcd5e5d83eda",
+   "status": "issued"
+  },
+  {
+   "symbol": "WRDc",
+   "ticker": "WRD",
+   "name": "WeRide Inc.",
+   "address": "0xb200000000000000000000e88EFe88D8aDE3f0dA",
+   "supply": 7504.0,
+   "liquidityUsd": 21364,
+   "volume24hUsd": 1,
+   "pythFeed": null,
+   "status": "trading"
+  },
+  {
+   "symbol": "RKLBc",
+   "ticker": "RKLB",
+   "name": "Rocket Lab Corporation",
+   "address": "0xb200000000000000000000e8E50CBbb9a3861a3C",
+   "supply": 546.8281742,
+   "liquidityUsd": 2,
+   "volume24hUsd": 0,
+   "pythFeed": "0x40589e289317e4fbd997b1a267606e20a1cc7c3e4689f9e5a5992957917816c8",
+   "status": "issued"
+  },
+  {
+   "symbol": "BMNRc",
+   "ticker": "BMNR",
+   "name": "BitMine Immersion Technologies, Inc.",
+   "address": "0xB200000000000000000000eA2df44A307CaB279C",
+   "supply": 0.52705231,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0x54e2e127c93950de5a710100fd1cd387aba1ec8920850efdb05da5fee57d2e32",
+   "status": "issued"
+  },
+  {
+   "symbol": "MRVLc",
+   "ticker": "MRVL",
+   "name": "Marvell Technology, Inc.",
+   "address": "0xB200000000000000000000eC3c4c7395Cc609813",
+   "supply": 1066.44037152,
+   "liquidityUsd": 117132,
+   "volume24hUsd": 91749,
+   "pythFeed": "0x7aef4e90557add5289266340ccd1e1aa7a225f1220206b07aaf98e53101ce116",
+   "status": "trading"
+  },
+  {
+   "symbol": "LITEc",
+   "ticker": "LITE",
+   "name": "Lumentum Holdings Inc",
+   "address": "0xB200000000000000000000eDA6C2c6F11E0F838f",
+   "supply": 241.92217355,
+   "liquidityUsd": 109035,
+   "volume24hUsd": 4891,
+   "pythFeed": "0xfd7141d35093fb93e84d82507cc6a97775fe263bd8ecd8b7e2b940a6ae487979",
+   "status": "trading"
+  },
+  {
+   "symbol": "CRWVc",
+   "ticker": "CRWV",
+   "name": "CoreWeave, Inc.",
+   "address": "0xB200000000000000000000F111184A74720787E6",
+   "supply": 2791.68072503,
+   "liquidityUsd": 105501,
+   "volume24hUsd": 0,
+   "pythFeed": "0x2a78b78189d6d6eff30a825e4698fd14a0b1ca659bb0079bb7e80521c0e8c75d",
+   "status": "trading"
+  },
+  {
+   "symbol": "LLYc",
+   "ticker": "LLY",
+   "name": "Eli Lilly & Co",
+   "address": "0xB200000000000000000000f1a0F91e34892E4718",
+   "supply": 129.90529547,
+   "liquidityUsd": 112417,
+   "volume24hUsd": 97287,
+   "pythFeed": "0x70dcf5fd56553d0023693e4b590336a8c9bcfd0d98dd9f093b1f697820d98325",
+   "status": "trading"
+  },
+  {
+   "symbol": "CAKEc",
+   "ticker": "CAKE",
+   "name": "Cheesecake Factory Inc",
+   "address": "0xb200000000000000000000f215E4C890CFb7176B",
+   "supply": 2.12483479,
+   "liquidityUsd": 69,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "issued"
+  },
+  {
+   "symbol": "HSAIc",
+   "ticker": "HSAI",
+   "name": "Hesai Group",
+   "address": "0xb200000000000000000000f3049F4aa834b23b64",
+   "supply": 2840.0,
+   "liquidityUsd": 25389,
+   "volume24hUsd": 10,
+   "pythFeed": null,
+   "status": "trading"
+  },
+  {
+   "symbol": "INFYc",
+   "ticker": "INFY",
+   "name": "Infosys Limited",
+   "address": "0xb200000000000000000000F6b0417af5F52341FC",
+   "supply": 2824.0,
+   "liquidityUsd": 25659,
+   "volume24hUsd": 54,
+   "pythFeed": null,
+   "status": "trading"
+  },
+  {
+   "symbol": "TTWOc",
+   "ticker": "TTWO",
+   "name": "Take-Two Interactive Software, Inc.",
+   "address": "0xB200000000000000000000f720C26062Bc3067Da",
+   "supply": 1680.57054437,
+   "liquidityUsd": 146925,
+   "volume24hUsd": 2131654,
+   "pythFeed": "0x782a6a261306f01ab2ad004062a2832107360eefdcf8c83223e0ff7ca7ebde8d",
+   "status": "trading"
+  },
+  {
+   "symbol": "AVGOc",
+   "ticker": "AVGO",
+   "name": "Broadcom Inc.",
+   "address": "0xB200000000000000000000Fc737aeA6196aB5a4c",
+   "supply": 1133.54915205,
+   "liquidityUsd": 127875,
+   "volume24hUsd": 340490,
+   "pythFeed": "0xd0c9aef79b28308b256db7742a0a9b08aaa5009db67a52ea7fa30ed6853f243b",
+   "status": "trading"
+  },
+  {
+   "symbol": "MUc",
+   "ticker": "MU",
+   "name": "Micron Technology Inc.",
+   "address": "0xb200000000000000000000Fd2f87532B90095211",
+   "supply": 1879.68148885,
+   "liquidityUsd": 488861,
+   "volume24hUsd": 8708777,
+   "pythFeed": "0x152244dc24665ca7dd3f257b8f442dc449b6346f48235b7b229268cb770dda2d",
+   "status": "trading"
+  },
+  {
+   "symbol": "KOc",
+   "ticker": "KO",
+   "name": "The Coca-Cola Company",
+   "address": "0xb200000000000000000000ffef181DB6dC5ed6A3",
+   "supply": 1502.0,
+   "liquidityUsd": 105440,
+   "volume24hUsd": 3,
+   "pythFeed": "0x9aa471dccea36b90703325225ac76189baf7e0cc286b8843de1de4f31f9caa7d",
+   "status": "trading"
+  },
   {
    "symbol": "RKTc",
    "ticker": "RKT",
@@ -42,15 +1032,37 @@
    "status": "never"
   },
   {
-   "symbol": "APPc",
-   "ticker": "APP",
-   "name": "AppLovin Corporation",
-   "address": "0xb20000000000000000000006f910a0e7BBD3c168",
-   "supply": 106.0015844,
+   "symbol": "LYFTc",
+   "ticker": "LYFT",
+   "name": "Lyft, Inc.",
+   "address": "0xB20000000000000000000005717Baa337022c782",
+   "supply": 0.0,
    "liquidityUsd": 0,
    "volume24hUsd": 0,
-   "pythFeed": "0x54f128939505878cf4412abc5a533255ce07e85833849170deb67deff0533aa7",
-   "status": "issued"
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
+   "symbol": "DOCNc",
+   "ticker": "DOCN",
+   "name": "DigitalOcean Holdings, Inc.",
+   "address": "0xB20000000000000000000005bEFA57b9B871E737",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
+   "symbol": "COHUc",
+   "ticker": "COHU",
+   "name": "Cohu, Inc.",
+   "address": "0xb20000000000000000000007b4Fcc48E2d70dCc6",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
   },
   {
    "symbol": "BJc",
@@ -61,6 +1073,17 @@
    "liquidityUsd": 0,
    "volume24hUsd": 0,
    "pythFeed": "0x77f1eaace82a490f8850a81c6e4165e21769f1c0b6dde6327c5068527546d7bd",
+   "status": "never"
+  },
+  {
+   "symbol": "MIRc",
+   "ticker": "MIR",
+   "name": "Mirion Technologies, Inc.",
+   "address": "0xb20000000000000000000009614107be6f562BA8",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
    "status": "never"
   },
   {
@@ -97,6 +1120,28 @@
    "status": "never"
   },
   {
+   "symbol": "SLSc",
+   "ticker": "SLS",
+   "name": "SELLAS Life Sciences Group, Inc.",
+   "address": "0xB2000000000000000000000C431e2a7c0CE7Ea31",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0xa101cb5e22cc9b5e18f384fbcaa1776b640036458ef7f4229a7005796a52f5dc",
+   "status": "never"
+  },
+  {
+   "symbol": "QXOc",
+   "ticker": "QXO",
+   "name": "QXO, Inc.",
+   "address": "0xB2000000000000000000000Cd31253817b36f88a",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
    "symbol": "QBTSc",
    "ticker": "QBTS",
    "name": "D-Wave Quantum Inc.",
@@ -108,17 +1153,6 @@
    "status": "never"
   },
   {
-   "symbol": "AMDc",
-   "ticker": "AMD",
-   "name": "Advanced Micro Devices, Inc.",
-   "address": "0xB2000000000000000000000d8Ce462E99ee7A47B",
-   "supply": 1153.92197948,
-   "liquidityUsd": 203795,
-   "volume24hUsd": 2562705,
-   "pythFeed": "0x3622e381dbca2efd1859253763b1adc63f7f9abb8e76da1aa8e638a57ccde93e",
-   "status": "trading"
-  },
-  {
    "symbol": "SHAZc",
    "ticker": "SHAZ",
    "name": "SharonAI Holdings Inc.",
@@ -127,6 +1161,17 @@
    "liquidityUsd": 0,
    "volume24hUsd": 0,
    "pythFeed": "0xa2306f89235d8ffe1b4de0d310c15389bc94d668755a91df02629e846c4c31ee",
+   "status": "never"
+  },
+  {
+   "symbol": "NUVBc",
+   "ticker": "NUVB",
+   "name": "Nuvation Bio Inc.",
+   "address": "0xB2000000000000000000000dE6A780902Db4eC09",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
    "status": "never"
   },
   {
@@ -160,6 +1205,17 @@
    "liquidityUsd": 0,
    "volume24hUsd": 0,
    "pythFeed": "0x199de6a3182e636305a268156c9e0fb58b845a1a9c40a2673f6262d621bd5ada",
+   "status": "never"
+  },
+  {
+   "symbol": "ABSIc",
+   "ticker": "ABSI",
+   "name": "Absci Corporation",
+   "address": "0xb20000000000000000000010718397ACA876A20a",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
    "status": "never"
   },
   {
@@ -229,17 +1285,6 @@
    "status": "never"
   },
   {
-   "symbol": "BEc",
-   "ticker": "BE",
-   "name": "Bloom Energy Corporation",
-   "address": "0xb20000000000000000000016f9dfe862feBA122b",
-   "supply": 1253.47088512,
-   "liquidityUsd": 106818,
-   "volume24hUsd": 41571,
-   "pythFeed": "0xa955f59cec6006d55ac21ab009c92662f2d9250bc22b86fcce16e7962c129c4f",
-   "status": "trading"
-  },
-  {
    "symbol": "AEHRc",
    "ticker": "AEHR",
    "name": "Aehr Test Systems",
@@ -251,37 +1296,15 @@
    "status": "never"
   },
   {
-   "symbol": "SANc",
-   "ticker": "SAN",
-   "name": "Banco Santander, S.A.",
-   "address": "0xB20000000000000000000017BB66E9301E913A99",
-   "supply": 2491.0,
-   "liquidityUsd": 31974,
-   "volume24hUsd": 52,
+   "symbol": "OMERc",
+   "ticker": "OMER",
+   "name": "Omeros Corporation",
+   "address": "0xb200000000000000000000178D4c37485ea47eF6",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
    "pythFeed": null,
-   "status": "trading"
-  },
-  {
-   "symbol": "SKHYc",
-   "ticker": "SKHY",
-   "name": "SK hynix Inc.",
-   "address": "0xb200000000000000000000187f7071D6E321a7d2",
-   "supply": 2167.7041319,
-   "liquidityUsd": 71981,
-   "volume24hUsd": 209020,
-   "pythFeed": "0xe5725db9661fa7df89131c9d7fd85c30122523a1e864d03986911342a43cd47c",
-   "status": "trading"
-  },
-  {
-   "symbol": "PFEc",
-   "ticker": "PFE",
-   "name": "Pfizer Inc",
-   "address": "0xB20000000000000000000018FE7eC7d6DfeeB528",
-   "supply": 9.86627835,
-   "liquidityUsd": 184,
-   "volume24hUsd": 70,
-   "pythFeed": "0x0704ad7547b3dfee329266ee53276349d48e4587cb08264a2818288f356efd1d",
-   "status": "issued"
+   "status": "never"
   },
   {
    "symbol": "ANFc",
@@ -295,15 +1318,15 @@
    "status": "never"
   },
   {
-   "symbol": "CRCLc",
-   "ticker": "CRCL",
-   "name": "Circle Internet Group Inc.",
-   "address": "0xB20000000000000000000019f6E7C675b73C2e4D",
-   "supply": 1685.59052387,
-   "liquidityUsd": 121168,
-   "volume24hUsd": 715,
-   "pythFeed": "0x92b8527aabe59ea2b12230f7b532769b133ffb118dfbd48ff676f14b273f1365",
-   "status": "trading"
+   "symbol": "IONSc",
+   "ticker": "IONS",
+   "name": "Ionis Pharmaceuticals, Inc.",
+   "address": "0xB2000000000000000000001997390508A5617d47",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
   },
   {
    "symbol": "SERVc",
@@ -350,6 +1373,17 @@
    "status": "never"
   },
   {
+   "symbol": "DHRc",
+   "ticker": "DHR",
+   "name": "Danaher Corporation",
+   "address": "0xB2000000000000000000001bcF0441201d513Fa5",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0x725ae6c67201359f9601d6ee8228c821f0abc93fef5cc509acfcee3f7bc2a388",
+   "status": "never"
+  },
+  {
    "symbol": "MVISc",
    "ticker": "MVIS",
    "name": "MicroVision, Inc.",
@@ -372,15 +1406,15 @@
    "status": "never"
   },
   {
-   "symbol": "TSLAc",
-   "ticker": "TSLA",
-   "name": "Tesla Inc.",
-   "address": "0xb2000000000000000000001e800a7f5189430cD0",
-   "supply": 6434.17576763,
-   "liquidityUsd": 329359,
-   "volume24hUsd": 4711159,
-   "pythFeed": "0x16dad506d7db8da01c87581c87ca897a012a153557d4d578c3b9c9e1bc0632f1",
-   "status": "trading"
+   "symbol": "PINSc",
+   "ticker": "PINS",
+   "name": "Pinterest, Inc.",
+   "address": "0xB2000000000000000000001dFD8c413Ecd6EC630",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0x05b0a4d52786320f28d1389ed8f236c3eca5854376431cfdf7ce37b6326402d2",
+   "status": "never"
   },
   {
    "symbol": "FWDIc",
@@ -405,10 +1439,32 @@
    "status": "never"
   },
   {
+   "symbol": "TNDMc",
+   "ticker": "TNDM",
+   "name": "Tandem Diabetes Care, Inc.",
+   "address": "0xB2000000000000000000001F6B9c31e43560a924",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
    "symbol": "HOGc",
    "ticker": "HOG",
    "name": "Harley-Davidson, Inc.",
    "address": "0xB2000000000000000000001FaA7Fa5eF4184eDE5",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
+   "symbol": "SOCc",
+   "ticker": "SOC",
+   "name": "Sable Offshore Corp.",
+   "address": "0xb2000000000000000000001fAb744De0b829EeD1",
    "supply": 0.0,
    "liquidityUsd": 0,
    "volume24hUsd": 0,
@@ -427,36 +1483,14 @@
    "status": "never"
   },
   {
-   "symbol": "SOUNc",
-   "ticker": "SOUN",
-   "name": "SoundHound AI, Inc.",
-   "address": "0xB2000000000000000000002137743D4a01Fe4e88",
-   "supply": 3.93243255,
-   "liquidityUsd": 81,
-   "volume24hUsd": 0,
-   "pythFeed": "0x88232bfe2ca44449224f24fc862d4b4fed9144e53f6cf9f0a939f88b82b4f8cd",
-   "status": "issued"
-  },
-  {
-   "symbol": "BRK.Bc",
-   "ticker": "BRK.B",
-   "name": "Berkshire Hathaway Inc. Class B",
-   "address": "0xb20000000000000000000024170488e788CBbCb4",
+   "symbol": "REALc",
+   "ticker": "REAL",
+   "name": "The RealReal, Inc.",
+   "address": "0xb200000000000000000000211a2ED33FAD95B0B3",
    "supply": 0.0,
    "liquidityUsd": 0,
    "volume24hUsd": 0,
    "pythFeed": null,
-   "status": "never"
-  },
-  {
-   "symbol": "MRKc",
-   "ticker": "MRK",
-   "name": "Merck & Co., Inc.",
-   "address": "0xb200000000000000000000241fe94fe97FcBf034",
-   "supply": 0.0,
-   "liquidityUsd": 0,
-   "volume24hUsd": 0,
-   "pythFeed": "0xc81114e16ec3cbcdf20197ac974aed5a254b941773971260ce09e7caebd6af46",
    "status": "never"
   },
   {
@@ -504,26 +1538,26 @@
    "status": "never"
   },
   {
-   "symbol": "HTZc",
-   "ticker": "HTZ",
-   "name": "Hertz Global Holdings, Inc.",
-   "address": "0xb2000000000000000000002601C5C94F435da168",
-   "supply": 225.71941499,
-   "liquidityUsd": 51,
+   "symbol": "GTc",
+   "ticker": "GT",
+   "name": "The Goodyear Tire & Rubber Company",
+   "address": "0xb200000000000000000000264d3A9dea68aA6631",
+   "supply": 0.0,
+   "liquidityUsd": 0,
    "volume24hUsd": 0,
    "pythFeed": null,
-   "status": "issued"
+   "status": "never"
   },
   {
-   "symbol": "ARMc",
-   "ticker": "ARM",
-   "name": "Arm Holdings plc",
-   "address": "0xB20000000000000000000026215D755356E5043f",
-   "supply": 255.49890308,
-   "liquidityUsd": 36833,
-   "volume24hUsd": 527,
-   "pythFeed": "0x957bf692b35cc62f222dbf4dc6929130df42fe17c9f03373f44c01f78b05391e",
-   "status": "trading"
+   "symbol": "FMCc",
+   "ticker": "FMC",
+   "name": "FMC Corporation",
+   "address": "0xB2000000000000000000002756093a39E13E08c6",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0x44955964544081c152e716f67f166083123d902d9436d2ea555e001ce2645860",
+   "status": "never"
   },
   {
    "symbol": "WINGc",
@@ -603,26 +1637,15 @@
    "status": "never"
   },
   {
-   "symbol": "GOOGLc",
-   "ticker": "GOOGL",
-   "name": "Alphabet Inc.",
-   "address": "0xb2000000000000000000002D0BA3164cc74f58B7",
-   "supply": 35126.50012163,
-   "liquidityUsd": 1404811,
-   "volume24hUsd": 8945179,
-   "pythFeed": "0x5a48c03e9b9cb337801073ed9d166817473697efff0d138874e0f6a33d6d5aa6",
-   "status": "trading"
-  },
-  {
-   "symbol": "NIOc",
-   "ticker": "NIO",
-   "name": "NIO Inc.",
-   "address": "0xb2000000000000000000002D2B5dc53c61f1bA06",
-   "supply": 15223.0,
-   "liquidityUsd": 40904,
-   "volume24hUsd": 558,
-   "pythFeed": "0xc8916a12ca17ed0883e37a10c8962370fbd2878a35bb70f6902a0f52be73338c",
-   "status": "trading"
+   "symbol": "TRIPc",
+   "ticker": "TRIP",
+   "name": "Tripadvisor, Inc.",
+   "address": "0xb2000000000000000000002f12AfA8f583b6CE85",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
   },
   {
    "symbol": "ISRGc",
@@ -647,15 +1670,15 @@
    "status": "never"
   },
   {
-   "symbol": "SEc",
-   "ticker": "SE",
-   "name": "Sea Limited",
-   "address": "0xB2000000000000000000003088798F6d0722AaAC",
-   "supply": 447.0,
-   "liquidityUsd": 26131,
-   "volume24hUsd": 747,
+   "symbol": "VCc",
+   "ticker": "VC",
+   "name": "Visteon Corporation",
+   "address": "0xb20000000000000000000030945cB9c538D0B326",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
    "pythFeed": null,
-   "status": "trading"
+   "status": "never"
   },
   {
    "symbol": "OUSTc",
@@ -666,6 +1689,17 @@
    "liquidityUsd": 0,
    "volume24hUsd": 0,
    "pythFeed": "0x33e337a21f74f02e0a5aa4a6ca8bcac777456865d1a27cc3e0495bd25d8d1b07",
+   "status": "never"
+  },
+  {
+   "symbol": "WUc",
+   "ticker": "WU",
+   "name": "The Western Union Company",
+   "address": "0xb20000000000000000000033be01089Cf02a2025",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
    "status": "never"
   },
   {
@@ -680,47 +1714,47 @@
    "status": "never"
   },
   {
-   "symbol": "ORCLc",
-   "ticker": "ORCL",
-   "name": "Oracle Corporation",
-   "address": "0xb200000000000000000000347AFbA223D7B6b63C",
-   "supply": 3336.18310083,
-   "liquidityUsd": 226043,
-   "volume24hUsd": 1290716,
-   "pythFeed": "0xe47ff732eaeb6b4163902bdee61572659ddf326511917b1423bae93fcdf3153c",
-   "status": "trading"
-  },
-  {
-   "symbol": "LRCXc",
-   "ticker": "LRCX",
-   "name": "Lam Research Corporation",
-   "address": "0xB20000000000000000000034975347FF1848AAb9",
+   "symbol": "WAYc",
+   "ticker": "WAY",
+   "name": "Waystar Holding Corp.",
+   "address": "0xB2000000000000000000003496C04Fcfee6997E0",
    "supply": 0.0,
    "liquidityUsd": 0,
    "volume24hUsd": 0,
-   "pythFeed": "0x01a67883f58bd0f0e9cf8f52f21d7cf78c144d7e7ae32ce9256420834b33fb75",
+   "pythFeed": null,
    "status": "never"
   },
   {
-   "symbol": "ULc",
-   "ticker": "UL",
-   "name": "Unilever Plc",
-   "address": "0xB200000000000000000000349ef3Aa93a0897476",
-   "supply": 629.0,
-   "liquidityUsd": 25907,
-   "volume24hUsd": 112,
-   "pythFeed": null,
-   "status": "trading"
-  },
-  {
-   "symbol": "MPc",
-   "ticker": "MP",
-   "name": "MP Materials Corp.",
-   "address": "0xB2000000000000000000003958003d801724F9d3",
+   "symbol": "PRMEc",
+   "ticker": "PRME",
+   "name": "Prime Medicine, Inc.",
+   "address": "0xb200000000000000000000351bd76098B359ADa8",
    "supply": 0.0,
    "liquidityUsd": 0,
    "volume24hUsd": 0,
-   "pythFeed": "0x92e03dac647ec6733f61f208a89115ecee4442653736a66008032f4ae588f304",
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
+   "symbol": "CRMDc",
+   "ticker": "CRMD",
+   "name": "CorMedix Inc.",
+   "address": "0xb200000000000000000000386f243773D48a4Be7",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
+   "symbol": "CPNGc",
+   "ticker": "CPNG",
+   "name": "Coupang, Inc.",
+   "address": "0xB20000000000000000000038e9982fE875b7E066",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0x5557d206aa0dd037fc082f03bbd78653f01465d280ea930bc93251f0eb60c707",
    "status": "never"
   },
   {
@@ -735,15 +1769,37 @@
    "status": "never"
   },
   {
-   "symbol": "SNDKc",
-   "ticker": "SNDK",
-   "name": "Sandisk Corporation",
-   "address": "0xb200000000000000000000397293Cb8cda9a10c5",
-   "supply": 2300.95020895,
-   "liquidityUsd": 1378936,
-   "volume24hUsd": 28987933,
-   "pythFeed": "0xc86a1f20cd7d5d07932baea30bcd8e479b775c4f51f82526bf1de6dc79fa3f76",
-   "status": "trading"
+   "symbol": "TGTXc",
+   "ticker": "TGTX",
+   "name": "TG Therapeutics, Inc.",
+   "address": "0xb2000000000000000000003A67b9f116f25513d6",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
+   "symbol": "NEMc",
+   "ticker": "NEM",
+   "name": "Newmont Corporation",
+   "address": "0xb2000000000000000000003AA0410688bAf4Da88",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0x29caf4d900d3080e56306ac41a9856735b89cb4df6813dd7b83e9eb96c04700d",
+   "status": "never"
+  },
+  {
+   "symbol": "NRGVc",
+   "ticker": "NRGV",
+   "name": "Energy Vault Holdings, Inc.",
+   "address": "0xB2000000000000000000003ac3D02891f0FC785e",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
   },
   {
    "symbol": "UMACc",
@@ -779,15 +1835,26 @@
    "status": "never"
   },
   {
-   "symbol": "RIVNc",
-   "ticker": "RIVN",
-   "name": "Rivian Automotive, Inc.",
-   "address": "0xB2000000000000000000003e4249C65bd6c037d9",
-   "supply": 2302.37477487,
+   "symbol": "HRBc",
+   "ticker": "HRB",
+   "name": "H&R Block, Inc.",
+   "address": "0xB2000000000000000000003C5564b8161680C86D",
+   "supply": 0.0,
    "liquidityUsd": 0,
    "volume24hUsd": 0,
-   "pythFeed": "0x1e59e3164331ce560683eae0c69efe9650ff1bc834225772ddb330aa808f72f0",
-   "status": "issued"
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
+   "symbol": "YOUc",
+   "ticker": "YOU",
+   "name": "CLEAR Secure, Inc.",
+   "address": "0xb2000000000000000000003cdB2c0F94e4EBf605",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
   },
   {
    "symbol": "BOOTc",
@@ -801,14 +1868,14 @@
    "status": "never"
   },
   {
-   "symbol": "SOFIc",
-   "ticker": "SOFI",
-   "name": "SoFi Technologies, Inc.",
-   "address": "0xB2000000000000000000003eF37a7c863DC1482A",
+   "symbol": "FIGSc",
+   "ticker": "FIGS",
+   "name": "FIGS, Inc.",
+   "address": "0xB2000000000000000000003EbE6a3A1Df07DB619",
    "supply": 0.0,
    "liquidityUsd": 0,
    "volume24hUsd": 0,
-   "pythFeed": "0x72fae0e0683c186f5ce9444afac9909cf5d60b499f4f9569dd75442f19c625c8",
+   "pythFeed": null,
    "status": "never"
   },
   {
@@ -831,6 +1898,17 @@
    "liquidityUsd": 0,
    "volume24hUsd": 0,
    "pythFeed": "0xe6af4d828b88cd3b40cb34686e61157d3fa37c1aa20ca2b99453aae62619b351",
+   "status": "never"
+  },
+  {
+   "symbol": "UIc",
+   "ticker": "UI",
+   "name": "Ubiquiti Inc.",
+   "address": "0xb2000000000000000000003fC6f17C8B775bcA78",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
    "status": "never"
   },
   {
@@ -867,15 +1945,26 @@
    "status": "never"
   },
   {
-   "symbol": "DJTc",
-   "ticker": "DJT",
-   "name": "Trump Media & Technology Group Corp.",
-   "address": "0xb200000000000000000000428E3a3eebBb20692B",
-   "supply": 9780.91291285,
-   "liquidityUsd": 295,
-   "volume24hUsd": 15,
-   "pythFeed": "0xcabf6dfb723b12ac8a67e919379d177903580f8d3ae2fad3897198dc07a5a861",
-   "status": "issued"
+   "symbol": "QUITc",
+   "ticker": "QUIT",
+   "name": "Achieve Life Sciences, Inc.",
+   "address": "0xb200000000000000000000426663e7212288FA97",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
+   "symbol": "ITc",
+   "ticker": "IT",
+   "name": "Gartner, Inc.",
+   "address": "0xB20000000000000000000042CBbae483635C3774",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0x22eb56a8faa26639943a3f96ab2b0b5fee3fb9c888789da4107d56ffe0471503",
+   "status": "never"
   },
   {
    "symbol": "CROXc",
@@ -900,37 +1989,26 @@
    "status": "never"
   },
   {
-   "symbol": "HIMSc",
-   "ticker": "HIMS",
-   "name": "Hims & Hers Health, Inc.",
-   "address": "0xB20000000000000000000043a599976181Bcf336",
-   "supply": 12100.78866352,
-   "liquidityUsd": 34813,
-   "volume24hUsd": 515070,
-   "pythFeed": "0x2132cbc333161e94b91da745ed73b1450410fdc870f2235bf628c28da358b652",
-   "status": "trading"
+   "symbol": "GRPNc",
+   "ticker": "GRPN",
+   "name": "Groupon, Inc.",
+   "address": "0xB2000000000000000000004637e5A787885C720D",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
   },
   {
-   "symbol": "WENc",
-   "ticker": "WEN",
-   "name": "Wendy's Co",
-   "address": "0xB20000000000000000000044E3CD7a0E1028E57a",
-   "supply": 241.76558697,
-   "liquidityUsd": 78,
-   "volume24hUsd": 9,
-   "pythFeed": "0xc6101ee4f14af5581a3995438bf0e80a574dd28fd497685988b526ae9ba34749",
-   "status": "issued"
-  },
-  {
-   "symbol": "PYPLc",
-   "ticker": "PYPL",
-   "name": "PayPal Holdings, Inc.",
-   "address": "0xb200000000000000000000450ad3abE5d4846c6E",
-   "supply": 161.0682849,
-   "liquidityUsd": 472,
-   "volume24hUsd": 10,
-   "pythFeed": "0x773c3b11f6be58e8151966a9f5832696d8cd08884ccc43ac8965a7ebea911533",
-   "status": "issued"
+   "symbol": "ANNXc",
+   "ticker": "ANNX",
+   "name": "Annexon, Inc.",
+   "address": "0xB200000000000000000000473F033036350312Da",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
   },
   {
    "symbol": "ALABc",
@@ -953,17 +2031,6 @@
    "volume24hUsd": 0,
    "pythFeed": null,
    "status": "never"
-  },
-  {
-   "symbol": "MSTRc",
-   "ticker": "MSTR",
-   "name": "Strategy Inc.",
-   "address": "0xb2000000000000000000004884b426556b92883d",
-   "supply": 17522.9847689,
-   "liquidityUsd": 1035707,
-   "volume24hUsd": 26545432,
-   "pythFeed": "0xe1e80251e5f5184f2195008382538e847fafc36f751896889dd3d1b1f6111f09",
-   "status": "trading"
   },
   {
    "symbol": "TKRc",
@@ -1010,17 +2077,6 @@
    "status": "never"
   },
   {
-   "symbol": "INTCc",
-   "ticker": "INTC",
-   "name": "Intel Corporation",
-   "address": "0xB2000000000000000000004AFF16039bA04bdFBc",
-   "supply": 2167.4961929,
-   "liquidityUsd": 111174,
-   "volume24hUsd": 33186,
-   "pythFeed": "0xc1751e085ee292b8b3b9dd122a135614485a201c35dfc653553f0e28c1baf3ff",
-   "status": "trading"
-  },
-  {
    "symbol": "AXONc",
    "ticker": "AXON",
    "name": "Axon Enterprise, Inc.",
@@ -1036,6 +2092,17 @@
    "ticker": "BLNK",
    "name": "Blink Charging Co.",
    "address": "0xB2000000000000000000004EC7c19212979672F9",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
+   "symbol": "VOYGc",
+   "ticker": "VOYG",
+   "name": "Voyager Technologies, Inc.",
+   "address": "0xb2000000000000000000004F13a2441D3C82eE54",
    "supply": 0.0,
    "liquidityUsd": 0,
    "volume24hUsd": 0,
@@ -1098,15 +2165,26 @@
    "status": "never"
   },
   {
-   "symbol": "BIRDc",
-   "ticker": "BIRD",
-   "name": "Smartbird, Inc.",
-   "address": "0xB200000000000000000000535fE96f18204BFD96",
-   "supply": 1.0,
+   "symbol": "ULTAc",
+   "ticker": "ULTA",
+   "name": "Ulta Beauty, Inc.",
+   "address": "0xb20000000000000000000053d000bAC95662D1e4",
+   "supply": 0.0,
    "liquidityUsd": 0,
    "volume24hUsd": 0,
-   "pythFeed": "0xc0f43f5c4282957c3cab84d1c882e79d600efdaf1817299859a09809e31b3988",
-   "status": "issued"
+   "pythFeed": "0x6187f28a5c56dfd380dfa2b718b4062f8c3ae8a0e32f7c11078e76b31269f49c",
+   "status": "never"
+  },
+  {
+   "symbol": "NTLAc",
+   "ticker": "NTLA",
+   "name": "Intellia Therapeutics, Inc.",
+   "address": "0xB20000000000000000000054a4a3659B55272125",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
   },
   {
    "symbol": "Vc",
@@ -1153,28 +2231,6 @@
    "status": "never"
   },
   {
-   "symbol": "QCOMc",
-   "ticker": "QCOM",
-   "name": "Qualcomm Incorporated",
-   "address": "0xB2000000000000000000005672D78eFF30D24665",
-   "supply": 0.0,
-   "liquidityUsd": 0,
-   "volume24hUsd": 0,
-   "pythFeed": "0x54350ebf587c3f14857efcfec50e5c4f6e10220770c2266e9fe85bd5e42e4022",
-   "status": "never"
-  },
-  {
-   "symbol": "NFLXc",
-   "ticker": "NFLX",
-   "name": "Netflix Inc",
-   "address": "0xb20000000000000000000058B8c947e44011dFE6",
-   "supply": 7757.58717567,
-   "liquidityUsd": 255987,
-   "volume24hUsd": 1711517,
-   "pythFeed": "0x8376cfd7ca8bcdf372ced05307b24dced1f15b1afafdeff715664598f15a3dd2",
-   "status": "trading"
-  },
-  {
    "symbol": "IONQc",
    "ticker": "IONQ",
    "name": "IonQ, Inc.",
@@ -1183,6 +2239,17 @@
    "liquidityUsd": 0,
    "volume24hUsd": 0,
    "pythFeed": "0x6af68a227de372e5d19183679911e468e06d85c013f56c376a78a4d942f8f269",
+   "status": "never"
+  },
+  {
+   "symbol": "CADLc",
+   "ticker": "CADL",
+   "name": "Candel Therapeutics, Inc.",
+   "address": "0xb200000000000000000000593460934fEC1b43Dc",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
    "status": "never"
   },
   {
@@ -1197,17 +2264,6 @@
    "status": "never"
   },
   {
-   "symbol": "NOKc",
-   "ticker": "NOK",
-   "name": "Nokia Corporation",
-   "address": "0xB2000000000000000000005ac674f707E357409c",
-   "supply": 5799.0002102,
-   "liquidityUsd": 28878,
-   "volume24hUsd": 45,
-   "pythFeed": "0xff1717bc1de364c8473f9c1928dad930a9ecc952d91f26133a7f94eb03166316",
-   "status": "trading"
-  },
-  {
    "symbol": "NDSNc",
    "ticker": "NDSN",
    "name": "Nordson Corporation",
@@ -1216,6 +2272,17 @@
    "liquidityUsd": 0,
    "volume24hUsd": 0,
    "pythFeed": "0x6727509d8f206c8615b61a01039caa23b45271196e603daebb0366d5e864666f",
+   "status": "never"
+  },
+  {
+   "symbol": "SNDXc",
+   "ticker": "SNDX",
+   "name": "Syndax Pharmaceuticals, Inc.",
+   "address": "0xB2000000000000000000005B8CEcE4a5F9306bb4",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
    "status": "never"
   },
   {
@@ -1230,15 +2297,15 @@
    "status": "never"
   },
   {
-   "symbol": "RBLXc",
-   "ticker": "RBLX",
-   "name": "Roblox Corporation",
-   "address": "0xB2000000000000000000005bd7AE89b9E6189Bb5",
-   "supply": 73.40046308,
-   "liquidityUsd": 340,
-   "volume24hUsd": 21,
-   "pythFeed": "0xd62134a195739141d0649991f11fe0f9cd9eb83fd890bc3ba41dfdd18c1a49f4",
-   "status": "issued"
+   "symbol": "SHAKc",
+   "ticker": "SHAK",
+   "name": "Shake Shack Inc.",
+   "address": "0xb2000000000000000000005C16DD6f675BF8Ceb7",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
   },
   {
    "symbol": "DNUTc",
@@ -1260,6 +2327,17 @@
    "liquidityUsd": 0,
    "volume24hUsd": 0,
    "pythFeed": "0x39763876ae1b3c2402f6d1e2f40d33fb4493ddd97d9edc42e64bd61f718b0eb7",
+   "status": "never"
+  },
+  {
+   "symbol": "NNc",
+   "ticker": "NN",
+   "name": "NextNav Inc.",
+   "address": "0xB2000000000000000000005D6Afb89705Cd203eA",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
    "status": "never"
   },
   {
@@ -1296,17 +2374,6 @@
    "status": "never"
   },
   {
-   "symbol": "VALEc",
-   "ticker": "VALE",
-   "name": "Vale S.A.",
-   "address": "0xB20000000000000000000063376b142C0764B489",
-   "supply": 4017.0,
-   "liquidityUsd": 26222,
-   "volume24hUsd": 121,
-   "pythFeed": "0x89dd5fb5c30324f3cb11920e3e5ca7de7732abf3889f93bf3757f9509715a89f",
-   "status": "trading"
-  },
-  {
    "symbol": "REGNc",
    "ticker": "REGN",
    "name": "Regeneron Pharmaceuticals, Inc.",
@@ -1318,14 +2385,25 @@
    "status": "never"
   },
   {
-   "symbol": "CRMc",
-   "ticker": "CRM",
-   "name": "Salesforce, Inc.",
-   "address": "0xB2000000000000000000006432a3a7991e718DBB",
+   "symbol": "WHRc",
+   "ticker": "WHR",
+   "name": "Whirlpool Corporation",
+   "address": "0xb2000000000000000000006448A906E8942850fa",
    "supply": 0.0,
    "liquidityUsd": 0,
    "volume24hUsd": 0,
-   "pythFeed": "0xfeff234600320f4d6bb5a01d02570a9725c1e424977f2b823f7231e6857bdae8",
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
+   "symbol": "YELPc",
+   "ticker": "YELP",
+   "name": "Yelp Inc.",
+   "address": "0xB2000000000000000000006454926Ad8576DC50e",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
    "status": "never"
   },
   {
@@ -1337,6 +2415,17 @@
    "liquidityUsd": 0,
    "volume24hUsd": 0,
    "pythFeed": "0x9b25e42163e85658664651dac0915b2e0474fe6f5e19541e48ba2356f11a9f32",
+   "status": "never"
+  },
+  {
+   "symbol": "JBLUc",
+   "ticker": "JBLU",
+   "name": "JetBlue Airways Corporation",
+   "address": "0xB20000000000000000000064832d0d2d38E2F4fc",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
    "status": "never"
   },
   {
@@ -1371,17 +2460,6 @@
    "volume24hUsd": 0,
    "pythFeed": "0x4a1a12070192e8db9a89ac235bb032342a390dde39389b4ee1ba8e41e7eae5d8",
    "status": "never"
-  },
-  {
-   "symbol": "RDDTc",
-   "ticker": "RDDT",
-   "name": "Reddit, Inc.",
-   "address": "0xb20000000000000000000066242d4067724cB7A1",
-   "supply": 651.79872126,
-   "liquidityUsd": 326,
-   "volume24hUsd": 325,
-   "pythFeed": "0xc0ece6b9254797f4384bda1ba3f2c33259f552c7849a86b3029e811be5ea9227",
-   "status": "issued"
   },
   {
    "symbol": "LUNRc",
@@ -1527,15 +2605,15 @@
    "status": "never"
   },
   {
-   "symbol": "CBRSc",
-   "ticker": "CBRS",
-   "name": "Cerebras Systems Inc.",
-   "address": "0xb200000000000000000000720133EeDF525f93E2",
-   "supply": 93.38458375,
-   "liquidityUsd": 132,
+   "symbol": "TTMIc",
+   "ticker": "TTMI",
+   "name": "TTM Technologies, Inc.",
+   "address": "0xB2000000000000000000007292D3D91c6b559058",
+   "supply": 0.0,
+   "liquidityUsd": 0,
    "volume24hUsd": 0,
-   "pythFeed": "0x7b6809a00a53228f74622e4909750c0d86a2081032955e02c8e3503b1b93829a",
-   "status": "issued"
+   "pythFeed": "0xf645c9aa24431545d435746258771dde072dd9d63f71f876b9d2c4d0eb573f84",
+   "status": "never"
   },
   {
    "symbol": "AIc",
@@ -1582,17 +2660,6 @@
    "status": "never"
   },
   {
-   "symbol": "GMEc",
-   "ticker": "GME",
-   "name": "GameStop Corp.",
-   "address": "0xb2000000000000000000007790ed6E48e06eD935",
-   "supply": 1990.00732968,
-   "liquidityUsd": 39,
-   "volume24hUsd": 1,
-   "pythFeed": "0x6f9cd89ef1b7fd39f667101a91ad578b6c6ace4579d5f7f285a4b06aa4504be6",
-   "status": "issued"
-  },
-  {
    "symbol": "BIIBc",
    "ticker": "BIIB",
    "name": "Biogen Inc.",
@@ -1615,25 +2682,25 @@
    "status": "never"
   },
   {
-   "symbol": "NVDAc",
-   "ticker": "NVDA",
-   "name": "NVIDIA Corporation",
-   "address": "0xb20000000000000000000078ee7ce2fE4908108C",
-   "supply": 34565.63331661,
-   "liquidityUsd": 996545,
-   "volume24hUsd": 9552447,
-   "pythFeed": "0xb1073854ed24cbc755dc527418f52b7d271f6cc967bbf8d8129112b18860a593",
-   "status": "trading"
-  },
-  {
-   "symbol": "VSTc",
-   "ticker": "VST",
-   "name": "Vistra Corp.",
-   "address": "0xB20000000000000000000079DC24fe2FBD09110f",
+   "symbol": "PCTc",
+   "ticker": "PCT",
+   "name": "PureCycle Technologies, Inc.",
+   "address": "0xB200000000000000000000796c05DD2536C7f91c",
    "supply": 0.0,
    "liquidityUsd": 0,
    "volume24hUsd": 0,
-   "pythFeed": "0x665d46c8142ca4486ebcdcfc0bbb913dee5255e0be63b6f971933620a7f69045",
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
+   "symbol": "UPSTc",
+   "ticker": "UPST",
+   "name": "Upstart Holdings, Inc.",
+   "address": "0xB2000000000000000000007A8a3Ab2d3b319036D",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0x2eb2da822ce9c90742c9133bc0aa94fa601210402ade6a35f0420865a378f876",
    "status": "never"
   },
   {
@@ -1648,15 +2715,26 @@
    "status": "never"
   },
   {
-   "symbol": "SPCXc",
-   "ticker": "SPCX",
-   "name": "Space Exploration Technologies Corp.",
-   "address": "0xb2000000000000000000007b9fcbd005511aCBd5",
-   "supply": 23648.56761682,
-   "liquidityUsd": 678082,
-   "volume24hUsd": 11353567,
-   "pythFeed": "0x8a593d6edde7a3095213c88116d8840d01e93c2ddeb800bc891772eb8b93bb94",
-   "status": "trading"
+   "symbol": "AMPXc",
+   "ticker": "AMPX",
+   "name": "Amprius Technologies, Inc.",
+   "address": "0xB2000000000000000000007c7088757Cb3703648",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
+   "symbol": "NEXTc",
+   "ticker": "NEXT",
+   "name": "NextDecade Corporation",
+   "address": "0xb2000000000000000000007c92881e458338B34d",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
   },
   {
    "symbol": "APLDc",
@@ -1668,17 +2746,6 @@
    "volume24hUsd": 0,
    "pythFeed": "0x7fc1e64946aff450748e8f60644d052ae787e5708dc48c6c73c546ee94218cc3",
    "status": "never"
-  },
-  {
-   "symbol": "PLTRc",
-   "ticker": "PLTR",
-   "name": "Palantir Technologies Inc.",
-   "address": "0xb2000000000000000000007d16372840dF4dAbbe",
-   "supply": 3062.96276072,
-   "liquidityUsd": 300741,
-   "volume24hUsd": 2249382,
-   "pythFeed": "0x11a70634863ddffb71f2b11f2cff29f73f3db8f6d0b78c49f2b5f4ad36e885f0",
-   "status": "trading"
   },
   {
    "symbol": "GSATc",
@@ -1707,6 +2774,17 @@
    "ticker": "EAT",
    "name": "Brinker International, Inc.",
    "address": "0xB200000000000000000000808E9CCA9ED8e4Da61",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
+   "symbol": "RHc",
+   "ticker": "RH",
+   "name": "RH",
+   "address": "0xB20000000000000000000080bAE0f654B5cC762C",
    "supply": 0.0,
    "liquidityUsd": 0,
    "volume24hUsd": 0,
@@ -1744,6 +2822,28 @@
    "liquidityUsd": 0,
    "volume24hUsd": 0,
    "pythFeed": "0x69d2eebcc3c62889f1c0105ff347f296eb435cba8d2e4705a486fd47a8fe1a1b",
+   "status": "never"
+  },
+  {
+   "symbol": "DRIc",
+   "ticker": "DRI",
+   "name": "Darden Restaurants, Inc.",
+   "address": "0xB2000000000000000000008451dB06977dEF7b3A",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0xf2f92d342955b934fa72137c7ed461dfd3e3112a7b962070440190b8184a7ab5",
+   "status": "never"
+  },
+  {
+   "symbol": "DKSc",
+   "ticker": "DKS",
+   "name": "DICK'S Sporting Goods, Inc.",
+   "address": "0xB2000000000000000000008463bf2557B483AbF9",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0x0960fc876589d92329305a38fd7165e7fe6f3b7ee88a5b4362135efa1ec7f5e1",
    "status": "never"
   },
   {
@@ -1890,15 +2990,15 @@
    "status": "never"
   },
   {
-   "symbol": "METAc",
-   "ticker": "META",
-   "name": "Meta Platforms Inc.",
-   "address": "0xb2000000000000000000008bC8786B856E61707C",
-   "supply": 8442.49800495,
-   "liquidityUsd": 896970,
-   "volume24hUsd": 8723313,
-   "pythFeed": "0x78a3e3b8e676a8f73c439f5d749737034b139bbbe899ba5775216fba596607fe",
-   "status": "trading"
+   "symbol": "FOURc",
+   "ticker": "FOUR",
+   "name": "Shift4 Payments, Inc.",
+   "address": "0xB2000000000000000000008C02BE39ba2CbdA822",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
   },
   {
    "symbol": "GLWc",
@@ -1923,15 +3023,48 @@
    "status": "never"
   },
   {
-   "symbol": "NVOc",
-   "ticker": "NVO",
-   "name": "Novo Nordisk A/S",
-   "address": "0xb2000000000000000000008D5328e9208773dC58",
-   "supply": 818.0,
-   "liquidityUsd": 26708,
-   "volume24hUsd": 199,
-   "pythFeed": "0x8dde322496e031d942b9eee8ca769d618cd2e69b18196644369379f5a1e7c23d",
-   "status": "trading"
+   "symbol": "Sc",
+   "ticker": "S",
+   "name": "SentinelOne, Inc.",
+   "address": "0xb2000000000000000000008CaE79B36e9269Eb86",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
+   "symbol": "NRGc",
+   "ticker": "NRG",
+   "name": "NRG Energy, Inc.",
+   "address": "0xb2000000000000000000008cE554342C043602a4",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0xcbb7674d9eebacf3a81a54109dca655d805f04d902bc61b2157e8a2d95b00492",
+   "status": "never"
+  },
+  {
+   "symbol": "MDGLc",
+   "ticker": "MDGL",
+   "name": "Madrigal Pharmaceuticals, Inc.",
+   "address": "0xB2000000000000000000008D426f3543BaBeE7bB",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
+   "symbol": "UPSc",
+   "ticker": "UPS",
+   "name": "United Parcel Service, Inc.",
+   "address": "0xb2000000000000000000008D84C0d360848dBbdE",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0xc446b836e3e1bf1610f29c51f9102e1d5ea2db1da64c39fcdc797d99df097bcc",
+   "status": "never"
   },
   {
    "symbol": "WOLFc",
@@ -1945,28 +3078,6 @@
    "status": "never"
   },
   {
-   "symbol": "PMc",
-   "ticker": "PM",
-   "name": "Philip Morris International Inc.",
-   "address": "0xB2000000000000000000008FC2A8C23cf5937b66",
-   "supply": 0.2513925,
-   "liquidityUsd": 129,
-   "volume24hUsd": 2,
-   "pythFeed": "0xa32f875eb39e23f087ea0db141b00857630c2c5011bfbe53a2a4d186f37cb583",
-   "status": "issued"
-  },
-  {
-   "symbol": "WDCc",
-   "ticker": "WDC",
-   "name": "Western Digital Corporation",
-   "address": "0xb2000000000000000000008fde21a1F5c69FeC0b",
-   "supply": 0.02405338,
-   "liquidityUsd": 6,
-   "volume24hUsd": 0,
-   "pythFeed": "0x37a782cf9bb6061d4cca34a419fb1ae5a8edf71ae8843206ea88b4ba696d4706",
-   "status": "issued"
-  },
-  {
    "symbol": "Uc",
    "ticker": "U",
    "name": "Unity Software Inc.",
@@ -1975,17 +3086,6 @@
    "liquidityUsd": 0,
    "volume24hUsd": 0,
    "pythFeed": null,
-   "status": "never"
-  },
-  {
-   "symbol": "JNJc",
-   "ticker": "JNJ",
-   "name": "Johnson & Johnson",
-   "address": "0xb20000000000000000000090658e3f9b29E2f5C2",
-   "supply": 0.0,
-   "liquidityUsd": 0,
-   "volume24hUsd": 0,
-   "pythFeed": "0x12848738d5db3aef52f51d78d98fc8b8b8450ffb19fb3aeeb67d38f8c147ff63",
    "status": "never"
   },
   {
@@ -2000,17 +3100,6 @@
    "status": "never"
   },
   {
-   "symbol": "PTONc",
-   "ticker": "PTON",
-   "name": "Peloton Interactive, Inc.",
-   "address": "0xB2000000000000000000009272A491812842Aa84",
-   "supply": 17.83166189,
-   "liquidityUsd": 59,
-   "volume24hUsd": 0,
-   "pythFeed": null,
-   "status": "issued"
-  },
-  {
    "symbol": "USDEc",
    "ticker": "USDE",
    "name": "StablecoinX Inc.",
@@ -2022,10 +3111,43 @@
    "status": "never"
   },
   {
+   "symbol": "FPSc",
+   "ticker": "FPS",
+   "name": "Forgent Power Solutions, Inc.",
+   "address": "0xb20000000000000000000095528Fb26aC48Bda96",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0xa98d4a82473c0a85d2416c185df4845ef8b1e7ed8606717ad1c4485c7a1b2840",
+   "status": "never"
+  },
+  {
    "symbol": "SRPTc",
    "ticker": "SRPT",
    "name": "Sarepta Therapeutics, Inc.",
    "address": "0xB200000000000000000000964b7F3f335d7e70B5",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
+   "symbol": "ACIc",
+   "ticker": "ACI",
+   "name": "Albertsons Companies, Inc.",
+   "address": "0xB200000000000000000000964eeD57D188766e55",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
+   "symbol": "RIGLc",
+   "ticker": "RIGL",
+   "name": "Rigel Pharmaceuticals, Inc.",
+   "address": "0xB200000000000000000000966Cbe5b99Be9b981a",
    "supply": 0.0,
    "liquidityUsd": 0,
    "volume24hUsd": 0,
@@ -2055,6 +3177,17 @@
    "status": "never"
   },
   {
+   "symbol": "OLLIc",
+   "ticker": "OLLI",
+   "name": "Ollie's Bargain Outlet Holdings, Inc.",
+   "address": "0xB20000000000000000000097CA7d4003399C67E6",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
    "symbol": "INTUc",
    "ticker": "INTU",
    "name": "Intuit Inc.",
@@ -2066,17 +3199,6 @@
    "status": "never"
   },
   {
-   "symbol": "LULUc",
-   "ticker": "LULU",
-   "name": "lululemon athletica inc.",
-   "address": "0xB200000000000000000000989dc22D3656717734",
-   "supply": 0.0,
-   "liquidityUsd": 0,
-   "volume24hUsd": 0,
-   "pythFeed": "0x13a19eb6a936a8c7020fe675687979b44e991efbfb4d3d2ca91425ce57b9e6f8",
-   "status": "never"
-  },
-  {
    "symbol": "HPQc",
    "ticker": "HPQ",
    "name": "HP Inc.",
@@ -2085,6 +3207,28 @@
    "liquidityUsd": 0,
    "volume24hUsd": 0,
    "pythFeed": "0xd1d6eb75702d0e80582c2d5a2df1849b9c83d7afbe99a2d474317f1f356e5659",
+   "status": "never"
+  },
+  {
+   "symbol": "ALLc",
+   "ticker": "ALL",
+   "name": "The Allstate Corporation",
+   "address": "0xb2000000000000000000009B05748Ece723cc6A6",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0xe99bb427a3e84a107c6e3108cd81608bfb1c54bba024374cae15da93da756c02",
+   "status": "never"
+  },
+  {
+   "symbol": "NKTRc",
+   "ticker": "NKTR",
+   "name": "Nektar Therapeutics",
+   "address": "0xb2000000000000000000009B6D9e39d1667cabE1",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
    "status": "never"
   },
   {
@@ -2121,6 +3265,17 @@
    "status": "never"
   },
   {
+   "symbol": "AXPc",
+   "ticker": "AXP",
+   "name": "American Express Company",
+   "address": "0xb2000000000000000000009CFe164A21cB5a11C5",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0x9ff7b9a93df40f6d7edc8184173c50f4ae72152c6142f001e8202a26f951d710",
+   "status": "never"
+  },
+  {
    "symbol": "IBMc",
    "ticker": "IBM",
    "name": "International Business Machines Corporation",
@@ -2132,6 +3287,28 @@
    "status": "never"
   },
   {
+   "symbol": "PRc",
+   "ticker": "PR",
+   "name": "Permian Resources Corporation",
+   "address": "0xB200000000000000000000a0390525880C1ac72B",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0xee8d8be099589b377d1761699c311172d895be6d08e940226da5a4d0262d2fc7",
+   "status": "never"
+  },
+  {
+   "symbol": "PSc",
+   "ticker": "PS",
+   "name": "Pershing Square Inc.",
+   "address": "0xb200000000000000000000A071d80FA5B480c448",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
    "symbol": "CRWDc",
    "ticker": "CRWD",
    "name": "CrowdStrike Holdings, Inc.",
@@ -2140,6 +3317,17 @@
    "liquidityUsd": 0,
    "volume24hUsd": 0,
    "pythFeed": "0xbaed936d3c6c2e34104e92c6b015b97ce96adc5ab4f04230c1270e1162e7a270",
+   "status": "never"
+  },
+  {
+   "symbol": "TWSTc",
+   "ticker": "TWST",
+   "name": "Twist Bioscience Corporation",
+   "address": "0xB200000000000000000000A15628dCEA6934EDE0",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0x9721a76ee064f0f569cb19219c82de4278f033fb659abb1739c9008b6f66b64e",
    "status": "never"
   },
   {
@@ -2165,17 +3353,6 @@
    "status": "never"
   },
   {
-   "symbol": "SONYc",
-   "ticker": "SONY",
-   "name": "Sony Group Corporation",
-   "address": "0xb200000000000000000000a26326a922FFA87f6C",
-   "supply": 1871.0,
-   "liquidityUsd": 26792,
-   "volume24hUsd": 3505,
-   "pythFeed": "0xb4e9d5fc0e0dbf10b138cbbdcb0c211dd6a56676bcf16d09760be7967bd204f9",
-   "status": "trading"
-  },
-  {
    "symbol": "MARAc",
    "ticker": "MARA",
    "name": "MARA Holdings, Inc.",
@@ -2184,6 +3361,17 @@
    "liquidityUsd": 0,
    "volume24hUsd": 0,
    "pythFeed": "0x0fc2ad77a9ab75bcbc3ebd7a9ff60facd08c517309e2d684baa979c910a0e43e",
+   "status": "never"
+  },
+  {
+   "symbol": "TDOCc",
+   "ticker": "TDOC",
+   "name": "Teladoc Health, Inc.",
+   "address": "0xB200000000000000000000A49b5EED0c1CF792BA",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
    "status": "never"
   },
   {
@@ -2196,17 +3384,6 @@
    "volume24hUsd": 0,
    "pythFeed": null,
    "status": "never"
-  },
-  {
-   "symbol": "DUOLc",
-   "ticker": "DUOL",
-   "name": "Duolingo, Inc.",
-   "address": "0xb200000000000000000000A613D12dEAfBBb1Db7",
-   "supply": 11.201144,
-   "liquidityUsd": 102,
-   "volume24hUsd": 2,
-   "pythFeed": null,
-   "status": "issued"
   },
   {
    "symbol": "KODKc",
@@ -2242,6 +3419,17 @@
    "status": "never"
   },
   {
+   "symbol": "KRMNc",
+   "ticker": "KRMN",
+   "name": "Karman Holdings Inc.",
+   "address": "0xB200000000000000000000A70e43DfF7aCC203B0",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
    "symbol": "GSc",
    "ticker": "GS",
    "name": "The Goldman Sachs Group, Inc.",
@@ -2264,15 +3452,70 @@
    "status": "never"
   },
   {
-   "symbol": "MSFTc",
-   "ticker": "MSFT",
-   "name": "Microsoft Corporation",
-   "address": "0xB200000000000000000000Ab99cFa739E253872B",
-   "supply": 2715.57085647,
-   "liquidityUsd": 439639,
-   "volume24hUsd": 5866344,
-   "pythFeed": "0xd0ca23c1cc005e004ccf1db5bf76aeb6a49218f43dac3d4b275e92de12ded4d1",
-   "status": "trading"
+   "symbol": "KMBc",
+   "ticker": "KMB",
+   "name": "Kimberly-Clark Corporation",
+   "address": "0xB200000000000000000000A8F1c97d05a15e89e2",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0x894f78037ec2465fbbd50c75abb95a5059d5d9ca5f092e2e6736685885569322",
+   "status": "never"
+  },
+  {
+   "symbol": "KDc",
+   "ticker": "KD",
+   "name": "Kyndryl Holdings, Inc.",
+   "address": "0xB200000000000000000000A8fff5B07C6c45a5d2",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
+   "symbol": "VSXYc",
+   "ticker": "VSXY",
+   "name": "Victoria's Secret & Co.",
+   "address": "0xB200000000000000000000a9dabFD3F0c5f21304",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
+   "symbol": "TMDXc",
+   "ticker": "TMDX",
+   "name": "TransMedics Group, Inc.",
+   "address": "0xb200000000000000000000AA0aA80F99c33081E1",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
+   "symbol": "HONc",
+   "ticker": "HON",
+   "name": "Honeywell International Inc.",
+   "address": "0xB200000000000000000000aB665a0775E19F0Dc5",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0x107918baaaafb79cd9df1c8369e44ac21136d95f3ca33f2373b78f24ba1e3e6a",
+   "status": "never"
+  },
+  {
+   "symbol": "SPHRc",
+   "ticker": "SPHR",
+   "name": "Sphere Entertainment Co.",
+   "address": "0xb200000000000000000000aBaDF9B1FDb845DB73",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
   },
   {
    "symbol": "GILDc",
@@ -2283,6 +3526,17 @@
    "liquidityUsd": 0,
    "volume24hUsd": 0,
    "pythFeed": "0x29148f7de5819fe7467e99f5f0b22e8fb124d958d8f668c3c17e607d7ed1eb09",
+   "status": "never"
+  },
+  {
+   "symbol": "EVERc",
+   "ticker": "EVER",
+   "name": "EverQuote, Inc.",
+   "address": "0xb200000000000000000000ad4Ca95Ce451578243",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
    "status": "never"
   },
   {
@@ -2308,17 +3562,6 @@
    "status": "never"
   },
   {
-   "symbol": "ASTSc",
-   "ticker": "ASTS",
-   "name": "AST SpaceMobile, Inc.",
-   "address": "0xB200000000000000000000B1a29cF17A1819288a",
-   "supply": 42.17148914,
-   "liquidityUsd": 291,
-   "volume24hUsd": 0,
-   "pythFeed": "0x17f979e1f6b7c429e4b9ecee96633dbecdc5378566ddfd3d220b0ef8d874e4bd",
-   "status": "issued"
-  },
-  {
    "symbol": "RUNc",
    "ticker": "RUN",
    "name": "Sunrun Inc.",
@@ -2330,14 +3573,14 @@
    "status": "never"
   },
   {
-   "symbol": "VRTc",
-   "ticker": "VRT",
-   "name": "Vertiv Holdings Co",
-   "address": "0xB200000000000000000000b2E8dBA585B1ffB158",
+   "symbol": "OWLc",
+   "ticker": "OWL",
+   "name": "Blue Owl Capital Inc.",
+   "address": "0xb200000000000000000000b1E11478cdd89Ef7B2",
    "supply": 0.0,
    "liquidityUsd": 0,
    "volume24hUsd": 0,
-   "pythFeed": "0x84dad6b760396a7904d04a3d83039a3fc18f10819fd97d023ac5535997d70108",
+   "pythFeed": null,
    "status": "never"
   },
   {
@@ -2356,6 +3599,17 @@
    "ticker": "JACK",
    "name": "Jack in the Box Inc.",
    "address": "0xb200000000000000000000B44f193b3fFdF17037",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
+   "symbol": "AAPc",
+   "ticker": "AAP",
+   "name": "Advance Auto Parts, Inc.",
+   "address": "0xB200000000000000000000B576d2d93De1e93c8e",
    "supply": 0.0,
    "liquidityUsd": 0,
    "volume24hUsd": 0,
@@ -2385,6 +3639,28 @@
    "status": "never"
   },
   {
+   "symbol": "RBRKc",
+   "ticker": "RBRK",
+   "name": "Rubrik, Inc.",
+   "address": "0xb200000000000000000000B6354bC256DbCD93a8",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
+   "symbol": "DECKc",
+   "ticker": "DECK",
+   "name": "Deckers Outdoor Corporation",
+   "address": "0xb200000000000000000000B85ffF48d4a26C3145",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0xd31cf7d2e7a6a971b74c72815830c642d10a3c4cb170163b30833db9fb1d3d60",
+   "status": "never"
+  },
+  {
    "symbol": "TKOc",
    "ticker": "TKO",
    "name": "TKO Group Holdings, Inc.",
@@ -2407,10 +3683,54 @@
    "status": "never"
   },
   {
+   "symbol": "LWLGc",
+   "ticker": "LWLG",
+   "name": "Lightwave Logic, Inc.",
+   "address": "0xb200000000000000000000Ba4309E1E35bc09F54",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
+   "symbol": "ETSYc",
+   "ticker": "ETSY",
+   "name": "Etsy, Inc.",
+   "address": "0xB200000000000000000000Ba75b2046AAD1C0a13",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
    "symbol": "GAPc",
    "ticker": "GAP",
    "name": "The Gap, Inc.",
    "address": "0xb200000000000000000000bBA79A25EdfD4B66c0",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
+   "symbol": "ENVXc",
+   "ticker": "ENVX",
+   "name": "Enovix Corporation",
+   "address": "0xB200000000000000000000BBc68170Eb0b049E42",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
+   "symbol": "SANAc",
+   "ticker": "SANA",
+   "name": "Sana Biotechnology, Inc.",
+   "address": "0xb200000000000000000000Bc043Cf5053540A588",
    "supply": 0.0,
    "liquidityUsd": 0,
    "volume24hUsd": 0,
@@ -2437,6 +3757,17 @@
    "liquidityUsd": 0,
    "volume24hUsd": 0,
    "pythFeed": "0x46417522a59b245c5af35c33c13426d991b36514c4c85aaefe1cf787e7daad90",
+   "status": "never"
+  },
+  {
+   "symbol": "ACMRc",
+   "ticker": "ACMR",
+   "name": "ACM Research, Inc.",
+   "address": "0xB200000000000000000000Bd0EA991Ec5B5A8A03",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
    "status": "never"
   },
   {
@@ -2473,6 +3804,17 @@
    "status": "never"
   },
   {
+   "symbol": "IRONc",
+   "ticker": "IRON",
+   "name": "Disc Medicine, Inc.",
+   "address": "0xb200000000000000000000bfeaBea0524c94AF03",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
    "symbol": "RGTIc",
    "ticker": "RGTI",
    "name": "Rigetti Computing, Inc.",
@@ -2484,15 +3826,15 @@
    "status": "never"
   },
   {
-   "symbol": "AAPLc",
-   "ticker": "AAPL",
-   "name": "Apple Inc.",
-   "address": "0xb200000000000000000000C2e324d24d7eEcd1fb",
-   "supply": 6663.40361951,
-   "liquidityUsd": 492534,
-   "volume24hUsd": 7143112,
-   "pythFeed": "0x49f6b65cb1de6b10eaf75e7c03ca029c306d0357e91b5311b175084a5ad55688",
-   "status": "trading"
+   "symbol": "PGc",
+   "ticker": "PG",
+   "name": "The Procter & Gamble Company",
+   "address": "0xb200000000000000000000c25611C4BdA138d298",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0xad2fda41998f4e7be99a2a7b27273bd16f183d9adfc014a4f5e5d3d6cd519bf4",
+   "status": "never"
   },
   {
    "symbol": "ADIc",
@@ -2504,28 +3846,6 @@
    "volume24hUsd": 0,
    "pythFeed": "0xa388977cbd7b063e456a31267919d86395af058a7558e892dde3c6b38c6240bb",
    "status": "never"
-  },
-  {
-   "symbol": "UNHc",
-   "ticker": "UNH",
-   "name": "UnitedHealth Group Incorporated",
-   "address": "0xb200000000000000000000c367d37d07150182A2",
-   "supply": 67.00418926,
-   "liquidityUsd": 0,
-   "volume24hUsd": 0,
-   "pythFeed": "0x05380f8817eb1316c0b35ac19c3caa92c9aa9ea6be1555986c46dce97fed6afd",
-   "status": "issued"
-  },
-  {
-   "symbol": "BUDc",
-   "ticker": "BUD",
-   "name": "Anheuser-Busch InBev SA/NV",
-   "address": "0xB200000000000000000000c36ce081Dd09e86cA2",
-   "supply": 418.0,
-   "liquidityUsd": 24727,
-   "volume24hUsd": 238,
-   "pythFeed": null,
-   "status": "trading"
   },
   {
    "symbol": "SBUXc",
@@ -2550,15 +3870,15 @@
    "status": "never"
   },
   {
-   "symbol": "NVAXc",
-   "ticker": "NVAX",
-   "name": "Novavax Inc",
-   "address": "0xB200000000000000000000C597c476FCf9Aed3a8",
-   "supply": 2.26930751,
-   "liquidityUsd": 112,
-   "volume24hUsd": 4,
-   "pythFeed": null,
-   "status": "issued"
+   "symbol": "NOCc",
+   "ticker": "NOC",
+   "name": "Northrop Grumman Corporation",
+   "address": "0xb200000000000000000000C5B17C065e5378d2A5",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0x5f848f61c44e1c9b21ddac0fcac5536344e80ad21df3271c2f069f57229fab81",
+   "status": "never"
   },
   {
    "symbol": "PLUGc",
@@ -2569,6 +3889,17 @@
    "liquidityUsd": 0,
    "volume24hUsd": 0,
    "pythFeed": "0x8f2af61cd4f049bce70d454e7a23c78760c68fff9d547d6144d9ae95a76a8913",
+   "status": "never"
+  },
+  {
+   "symbol": "WGSc",
+   "ticker": "WGS",
+   "name": "GeneDx Holdings Corp.",
+   "address": "0xB200000000000000000000c6F4B26Bd2BE77F18D",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
    "status": "never"
   },
   {
@@ -2592,39 +3923,6 @@
    "volume24hUsd": 0,
    "pythFeed": null,
    "status": "never"
-  },
-  {
-   "symbol": "PDDc",
-   "ticker": "PDD",
-   "name": "PDD Holdings Inc.",
-   "address": "0xB200000000000000000000c8A7223510467D8563",
-   "supply": 450.0,
-   "liquidityUsd": 26093,
-   "volume24hUsd": 1252,
-   "pythFeed": "0xae69f62081eb15ae4f077397871a1cf29cacf75e7b1db740aed9074c1efd3fa4",
-   "status": "trading"
-  },
-  {
-   "symbol": "QUBTc",
-   "ticker": "QUBT",
-   "name": "Quantum Computing Inc.",
-   "address": "0xb200000000000000000000CA425ab42e07C35bC3",
-   "supply": 287.21009592,
-   "liquidityUsd": 66,
-   "volume24hUsd": 17,
-   "pythFeed": "0x35df6acc91ade17065f757233443edee7b5046a4cd65748641f48d1c78e031b3",
-   "status": "issued"
-  },
-  {
-   "symbol": "BILIc",
-   "ticker": "BILI",
-   "name": "Bilibili Inc.",
-   "address": "0xb200000000000000000000ca7C6D1438e7245eb6",
-   "supply": 2679.0,
-   "liquidityUsd": 24050,
-   "volume24hUsd": 363,
-   "pythFeed": "0x006d336e4cd222530a057ed307c619af1379a4dedfc4839dcbab413df956fbaa",
-   "status": "trading"
   },
   {
    "symbol": "UBERc",
@@ -2671,15 +3969,15 @@
    "status": "never"
   },
   {
-   "symbol": "AMCc",
-   "ticker": "AMC",
-   "name": "AMC Entertainment Holdings, Inc.",
-   "address": "0xB200000000000000000000CD7e6b8042cb7c2BB5",
-   "supply": 9299.84104696,
+   "symbol": "UALc",
+   "ticker": "UAL",
+   "name": "United Airlines Holdings, Inc.",
+   "address": "0xb200000000000000000000Cdbf3E786FF34DBE51",
+   "supply": 0.0,
    "liquidityUsd": 0,
    "volume24hUsd": 0,
-   "pythFeed": "0x5b1703d7eb9dc8662a61556a2ca2f9861747c3fc803e01ba5a8ce35cb50a13a1",
-   "status": "issued"
+   "pythFeed": "0xcba6d204bc8c77c733d1f1acc5288d00dc4361046fe4559f2f6fb750321b0afa",
+   "status": "never"
   },
   {
    "symbol": "Fc",
@@ -2693,15 +3991,15 @@
    "status": "never"
   },
   {
-   "symbol": "AAOIc",
-   "ticker": "AAOI",
-   "name": "Applied Optoelectronics Inc",
-   "address": "0xb200000000000000000000cf36D05963A3E2205c",
-   "supply": 2468.55546741,
-   "liquidityUsd": 105386,
-   "volume24hUsd": 3296,
-   "pythFeed": "0xff68be691d07c6513247fd4e93a6d52b31e0ef7e4899acc43e59cb5c95b3fa76",
-   "status": "trading"
+   "symbol": "TOSTc",
+   "ticker": "TOST",
+   "name": "Toast, Inc.",
+   "address": "0xB200000000000000000000cF2593D5FFC13Bd817",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0xd41eeeb414e39be931a2a49df678f11b6b4d5479d4e4dcb5b9b09c0b0a301480",
+   "status": "never"
   },
   {
    "symbol": "AURc",
@@ -2712,6 +4010,17 @@
    "liquidityUsd": 0,
    "volume24hUsd": 0,
    "pythFeed": "0x91d942b363c77592a40d4590a96283e9ad95c55ec40a06f57d9a840229786715",
+   "status": "never"
+  },
+  {
+   "symbol": "CRVSc",
+   "ticker": "CRVS",
+   "name": "Corvus Pharmaceuticals, Inc.",
+   "address": "0xB200000000000000000000Cf9b4854BEb312e351",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
    "status": "never"
   },
   {
@@ -2726,25 +4035,47 @@
    "status": "never"
   },
   {
-   "symbol": "BIDUc",
-   "ticker": "BIDU",
-   "name": "Baidu, Inc.",
-   "address": "0xb200000000000000000000d2b7D9aeE52F6C6BEf",
-   "supply": 457.0,
-   "liquidityUsd": 27032,
-   "volume24hUsd": 440,
-   "pythFeed": "0x9bdee8cb689424d01f6eaf7217adfcff65b51a30774a77fff8006c21c7059350",
-   "status": "trading"
-  },
-  {
-   "symbol": "MCDc",
-   "ticker": "MCD",
-   "name": "McDonald's Corporation",
-   "address": "0xb200000000000000000000d2f4cf2f7DEBB244BB",
+   "symbol": "AVAVc",
+   "ticker": "AVAV",
+   "name": "AeroVironment, Inc.",
+   "address": "0xb200000000000000000000D0d00a5e1f2D2eb61A",
    "supply": 0.0,
    "liquidityUsd": 0,
    "volume24hUsd": 0,
-   "pythFeed": "0xd3178156b7c0f6ce10d6da7d347952a672467b51708baaf1a57ffe1fb005824a",
+   "pythFeed": "0xa86055b68b5bc660f10d21532af5d5402200013f3f3596b1ce9be84632277010",
+   "status": "never"
+  },
+  {
+   "symbol": "SWKSc",
+   "ticker": "SWKS",
+   "name": "Skyworks Solutions, Inc.",
+   "address": "0xB200000000000000000000d154b5666b2d1e5A02",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0x431349b17e1ee2605695615baffd31e44290477089c02536bb2926dfa36850b8",
+   "status": "never"
+  },
+  {
+   "symbol": "HEc",
+   "ticker": "HE",
+   "name": "Hawaiian Electric Industries, Inc.",
+   "address": "0xb200000000000000000000D2a1ee1F57Be718E71",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
+   "symbol": "WTIc",
+   "ticker": "WTI",
+   "name": "W&T Offshore, Inc.",
+   "address": "0xb200000000000000000000d2f94f19Aa759f4690",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
    "status": "never"
   },
   {
@@ -2759,15 +4090,15 @@
    "status": "never"
   },
   {
-   "symbol": "LIc",
-   "ticker": "LI",
-   "name": "Li Auto Inc.",
-   "address": "0xb200000000000000000000D61eFD9F54A23ef9eB",
-   "supply": 2852.0,
-   "liquidityUsd": 26090,
-   "volume24hUsd": 96,
-   "pythFeed": "0xb10d624c07226d795e9211c9ac95baf43b4a4234ac89cd319e3c72b20de92f99",
-   "status": "trading"
+   "symbol": "ABTc",
+   "ticker": "ABT",
+   "name": "Abbott Laboratories",
+   "address": "0xb200000000000000000000D6351D2Eb7ED29bf0b",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0x4aac40f432e039ab06236eb9bd3c58347f953d8f05b29aaac295b99cc47ee429",
+   "status": "never"
   },
   {
    "symbol": "SPCEc",
@@ -2803,26 +4134,26 @@
    "status": "never"
   },
   {
-   "symbol": "AMZNc",
-   "ticker": "AMZN",
-   "name": "Amazon.com Inc.",
-   "address": "0xb200000000000000000000d9192b6B456483C2E8",
-   "supply": 8971.17071438,
-   "liquidityUsd": 1188177,
-   "volume24hUsd": 11820813,
-   "pythFeed": "0xb5d0e0fa58a1f8b81498ae670ce93c872d14434b72c364885d4fa1b257cbb07a",
-   "status": "trading"
+   "symbol": "BEAMc",
+   "ticker": "BEAM",
+   "name": "Beam Therapeutics Inc.",
+   "address": "0xB200000000000000000000dA21e7163dC02c0616",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
   },
   {
-   "symbol": "SAPc",
-   "ticker": "SAP",
-   "name": "SAP SE",
-   "address": "0xb200000000000000000000da6F64c306234127E0",
-   "supply": 148.0,
-   "liquidityUsd": 24697,
-   "volume24hUsd": 605,
-   "pythFeed": "0x0ee2e3f1c7689e1abf957009f747228a30b47678c8e5844cb033cbcf790fa20b",
-   "status": "trading"
+   "symbol": "CEGc",
+   "ticker": "CEG",
+   "name": "Constellation Energy Corporation",
+   "address": "0xb200000000000000000000Da9874B62B55e791b5",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0xa541bc5c4b69961442e45e9198c7cce151ff9c2a1003f620c6d4a9785c77a4d9",
+   "status": "never"
   },
   {
    "symbol": "LFMDc",
@@ -2847,14 +4178,14 @@
    "status": "never"
   },
   {
-   "symbol": "GTLBc",
-   "ticker": "GTLB",
-   "name": "GitLab Inc.",
-   "address": "0xb200000000000000000000df14B76C292A32982d",
+   "symbol": "SMc",
+   "ticker": "SM",
+   "name": "SM Energy Company",
+   "address": "0xb200000000000000000000DD40740E9c445E211b",
    "supply": 0.0,
    "liquidityUsd": 0,
    "volume24hUsd": 0,
-   "pythFeed": "0xf8d023d26b597738c7d97b5fa0e9141334766e76fb9e4374c1610a4b2978ab35",
+   "pythFeed": null,
    "status": "never"
   },
   {
@@ -2891,15 +4222,15 @@
    "status": "never"
   },
   {
-   "symbol": "MRNAc",
-   "ticker": "MRNA",
-   "name": "Moderna, Inc.",
-   "address": "0xB200000000000000000000e215e9B76ecBA02468",
-   "supply": 537.67167998,
-   "liquidityUsd": 106846,
-   "volume24hUsd": 107976,
-   "pythFeed": "0x4083b0b1471123cf4d3e8edee7890940cafad866f06cadae638c23e555a1f4fc",
-   "status": "trading"
+   "symbol": "PUMPc",
+   "ticker": "PUMP",
+   "name": "ProPetro Holding Corp.",
+   "address": "0xB200000000000000000000E1b0b17fD671771813",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
   },
   {
    "symbol": "ZBRAc",
@@ -2913,14 +4244,14 @@
    "status": "never"
   },
   {
-   "symbol": "BACc",
-   "ticker": "BAC",
-   "name": "Bank of America Corporation",
-   "address": "0xB200000000000000000000E3e784CDF88Df2959d",
+   "symbol": "CCc",
+   "ticker": "CC",
+   "name": "The Chemours Company",
+   "address": "0xB200000000000000000000E359b2ca361E1905C9",
    "supply": 0.0,
    "liquidityUsd": 0,
    "volume24hUsd": 0,
-   "pythFeed": "0x21debc1718a4b76ff74dadf801c261d76c46afaafb74d9645b65e00b80f5ee3e",
+   "pythFeed": null,
    "status": "never"
   },
   {
@@ -2935,14 +4266,36 @@
    "status": "never"
   },
   {
-   "symbol": "CMGc",
-   "ticker": "CMG",
-   "name": "Chipotle Mexican Grill, Inc.",
-   "address": "0xB200000000000000000000E4A60215E10D6D8c2b",
+   "symbol": "KTOSc",
+   "ticker": "KTOS",
+   "name": "Kratos Defense & Security Solutions, Inc.",
+   "address": "0xB200000000000000000000e47c019ec313AaD347",
    "supply": 0.0,
    "liquidityUsd": 0,
    "volume24hUsd": 0,
-   "pythFeed": "0xc1046358a2b78d92a2ad45b9d3c271350ab9335b478df21a390b8924cad91563",
+   "pythFeed": "0xcfb40f97941f8fdafea7ae631b75316b323297ce4ee04148f31ea7cc7974815d",
+   "status": "never"
+  },
+  {
+   "symbol": "NTAPc",
+   "ticker": "NTAP",
+   "name": "NetApp, Inc.",
+   "address": "0xb200000000000000000000e6D729A9705303bd2B",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0x5d929fdc829ffa55be5b1fd8b4d140ab555b1c71ec098c3ed5bce70d5911d753",
+   "status": "never"
+  },
+  {
+   "symbol": "RTXc",
+   "ticker": "RTX",
+   "name": "RTX Corporation",
+   "address": "0xB200000000000000000000e6Eb8A05D09d73DAD5",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0x97c483cc4172de7ac1a3cc0814f442e4747e64008723f2705d6e9fdff3ba4d3d",
    "status": "never"
   },
   {
@@ -2957,76 +4310,54 @@
    "status": "never"
   },
   {
-   "symbol": "ANETc",
-   "ticker": "ANET",
-   "name": "Arista Networks, Inc.",
-   "address": "0xB200000000000000000000E71D4E45D1421251cb",
+   "symbol": "ESc",
+   "ticker": "ES",
+   "name": "Eversource Energy",
+   "address": "0xb200000000000000000000E90b1aC2DA02106417",
    "supply": 0.0,
    "liquidityUsd": 0,
    "volume24hUsd": 0,
-   "pythFeed": "0x31cc7558642dc348a3e2894146a998031438de8ccc56b7af2171bcd5e5d83eda",
+   "pythFeed": "0xe0b9598e00ab485a49941feceb653d02e7b50f8e0074d5fab1d561add4f8c125",
    "status": "never"
   },
   {
-   "symbol": "WRDc",
-   "ticker": "WRD",
-   "name": "WeRide Inc.",
-   "address": "0xb200000000000000000000e88EFe88D8aDE3f0dA",
-   "supply": 7504.0,
-   "liquidityUsd": 25422,
-   "volume24hUsd": 90,
+   "symbol": "SPBc",
+   "ticker": "SPB",
+   "name": "Spectrum Brands Holdings, Inc.",
+   "address": "0xb200000000000000000000Ec3cD781ACaD151fDC",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
    "pythFeed": null,
-   "status": "trading"
+   "status": "never"
   },
   {
-   "symbol": "RKLBc",
-   "ticker": "RKLB",
-   "name": "Rocket Lab Corporation",
-   "address": "0xb200000000000000000000e8E50CBbb9a3861a3C",
-   "supply": 51.50208152,
-   "liquidityUsd": 27,
-   "volume24hUsd": 80,
-   "pythFeed": "0x40589e289317e4fbd997b1a267606e20a1cc7c3e4689f9e5a5992957917816c8",
-   "status": "issued"
-  },
-  {
-   "symbol": "BMNRc",
-   "ticker": "BMNR",
-   "name": "BitMine Immersion Technologies, Inc.",
-   "address": "0xB200000000000000000000eA2df44A307CaB279C",
-   "supply": 0.52705231,
+   "symbol": "COPc",
+   "ticker": "COP",
+   "name": "ConocoPhillips",
+   "address": "0xB200000000000000000000eC622942B76a2d3b21",
+   "supply": 0.0,
    "liquidityUsd": 0,
    "volume24hUsd": 0,
-   "pythFeed": "0x54e2e127c93950de5a710100fd1cd387aba1ec8920850efdb05da5fee57d2e32",
-   "status": "issued"
-  },
-  {
-   "symbol": "MRVLc",
-   "ticker": "MRVL",
-   "name": "Marvell Technology, Inc.",
-   "address": "0xB200000000000000000000eC3c4c7395Cc609813",
-   "supply": 980.31986368,
-   "liquidityUsd": 111492,
-   "volume24hUsd": 11719,
-   "pythFeed": "0x7aef4e90557add5289266340ccd1e1aa7a225f1220206b07aaf98e53101ce116",
-   "status": "trading"
-  },
-  {
-   "symbol": "LITEc",
-   "ticker": "LITE",
-   "name": "Lumentum Holdings Inc",
-   "address": "0xB200000000000000000000eDA6C2c6F11E0F838f",
-   "supply": 207.79422362,
-   "liquidityUsd": 0,
-   "volume24hUsd": 0,
-   "pythFeed": "0xfd7141d35093fb93e84d82507cc6a97775fe263bd8ecd8b7e2b940a6ae487979",
-   "status": "issued"
+   "pythFeed": "0xd54d8d4e3774ea53660e660ecd03aa9daa31eed9b7e67d1a2aed3095b3e6720d",
+   "status": "never"
   },
   {
    "symbol": "FIZZc",
    "ticker": "FIZZ",
    "name": "National Beverage Corp.",
    "address": "0xB200000000000000000000ee6fD7De967ea1A0DC",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
+   "symbol": "MTNc",
+   "ticker": "MTN",
+   "name": "Vail Resorts, Inc.",
+   "address": "0xb200000000000000000000EE80a37e1f888644b3",
    "supply": 0.0,
    "liquidityUsd": 0,
    "volume24hUsd": 0,
@@ -3045,6 +4376,28 @@
    "status": "never"
   },
   {
+   "symbol": "VERAc",
+   "ticker": "VERA",
+   "name": "Vera Therapeutics, Inc.",
+   "address": "0xB200000000000000000000Ef7F9A89256Fa06887",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
+   "symbol": "VRDNc",
+   "ticker": "VRDN",
+   "name": "Viridian Therapeutics, Inc.",
+   "address": "0xb200000000000000000000ef8D64f65302eC1FB2",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
+  },
+  {
    "symbol": "GPROc",
    "ticker": "GPRO",
    "name": "GoPro, Inc.",
@@ -3054,50 +4407,6 @@
    "volume24hUsd": 0,
    "pythFeed": "0xb1c775cfcb8140daacc57f79a63fb1b30b69a1dac14d29d03b713bb88711a928",
    "status": "never"
-  },
-  {
-   "symbol": "CRWVc",
-   "ticker": "CRWV",
-   "name": "CoreWeave, Inc.",
-   "address": "0xB200000000000000000000F111184A74720787E6",
-   "supply": 2534.52700157,
-   "liquidityUsd": 105053,
-   "volume24hUsd": 0,
-   "pythFeed": "0x2a78b78189d6d6eff30a825e4698fd14a0b1ca659bb0079bb7e80521c0e8c75d",
-   "status": "trading"
-  },
-  {
-   "symbol": "LLYc",
-   "ticker": "LLY",
-   "name": "Eli Lilly & Co",
-   "address": "0xB200000000000000000000f1a0F91e34892E4718",
-   "supply": 144.86218134,
-   "liquidityUsd": 109296,
-   "volume24hUsd": 25646,
-   "pythFeed": "0x70dcf5fd56553d0023693e4b590336a8c9bcfd0d98dd9f093b1f697820d98325",
-   "status": "trading"
-  },
-  {
-   "symbol": "CAKEc",
-   "ticker": "CAKE",
-   "name": "Cheesecake Factory Inc",
-   "address": "0xb200000000000000000000f215E4C890CFb7176B",
-   "supply": 2.12483479,
-   "liquidityUsd": 76,
-   "volume24hUsd": 2,
-   "pythFeed": null,
-   "status": "issued"
-  },
-  {
-   "symbol": "HSAIc",
-   "ticker": "HSAI",
-   "name": "Hesai Group",
-   "address": "0xb200000000000000000000f3049F4aa834b23b64",
-   "supply": 2840.0,
-   "liquidityUsd": 25325,
-   "volume24hUsd": 109,
-   "pythFeed": null,
-   "status": "trading"
   },
   {
    "symbol": "HSYc",
@@ -3133,26 +4442,26 @@
    "status": "never"
   },
   {
-   "symbol": "INFYc",
-   "ticker": "INFY",
-   "name": "Infosys Limited",
-   "address": "0xb200000000000000000000F6b0417af5F52341FC",
-   "supply": 2824.0,
-   "liquidityUsd": 25582,
-   "volume24hUsd": 3824,
-   "pythFeed": null,
-   "status": "trading"
+   "symbol": "SOc",
+   "ticker": "SO",
+   "name": "The Southern Company",
+   "address": "0xB200000000000000000000F814b4666c2d70a670",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0x650293cd51d63cac28ecb03823af05d8192dad724156af6ed4a90b1708057bf2",
+   "status": "never"
   },
   {
-   "symbol": "TTWOc",
-   "ticker": "TTWO",
-   "name": "Take-Two Interactive Software, Inc.",
-   "address": "0xB200000000000000000000f720C26062Bc3067Da",
-   "supply": 850.47571845,
-   "liquidityUsd": 90926,
-   "volume24hUsd": 52955,
-   "pythFeed": "0x782a6a261306f01ab2ad004062a2832107360eefdcf8c83223e0ff7ca7ebde8d",
-   "status": "trading"
+   "symbol": "BWc",
+   "ticker": "BW",
+   "name": "Babcock & Wilcox Enterprises, Inc.",
+   "address": "0xb200000000000000000000F9274fE22C626373F2",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": null,
+   "status": "never"
   },
   {
    "symbol": "CLSKc",
@@ -3188,17 +4497,6 @@
    "status": "never"
   },
   {
-   "symbol": "AVGOc",
-   "ticker": "AVGO",
-   "name": "Broadcom Inc.",
-   "address": "0xB200000000000000000000Fc737aeA6196aB5a4c",
-   "supply": 1070.53807558,
-   "liquidityUsd": 106094,
-   "volume24hUsd": 29235,
-   "pythFeed": "0xd0c9aef79b28308b256db7742a0a9b08aaa5009db67a52ea7fa30ed6853f243b",
-   "status": "trading"
-  },
-  {
    "symbol": "EMRc",
    "ticker": "EMR",
    "name": "Emerson Electric Co.",
@@ -3210,15 +4508,15 @@
    "status": "never"
   },
   {
-   "symbol": "MUc",
-   "ticker": "MU",
-   "name": "Micron Technology Inc.",
-   "address": "0xb200000000000000000000Fd2f87532B90095211",
-   "supply": 1258.39154755,
-   "liquidityUsd": 480786,
-   "volume24hUsd": 4675848,
-   "pythFeed": "0x152244dc24665ca7dd3f257b8f442dc449b6346f48235b7b229268cb770dda2d",
-   "status": "trading"
+   "symbol": "BAc",
+   "ticker": "BA",
+   "name": "The Boeing Company",
+   "address": "0xB200000000000000000000Fd10D35a781efB5C2F",
+   "supply": 0.0,
+   "liquidityUsd": 0,
+   "volume24hUsd": 0,
+   "pythFeed": "0x8419416ba640c8bbbcf2d464561ed7dd860db1e38e51cec9baf1e34c4be839ae",
+   "status": "never"
   },
   {
    "symbol": "JPMc",
@@ -3273,17 +4571,6 @@
    "liquidityUsd": 0,
    "volume24hUsd": 0,
    "pythFeed": "0x8cbd009149f28a8f19d01de7f31d85d48c7f2d35a9ae40c03930712d84fbd92a",
-   "status": "never"
-  },
-  {
-   "symbol": "KOc",
-   "ticker": "KO",
-   "name": "The Coca-Cola Company",
-   "address": "0xb200000000000000000000ffef181DB6dC5ed6A3",
-   "supply": 0.0,
-   "liquidityUsd": 0,
-   "volume24hUsd": 0,
-   "pythFeed": "0x9aa471dccea36b90703325225ac76189baf7e0cc286b8843de1de4f31f9caa7d",
    "status": "never"
   }
  ]
