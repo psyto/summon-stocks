@@ -9,6 +9,8 @@
  *   TICKER=next npm run e2e      # the first demo stock not yet summoned that the guard can price
  *   WAIT_SECONDS=900 npm run e2e
  *   SCHEDULED=1 npm run e2e      # the summon workflow: only in a summoning window, at most one fill in 12 h
+ *   TICKER=ZM OPEN_ONLY=1 DEADLINE=2026-11-25T15:00:00Z npm run e2e
+ *                                # open the round days ahead so people can pledge; the summoning tops it up
  */
 import { decodeEventLog, parseAbi, parseUnits, type Abi, type Hex } from "viem";
 import { STATES, b20Abi, erc20Abi, guardFeedAbi, pythAbi, roundAbi, summonFactoryAbi } from "./abi.js";
@@ -174,7 +176,7 @@ async function main() {
   }
   const target = parseUnits(process.env.TARGET ?? "300", 6);
   const wait = Number(process.env.WAIT_SECONDS ?? "120");
-  const deadline = BigInt(Math.floor(Date.now() / 1000) + 3 * 86_400);
+  const deadline = BigInt(process.env.DEADLINE ? Math.floor(Date.parse(process.env.DEADLINE) / 1000) : Math.floor(Date.now() / 1000) + 3 * 86_400);
 
   let round = await pc.readContract({ address: d.factory, abi: summonFactoryAbi, functionName: "latestRound", args: [d.stock] });
   let state = round === "0x0000000000000000000000000000000000000000" ? "none" : STATES[await pc.readContract({ address: round, abi: roundAbi, functionName: "state" })];
@@ -198,6 +200,7 @@ async function main() {
     state = "Open";
   }
   console.log("round", round, state);
+  if (process.env.OPEN_ONLY === "1") return console.log(`open only: deadline ${new Date(Number((await pc.readContract({ address: round, abi: roundAbi, functionName: "params" })).deadline) * 1000).toISOString()}`);
 
   const shares = { alice: 150n, bob: 90n, carol: 60n } as const;
   if (state === "Open") {
