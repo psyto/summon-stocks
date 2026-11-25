@@ -90,9 +90,6 @@ Docs:
 - [docs/specs/001-summon.md](docs/specs/001-summon.md): the spec (r5)
 - [docs/reviews/](docs/reviews): the reviews (Codex r1-r8 with each request, and what changed after each)
 - [docs/design.md](docs/design.md): the web design
-- [docs/plan-to-submission.md](docs/plan-to-submission.md): the plan to submission (in Japanese)
-- [docs/x-drafts.md](docs/x-drafts.md): drafts of the milestone posts on X
-- [docs/telegram-drafts.md](docs/telegram-drafts.md): questions for the Base, BaseStonk and Bankr support groups
 
 ## The full flow on Base Sepolia
 

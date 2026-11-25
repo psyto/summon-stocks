@@ -91,7 +91,7 @@ Principles:
   until there is test USDC, and the amount is checked against the balance and the room left.
 
 ## Round page, redone (2026-11-12)
-Set beside the trade page of another of our projects, the certificate round page read as a document: little changed when
+Set beside another trading app's page, the certificate round page read as a document: little changed when
 something happened, and the demo had to be told in a terminal. Now:
 - One screen at 1440×900, no scrolling: the seal sits inside a 270° dial. Open: the dial fills with
   pledges, and the amount being chosen shows as a dashed arc before anything is signed. Auction: the dial
@@ -102,20 +102,19 @@ something happened, and the demo had to be told in a terminal. Now:
   transaction simulated first so a refusal is the contract's own error.
 - Motion follows the chain: reads every 4 s while a round moves, the dial glides between reads, the big
   number counts up. The fill conditions fold below the screen.
-- Still Summon's: paper, ink and seal red, the rosette at the centre. Not the dark trading look of that other project,
-  so the two do not read as one product.
+- Still Summon's: paper, ink and seal red, the rosette at the centre. Not a dark trading-terminal look.
 - Filmed end to end on 11-12 (ET) for the demo video. One thing came out of it: after the unwind, the
   position dropped a backer's pool share once it was claimed, so it read as a loss. It now values the
   share from what the round took out of the pool, claimed or not. Times on the page follow the viewer's
   clock; the video is recorded on New York time, the market's own.
 
 ## One frame (2026-11-12, late)
-Set beside that page again, the page read as scattered: the demo moved through seven layouts, the new
+Set beside that trading app again, the page read as scattered: the demo moved through seven layouts, the new
 features sat as small pills by the title, and pages jumped. Now the tabs (Register, Rounds, My summons,
 How it works) stay at the top; the register fits one screen under a one-line intro (the pitch moved to
 How it works); follow, alerts and share are one "keep up" block at the foot of the panel or ticket, headed
 by what comes next.
-- The first screen is Now, not the register: that page opens on one name and one action, while the
+- The first screen is Now, not the register: that app opens on one name and one action, while the
   register opened on 298 faint seals in alphabetical order with GME selected at $0. Now shows the liveliest
   round in the round page's own frame, then "Which stock next?" ranked by signed intents.
 
